@@ -40,11 +40,11 @@ import org.jetbrains.annotations.Nullable;
  * 不是物品 id：{@code touhou_little_maid:item/point_item} 对应
  * {@code assets/touhou_little_maid/models/item/point_item.json}。</p>
  *
- * <h2>御币的手持模型（上游 {@code addInHandModel}）</h2>
+ * <h2>手持模型（上游 {@code addInHandModel}）</h2>
  *
- * <p>上游在 {@code InitSpecialItemRender} 里注册了 5 个「手持模型」（{@code *_in_hand.json}）：
- * 博丽御币、东风谷御币、灭火器、相机、女仆信标。本移植版先移植<b>两个御币</b>
- * （这两件物品在当前端口里已经完整可用，且 {@code *_in_hand} 的贴图齐全）。</p>
+ * <p>上游在 {@code InitSpecialItemRender} 里对 5 件物品调用了 {@code addInHandModel}：
+ * 博丽御币、东风谷御币、灭火器、相机、女仆信标。
+ * 本移植版把这 5 项全部列入 {@link #IN_HAND_ITEMS}（见那里的状态表）。</p>
  *
  * <p>它们的处理方式和「图标替换」不同：图标替换只是「换读哪个 JSON」，
  * 而手持模型需要在<b>同一个物品</b>上按视角切换两套模型，所以返回一个
@@ -63,12 +63,53 @@ public final class InitSpecialItemRender {
             new ModelResourceLocation(new ResourceLocation("minecraft", "totem_of_undying"), "inventory");
 
     /**
-     * 有 {@code *_in_hand} 手持模型的物品（上游 {@code addInHandModel} 的前两项）。
+     * 有 {@code *_in_hand} 手持模型的物品（逐项对应上游 {@code addInHandModel} 的 5 个调用）。
      *
      * <p>值是物品 id 的 path，对应的两个模型 id 分别是
      * {@code touhou_little_maid:item/<path>} 与 {@code touhou_little_maid:item/<path>_in_hand}。</p>
+     *
+     * <h2>为什么原版需要这种「单独的 in_hand 模型文件」</h2>
+     *
+     * <p>反编译 {@code ModelBakery} 的构造函数可以看到原版自己就是这么干的：</p>
+     *
+     * <pre>
+     * // 顶层模型要显式登记才会被烘焙、贴图才会进图集
+     * this.loadTopLevel(..., "blocks");
+     * this.loadTopLevel(..., "items", "inventory");
+     * // ↓ 只有这两件被硬编码进来
+     * this.loadTopLevel(new ModelResourceLocation("minecraft:trident_in_hand#inventory"));
+     * this.loadTopLevel(new ModelResourceLocation("minecraft:spyglass_in_hand#inventory"));
+     * </pre>
+     *
+     * <p>三叉戟 / 望远镜的 3D 手持模型就是这样被「额外塞进顶层模型表」的 ——
+     * 它们不属于任何物品 id 的默认模型占位，靠上面的显式调用才被烘焙，
+     * 贴图也才会在拼接阶段进入图集。本移植版用 {@link InHandModelUnbaked}
+     * 把这件事做在 Fabric 的 {@code ModelVariantProvider} 里，效果等价。</p>
+     *
+     * <h2>当前生效状态</h2>
+     *
+     * <table border="1">
+     *     <caption>五个手持模型</caption>
+     *     <tr><th>path</th><th>物品是否已注册</th><th>说明</th></tr>
+     *     <tr><td>{@code hakurei_gohei}</td><td>是</td><td>博丽御币</td></tr>
+     *     <tr><td>{@code sanae_gohei}</td><td>是</td><td>东风谷御币</td></tr>
+     *     <tr><td>{@code extinguisher}</td><td>是</td><td>灭火器</td></tr>
+     *     <tr><td>{@code camera}</td><td>否</td><td>上游 {@code ItemCamera}（拍照子系统），未移植</td></tr>
+     *     <tr><td>{@code maid_beacon}</td><td>否</td><td>上游 {@code ItemMaidBeacon}（方块 + 方块实体 + GUI），未移植</td></tr>
+     * </table>
+     *
+     * <p>表格后两件<b>物品本身还没移植</b>，所以游戏永远不会去请求
+     * {@code touhou_little_maid:camera#inventory}，这两项目前是「备好的挂点」；
+     * 一旦物品注册完成，无需再改这里就能直接生效。
+     * 模型与贴图（{@code camera_2d/camera_3d/maid_beacon}）在资源里都已齐备。</p>
      */
-    private static final String[] IN_HAND_ITEMS = {"hakurei_gohei", "sanae_gohei"};
+    private static final String[] IN_HAND_ITEMS = {
+            "hakurei_gohei",
+            "sanae_gohei",
+            "extinguisher",
+            "camera",
+            "maid_beacon"
+    };
 
     private InitSpecialItemRender() {
     }
@@ -83,7 +124,8 @@ public final class InitSpecialItemRender {
             }
             return loadInHandModel(modelId, context);
         });
-        TouhouLittleMaid.LOGGER.info("[Futo] special item render registered (xp bottle / totem / gohei in-hand)");
+        TouhouLittleMaid.LOGGER.info("[Futo] special item render registered (xp bottle / totem / {} in-hand models)",
+                IN_HAND_ITEMS.length);
     }
 
     /**
