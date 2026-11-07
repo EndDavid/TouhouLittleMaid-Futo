@@ -1,0 +1,55 @@
+# ============================================================ 构建产物
+build/
+.gradle/
+out/
+bin/
+*.class
+
+# ============================================================ 运行目录
+# run/ 里是世界存档、日志、运行期生成的配置、以及 Gradle 运行时的缓存。
+# 每次测试都会变，而且 run/saves 可能有几百 MB，不入库。
+run/
+
+# ============================================================ 临时文件
+# 我用脚本做批量改写时会在这两个位置留临时文件，不要入库
+tmp_*
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# ============================================================ 日志
+*.log
+*.log.gz
+
+# ============================================================ IDE
+# .idea/ 里的 workspace.xml / usage.statistics.xml 每次打开都会变；
+# 只保留能表达项目结构的几份共享配置（见下方 ! 例外）。
+.idea/*
+!.idea/vcs.xml
+!.idea/modules.xml
+!.idea/misc.xml
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+*.iml
+!hello\ java.iml
+
+# Eclipse / VSCode
+.classpath
+.project
+.settings/
+.vscode/
+*.code-workspace
+
+# ============================================================ 系统
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ============================================================ 注意（不属于忽略，写在这里当备忘）
+# 下面这些**必须入库**，否则 clone 下来编译不了：
+#   libs/*.jar          —— build.gradle 用 files("libs/xxx.jar") 硬引用，4 个本地依赖
+#   gradle/wrapper/     —— Gradle wrapper 本体
+#   port/               —— 上游参考源码（改代码时的对照物）
+#   src/main/resources  —— 内置模型 / 贴图 / 音效（约 48 MB）
+

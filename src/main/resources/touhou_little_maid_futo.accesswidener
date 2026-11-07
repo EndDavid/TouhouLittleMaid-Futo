@@ -1,0 +1,19 @@
+accessWidener	v2	named
+
+# 【当前未启用】此文件既没有被 fabric.mod.json 的 accessWidener 引用，
+# 也没有在 build.gradle 的 loom.accessWidenerPath 中声明。
+#
+# 原因：上游用 Forge AT 打开了下面这几个私有成员，而在 Fabric 侧
+#   - Loom 1.15 只接受 classTweaker 表头（classTweaker v1 named）
+#   - Fabric Loader 0.14.25 只接受 accessWidener 表头（accessWidener v2 named）
+# 同一份文件无法同时满足两者，实测结果是「开发期能编译、进游戏报
+# Failed to read accessWidener file」。
+#
+# 因此 Brain 系统改为运行期反射构造（见 util/MaidReflection），
+# 并把 Brain#lastScheduleUpdate 换成行为自身的字段。
+# 等工具链能同时支持两种表头时，可重新启用本文件并删掉 MaidReflection。
+#
+# accessible method net/minecraft/world/entity/ai/sensing/SensorType <init> (Ljava/util/function/Supplier;)V
+# accessible method net/minecraft/world/entity/schedule/Activity <init> (Ljava/lang/String;)V
+# accessible method net/minecraft/world/entity/ai/memory/MemoryModuleType <init> (Ljava/util/Optional;)V
+# accessible field net/minecraft/world/entity/ai/Brain lastScheduleUpdate J

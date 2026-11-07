@@ -1,0 +1,79 @@
+package com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task;
+
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;
+import com.google.common.collect.ImmutableMap;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.MemoryStatus;
+import net.minecraft.world.entity.ai.memory.NearestVisibleLivingEntities;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.item.ItemStack;
+
+/**
+ * 喂养动物（让它们进入繁殖状态），移植自上游 {@code MaidFeedAnimalTask}。
+ *
+ * <p>只会喂「已成年 + 可以求爱 + 手上有它爱吃的食物」的动物；当工作范围内的
+ * 动物数量超过上限时就不再喂，避免无限繁殖卡顿。</p>
+ *
+ * <p>与上游的差异：上游在超限时会弹一个聊天气泡（{@code ChatBubbleManger}），
+ * 气泡系统尚未移植，因此省略。</p>
+ */
+public class MaidFeedAnimalTask extends MaidCheckRateTask {
+    private static final int MAX_DELAY_TIME = 12;
+    private final float speedModifier;
+    private final int maxAnimalCount;
+    private Animal feedEntity = null;
+
+    public MaidFeedAnimalTask(float speedModifier, int maxAnimalCount) {
+        super(ImmutableMap.of(MemoryModuleType.NEAREST_VISIBLE_LIVING_ENTITIES, MemoryStatus.VALUE_PRESENT,
+                MemoryModuleType.WALK_TARGET, MemoryStatus.VALUE_ABSENT));
+        this.speedModifier = speedModifier;
+        this.maxAnimalCount = maxAnimalCount;
+        this.setMaxCheckRate(MAX_DELAY_TIME);
+    }
+
+    @Override
+    protected void start(ServerLevel worldIn, EntityMaid maid, long gameTimeIn) {
+        feedEntity = null;
+        long animalCount = this.getEntities(maid)
+                .find(e -> maid.isWithinRestriction(e.blockPosition()))
+                .filter(Entity::isAlive)
+                .filter(e -> e instanceof Animal).count();
+
+        if (animalCount < this.maxAnimalCount) {
+            this.getEntities(maid)
+                    .find(e -> maid.isWithinRestriction(e.blockPosition()))
+                    .filter(Entity::isAlive)
+                    .filter(e -> e instanceof Animal)
+                    .filter(e -> ((Animal) e).getAge() == 0)
+                    .filter(e -> ((Animal) e).canFallInLove())
+                    .filter(e -> ItemsUtil.isStackIn(maid.getAvailableInv(false), ((Animal) e)::isFood))
+                    .filter(maid::canPathReach)
+                    .findFirst()
+                    .ifPresent(e -> {
+                        feedEntity = (Animal) e;
+                        BehaviorUtils.setWalkAndLookTargetMemories(maid, e, this.speedModifier, 0);
+                    });
+
+            if (feedEntity != null && feedEntity.closerThan(maid, 2)) {
+                ItemStack food = ItemsUtil.getStack(maid.getAvailableInv(false), feedEntity::isFood);
+                if (!food.isEmpty()) {
+                    food.shrink(1);
+                    maid.swing(InteractionHand.MAIN_HAND);
+                    feedEntity.setInLove(null);
+                }
+                feedEntity = null;
+            }
+        }
+    }
+
+    private NearestVisibleLivingEntities getEntities(EntityMaid maid) {
+        return maid.getBrain().getMemory(MemoryModuleType.NEAREST_VISIBLE_LIVING_ENTITIES)
+                .orElse(NearestVisibleLivingEntities.empty());
+    }
+}
+

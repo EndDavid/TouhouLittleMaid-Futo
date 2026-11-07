@@ -1,0 +1,280 @@
+{
+    "format_version":  "1.8.0",
+    "animations":  {
+    "chair":  {
+        "loop":  "true",
+        "bones":  {
+            "LeftLeg":  {
+                "rotation":  [-65, 0, -15]
+            },
+            "RightLeg":  {
+                "rotation":  [-65, 0, 15]
+            },
+            "Skirt":  {
+                "rotation":  [-32.5, 0, 0]
+            }
+        }
+    },
+                       "sit":  {
+                                   "loop":  "true",
+                                   "animation_length":  1.0,
+                                   "bones":  {
+                                                 "Root":  {
+                                                              "position":  [
+                                                                               0,
+                                                                               -3.5,
+                                                                               0
+                                                                           ]
+                                                          },
+                                                 "UpBody":  {
+                                                                "rotation":  [
+                                                                                 10,
+                                                                                 0,
+                                                                                 0
+                                                                             ]
+                                                            },
+                                                 "LeftArm":  {
+                                                                 "rotation":  [
+                                                                                  -45.7,
+                                                                                  0,
+                                                                                  15.7
+                                                                              ]
+                                                             },
+                                                 "RightArm":  {
+                                                                  "rotation":  [
+                                                                                   -45.7,
+                                                                                   0,
+                                                                                   -15.7
+                                                                               ]
+                                                              },
+                                                 "LeftLeg":  {
+                                                                 "rotation":  [
+                                                                                  -65,
+                                                                                  0,
+                                                                                  -15
+                                                                              ]
+                                                             },
+                                                 "RightLeg":  {
+                                                                  "rotation":  [
+                                                                                   -65,
+                                                                                   0,
+                                                                                   15
+                                                                               ]
+                                                              },
+                                                 "Skirt":  {
+                                                               "rotation":  [
+                                                                                -32.5,
+                                                                                0,
+                                                                                0
+                                                                            ]
+                                                           }
+                                             }
+                               },
+                       "use_mainhand:bow":  {
+                                                "loop":  "true",
+                                                "animation_length":  1.0,
+                                                "bones":  {
+                                                              "LeftArm":  {
+                                                                              "rotation":  [
+                                                                                               -80,
+                                                                                               45,
+                                                                                               0
+                                                                                           ]
+                                                                          },
+                                                              "RightArm":  {
+                                                                               "rotation":  [
+                                                                                                -80,
+                                                                                                -10,
+                                                                                                0
+                                                                                            ]
+                                                                           }
+                                                          }
+                                            },
+                       "use_offhand:bow":  {
+                                               "loop":  "true",
+                                               "animation_length":  1.0,
+                                               "bones":  {
+                                                             "LeftArm":  {
+                                                                             "rotation":  [
+                                                                                              -80,
+                                                                                              45,
+                                                                                              0
+                                                                                          ]
+                                                                         },
+                                                             "RightArm":  {
+                                                                              "rotation":  [
+                                                                                               -80,
+                                                                                               -10,
+                                                                                               0
+                                                                                           ]
+                                                                          }
+                                                         }
+                                           },
+                       "use_mainhand:crossbow":  {
+                                                     "loop":  "true",
+                                                     "animation_length":  1.0,
+                                                     "bones":  {
+                                                                   "LeftArm":  {
+                                                                                   "rotation":  [
+                                                                                                    -80,
+                                                                                                    45,
+                                                                                                    0
+                                                                                                ]
+                                                                               },
+                                                                   "RightArm":  {
+                                                                                    "rotation":  [
+                                                                                                     -80,
+                                                                                                     -10,
+                                                                                                     0
+                                                                                                 ]
+                                                                                }
+                                                               }
+                                                 },
+                       "use_offhand:crossbow":  {
+                                                    "loop":  "true",
+                                                    "animation_length":  1.0,
+                                                    "bones":  {
+                                                                  "LeftArm":  {
+                                                                                  "rotation":  [
+                                                                                                   -80,
+                                                                                                   45,
+                                                                                                   0
+                                                                                               ]
+                                                                              },
+                                                                  "RightArm":  {
+                                                                                   "rotation":  [
+                                                                                                    -80,
+                                                                                                    -10,
+                                                                                                    0
+                                                                                                ]
+                                                                               }
+                                                              }
+                                                },
+                       "use_mainhand:gohei":  {
+                                                  "loop":  "true",
+                                                  "animation_length":  1.0,
+                                                  "bones":  {
+                                                                "LeftArm":  {
+                                                                                "rotation":  [
+                                                                                                 -80,
+                                                                                                 45,
+                                                                                                 0
+                                                                                             ]
+                                                                            },
+                                                                "RightArm":  {
+                                                                                 "rotation":  [
+                                                                                                  -80,
+                                                                                                  -10,
+                                                                                                  0
+                                                                                              ]
+                                                                             }
+                                                            }
+                                              },
+                       "use_offhand:gohei":  {
+                                                 "loop":  "true",
+                                                 "animation_length":  1.0,
+                                                 "bones":  {
+                                                               "LeftArm":  {
+                                                                               "rotation":  [
+                                                                                                -80,
+                                                                                                45,
+                                                                                                0
+                                                                                            ]
+                                                                           },
+                                                               "RightArm":  {
+                                                                                "rotation":  [
+                                                                                                 -80,
+                                                                                                 -10,
+                                                                                                 0
+                                                                                             ]
+                                                                            }
+                                                           }
+                                             },
+                       "use_mainhand:spear":  {
+                                                  "loop":  "true",
+                                                  "animation_length":  1.0,
+                                                  "bones":  {
+                                                                "LeftArm":  {
+                                                                                "rotation":  [
+                                                                                                 -80,
+                                                                                                 45,
+                                                                                                 0
+                                                                                             ]
+                                                                            },
+                                                                "RightArm":  {
+                                                                                 "rotation":  [
+                                                                                                  -80,
+                                                                                                  -10,
+                                                                                                  0
+                                                                                              ]
+                                                                             }
+                                                            }
+                                              },
+                       "use_offhand:spear":  {
+                                                 "loop":  "true",
+                                                 "animation_length":  1.0,
+                                                 "bones":  {
+                                                               "LeftArm":  {
+                                                                               "rotation":  [
+                                                                                                -80,
+                                                                                                45,
+                                                                                                0
+                                                                                            ]
+                                                                           },
+                                                               "RightArm":  {
+                                                                                "rotation":  [
+                                                                                                 -80,
+                                                                                                 -10,
+                                                                                                 0
+                                                                                             ]
+                                                                            }
+                                                           }
+                                             },
+                       "armed_pose":  {
+                                          "loop":  "true",
+                                          "animation_length":  1,
+                                          "bones":  {
+                                                        "LeftArm":  {
+                                                                        "rotation":  [
+                                                                                         -80,
+                                                                                         45,
+                                                                                         0
+                                                                                     ]
+                                                                    },
+                                                        "RightArm":  {
+                                                                         "rotation":  [
+                                                                                          -80,
+                                                                                          -10,
+                                                                                          0
+                                                                                      ]
+                                                                     }
+                                                    }
+                                      },
+                       "use_mainhand":  {
+                                            "loop":  "true",
+                                            "animation_length":  1.0,
+                                            "bones":  {
+                                                          "RightArm":  {
+                                                                           "rotation":  [
+                                                                                            -80,
+                                                                                            -20,
+                                                                                            0
+                                                                                        ]
+                                                                       }
+                                                      }
+                                        },
+                       "use_offhand":  {
+                                           "loop":  "true",
+                                           "animation_length":  1.0,
+                                           "bones":  {
+                                                         "LeftArm":  {
+                                                                         "rotation":  [
+                                                                                          -80,
+                                                                                          25,
+                                                                                          0
+                                                                                      ]
+                                                                     }
+                                                     }
+                                       }
+                    }
+}

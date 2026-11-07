@@ -1,0 +1,89 @@
+package com.github.tartaricacid.touhoulittlemaid.util;
+
+import com.mojang.serialization.Codec;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.sensing.SensorType;
+import net.minecraft.world.entity.schedule.Activity;
+
+import java.lang.reflect.Constructor;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+/**
+ * 少量 vanilla 私有构造函数的反射工厂。
+ *
+ * <p><b>为什么需要它：</b>1.18.2 里 {@link SensorType}、{@link Activity}、
+ * {@link MemoryModuleType} 的构造函数都是 {@code private}。上游是 Forge 模组，
+ * 通过 AccessTransformer 打开；本移植版原本用 AccessWidener 打开，但
+ * Loom 1.15 与 Fabric Loader 0.14.25 对表头格式的要求不一致
+ * （Loom 认 {@code classTweaker}，Loader 认 {@code accessWidener}）——
+ * 同一份文件无法同时满足两者，会导致“开发能编译、进游戏就报
+ * Failed to read accessWidener file”。</p>
+ *
+ * <p>因此这里改为运行期反射：Minecraft 与 Fabric 都加载在 unnamed module 中，
+ * {@code setAccessible(true)} 正常工作，且不依赖任何打包期工具。</p>
+ *
+ * <p>一旦工具链统一支持 ClassTweaker 与 AccessWidener 双表头，可换回 AW 并删除本类。</p>
+ */
+public final class MaidReflection {
+    private MaidReflection() {
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends net.minecraft.world.entity.ai.sensing.Sensor<?>> SensorType<T> newSensorType(Supplier<T> factory) {
+        return (SensorType<T>) construct(SensorType.class, new Class<?>[]{Supplier.class}, new Object[]{factory});
+    }
+
+    public static Activity newActivity(String name) {
+        return (Activity) construct(Activity.class, new Class<?>[]{String.class}, new Object[]{name});
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <U> MemoryModuleType<U> newMemoryModuleType(Optional<Codec<U>> codec) {
+        return (MemoryModuleType<U>) construct(MemoryModuleType.class,
+                new Class<?>[]{Optional.class}, new Object[]{codec});
+    }
+
+    /**
+     * 注册 {@code SpawnPlacements}（1.18.2 里 {@code SpawnPlacements#register} 是 <b>private</b>）。
+     *
+     * <p><b>为什么非注册不可：</b>{@code SpawnPlacements#checkSpawnRules} 在表里找不到类型时
+     * <b>直接返回 true</b>，也就是「没有谓词 = 处处可刷」。女仆妖精的稻草人驱散判定挂在
+     * 这个谓词上，不注册就等于驱散完全失效。</p>
+     *
+     * <p>顺带一提，注册 {@code Type.ON_GROUND} + {@code MOTION_BLOCKING_NO_LEAVES}
+     * 也会让 {@code NaturalSpawner#isSpawnPositionOk} 走「地面刷怪」那一支，
+     * 否则飞行生物按原版规则会被判成「刷在空中」，几乎刷不出来。</p>
+     */
+    public static <T extends net.minecraft.world.entity.Mob> void registerSpawnPlacement(
+            net.minecraft.world.entity.EntityType<T> type,
+            net.minecraft.world.entity.SpawnPlacements.Type placementType,
+            net.minecraft.world.level.levelgen.Heightmap.Types heightmapType,
+            net.minecraft.world.entity.SpawnPlacements.SpawnPredicate<T> predicate) {
+        try {
+            java.lang.reflect.Method method = net.minecraft.world.entity.SpawnPlacements.class
+                    .getDeclaredMethod("register", net.minecraft.world.entity.EntityType.class,
+                            net.minecraft.world.entity.SpawnPlacements.Type.class,
+                            net.minecraft.world.level.levelgen.Heightmap.Types.class,
+                            net.minecraft.world.entity.SpawnPlacements.SpawnPredicate.class);
+            method.setAccessible(true);
+            method.invoke(null, type, placementType, heightmapType, predicate);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to register spawn placement for "
+                    + net.minecraft.core.Registry.ENTITY_TYPE.getKey(type)
+                    + " (unsupported Minecraft version?)", e);
+        }
+    }
+
+    private static Object construct(Class<?> type, Class<?>[] parameterTypes, Object[] args) {
+        try {
+            Constructor<?> constructor = type.getDeclaredConstructor(parameterTypes);
+            constructor.setAccessible(true);
+            return constructor.newInstance(args);
+        } catch (ReflectiveOperationException e) {
+            // 这里失败意味着 Minecraft 版本与预期不符，直接抛出以便第一时间发现
+            throw new IllegalStateException("Failed to create " + type.getSimpleName()
+                    + " via reflection (unsupported Minecraft version?)", e);
+        }
+    }
+}

@@ -1,0 +1,58 @@
+package com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.sensor;
+
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
+import com.google.common.collect.ImmutableSet;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.sensing.Sensor;
+import net.minecraft.world.phys.AABB;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 搜索掉落物等「可拾取实体」，移植自上游 {@code MaidPickupEntitiesSensor}。
+ *
+ * <p>每 30 tick 才跑一次（与上游一致），结果写进自定义记忆
+ * {@link InitEntities#VISIBLE_PICKUP_ENTITIES}。</p>
+ */
+public class MaidPickupEntitiesSensor extends Sensor<EntityMaid> {
+    private static final int VERTICAL_SEARCH_RANGE = 4;
+
+    public MaidPickupEntitiesSensor() {
+        super(30);
+    }
+
+    @Override
+    public Set<MemoryModuleType<?>> requires() {
+        return ImmutableSet.of(InitEntities.VISIBLE_PICKUP_ENTITIES);
+    }
+
+    @Override
+    protected void doTick(ServerLevel worldIn, EntityMaid maid) {
+        if (!maid.isTame()) {
+            return;
+        }
+        float radius = maid.getRestrictRadius();
+        AABB aabb;
+        if (maid.hasRestriction()) {
+            aabb = new AABB(maid.getRestrictCenter()).inflate(radius, VERTICAL_SEARCH_RANGE, radius);
+        } else {
+            aabb = maid.getBoundingBox().inflate(radius, VERTICAL_SEARCH_RANGE, radius);
+        }
+        List<Entity> allEntities = worldIn.getEntitiesOfClass(Entity.class, aabb, Entity::isAlive);
+        allEntities.sort(Comparator.comparingDouble(maid::distanceToSqr));
+        List<Entity> optional = allEntities.stream()
+                .filter(e -> maid.canPickup(e, true))
+                .filter(e -> e.closerThan(maid, radius + 1))
+                .filter(e -> maid.isWithinRestriction(e.blockPosition()))
+                .filter(maid::hasLineOfSight)
+                .collect(Collectors.toList());
+        maid.getBrain().setMemory(InitEntities.VISIBLE_PICKUP_ENTITIES, optional);
+    }
+}
+

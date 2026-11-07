@@ -1,0 +1,20 @@
+# 关闭一切自动的行尾转换与编码「修正」。
+#
+# 原因：这个仓库里的 .java 文件是 CRLF + UTF-8（无 BOM），而且我用脚本做批量改写时
+# 是按字节读写的。git 默认的 autocrlf 会在 checkout 时把 CRLF 换成 LF，
+# 于是「工作区文件」和「库里文件」永远不一致，每次 git status 都显示满屏改动，
+# diff 也会变成整文件重写 —— 恰恰毁掉了「用 git 回滚」的价值。
+#
+# `* -text` 让 git 把每个文件当二进制逐字节处理，永不转换。
+* -text
+
+# 显式标记真正需要 diff 的文本类型（仍然不做行尾转换，只是让 diff 能正常显示）
+*.java   diff
+*.gradle diff
+*.json   diff
+*.md     diff
+*.properties diff
+*.toml   diff
+*.ps1    diff
+*.py     diff
+

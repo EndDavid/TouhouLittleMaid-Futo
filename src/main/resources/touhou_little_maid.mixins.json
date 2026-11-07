@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.github.tartaricacid.touhoulittlemaid.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "LivingEntityKillCreditMixin",
+    "PlayerPowerMixin",
+    "ServerPlayerPowerMixin",
+    "NaturalSpawnerMixin",
+    "EntityPositionRiderMixin"
+  ],
+  "client": [
+    "client.HumanoidModelMixin",
+    "client.ItemInHandRendererMixin",
+    "client.ItemInHandLayerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

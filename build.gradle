@@ -1,0 +1,120 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	flatDir {
+		dir 'libs'
+	}
+	maven {
+		name = "Modrinth"
+		url = "https://api.modrinth.com/maven"
+		content {
+			includeGroup "maven.modrinth"
+		}
+	}
+	maven {
+		name = "shedaniel"
+		url = "https://maven.shedaniel.me/"
+	}
+	maven {
+		name = "Fuzs Mod Resources"
+		url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/"
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	// Forge 1.18.2 源码使用 official(mojmap) + parchment，这里保持 official 命名，
+	// 使上游源码几乎可以原样编译，AccessTransformer 也只需换成等价 AccessWidener。
+	mappings loom.officialMojangMappings()
+
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// 编译期注解（Forge 侧由 Forge 提供）
+	compileOnly "com.google.code.findbugs:jsr305:3.0.2"
+
+	// Forge Config API Port：上游 TLMO 1.20.1 也用它，因此这里直接复用它提供的
+	// net.minecraftforge.common.ForgeConfigSpec，配置代码可以按上游原样搬运，不必自造轮子。
+	//
+	// 用 libs/ 下的本地 jar：离线构建可用，版本也钉死不会漂移。
+	// 注意：Loom 的 include（JiJ 打包）只接受模块坐标，不接受本地文件，
+	// 因此这两个库需要在运行时另外安装（与上游 TLMO 的做法一致，
+	// fabric.mod.json 里已用 depends 声明）。
+	modImplementation files("libs/ForgeConfigAPIPort-v3.2.4-1.18.2-Fabric.jar")
+	// Cloth Config：ForgeConfigAPIPort 的配置界面依赖它（仅客户端需要）
+	modImplementation files("libs/cloth-config-6.5.133-fabric.jar")
+	// night-config：ForgeConfigAPIPort 的配置读写依赖它。
+	//
+	// 原版 ForgeConfigAPIPort 是把这两个 jar 作为 JiJ（jar-in-jar）内嵌的，
+	// 但 Loom 只对「正规模块坐标依赖」展开嵌套 jar，对 files() 本地文件不展开 ——
+	// 于是开发环境启动时会报「requires any version of
+	// com_electronwill_night-config_core, which is missing」。
+	//
+	// 解决办法：把它们从 ForgeConfigAPIPort 的 META-INF/jars 里解出来，
+	// 单独作为模组依赖加入（这两个 jar 自带 fabric.mod.json，mod id 正是
+	// com_electronwill_night-config_core / _toml，因此加载器能直接认到）。
+	// 必须是 modImplementation（而非 compileOnly）：既要在编译期解析
+	// ModLoadingContext#registerConfig 的签名，也要在运行期出现在 classpath 上。
+	modImplementation files("libs/core-3.6.5.jar")
+	modImplementation files("libs/toml-3.6.5.jar")
+
+	// 说明：基岩版模型解析库（simplebedrockmodel）将在渲染里程碑中作为独立 Fabric 库接入，
+	// 目前尚未使用，因此暂不加入依赖，避免启动期出现缺失 jar 的警告。
+}
+
+processResources {
+	inputs.property "version", project.version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": inputs.properties.version
+	}
+}
+
+// 固定开发客户端的玩家名。
+//
+// Loom 默认每次启动都会随机生成一个玩家名（日志里的 "Setting user: Player857"），
+// 而离线模式下的 UUID 是 MD5("OfflinePlayer:" + name) —— 名字一变 UUID 就变，
+// 于是「上一轮训好的女仆」在新的一轮里 owner 对不上，表现为【女仆完全无法交互】。
+// 固定名字后 UUID 稳定，跨次启动的存档数据才有意义。
+loom {
+	runs {
+		client {
+			programArgs "--username", "Dev"
+		}
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 17
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	// 编译与运行游戏都用 JDK 17（Gradle 守护进程本身需要 21，由 JAVA_HOME 提供）。
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+}
+
+jar {
+	inputs.property "archivesName", project.base.archivesName
+}
+
+// 说明：这里故意不声明 loom.accessWidenerPath。
+// 上游用 Forge AT 打开了 SensorType/Activity/MemoryModuleType 的私有构造函数与
+// Brain#lastScheduleUpdate，本移植版改为「反射 + 行为自带时间戳」实现（见 MaidReflection），
+// 因为 Loom 1.15 要求 classTweaker 表头、而 Fabric Loader 0.14.25 只认 accessWidener 表头，
+// 同一份文件无法同时满足两者。

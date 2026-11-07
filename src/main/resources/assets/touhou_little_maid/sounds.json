@@ -1,0 +1,695 @@
+{
+    "maid.mode.idle":  {
+                           "category":  "neutral",
+                           "subtitle":  "subtitle.touhou_little_maid.maid.mode.idle",
+                           "sounds":  [
+                                          "touhou_little_maid:maid/mode/idle1",
+                                          "touhou_little_maid:maid/mode/idle2",
+                                          "touhou_little_maid:maid/mode/idle3",
+                                          "touhou_little_maid:maid/mode/idle4",
+                                          "touhou_little_maid:maid/mode/idle5",
+                                          "touhou_little_maid:maid/mode/idle6",
+                                          "touhou_little_maid:maid/mode/idle7",
+                                          "touhou_little_maid:maid/mode/idle8",
+                                          "touhou_little_maid:maid/mode/idle9",
+                                          "touhou_little_maid:maid/mode/idle10",
+                                          "touhou_little_maid:maid/mode/idle11",
+                                          "touhou_little_maid:maid/mode/idle12",
+                                          "touhou_little_maid:maid/mode/idle13",
+                                          "touhou_little_maid:maid/mode/idle14",
+                                          "touhou_little_maid:maid/mode/idle15",
+                                          "touhou_little_maid:maid/mode/idle16",
+                                          "touhou_little_maid:maid/mode/idle17",
+                                          "touhou_little_maid:maid/mode/idle18",
+                                          "touhou_little_maid:maid/mode/idle19",
+                                          "touhou_little_maid:maid/mode/idle20",
+                                          "touhou_little_maid:maid/mode/idle21",
+                                          "touhou_little_maid:maid/mode/idle22",
+                                          "touhou_little_maid:maid/mode/idle23",
+                                          "touhou_little_maid:maid/mode/idle24",
+                                          "touhou_little_maid:maid/mode/idle25",
+                                          "touhou_little_maid:maid/mode/idle26",
+                                          "touhou_little_maid:maid/mode/idle27",
+                                          "touhou_little_maid:maid/mode/idle28",
+                                          "touhou_little_maid:maid/mode/idle29",
+                                          "touhou_little_maid:maid/mode/idle30",
+                                          "touhou_little_maid:maid/mode/idle31",
+                                          "touhou_little_maid:maid/mode/idle32",
+                                          "touhou_little_maid:maid/mode/idle33",
+                                          "touhou_little_maid:maid/mode/idle34",
+                                          "touhou_little_maid:maid/mode/idle35",
+                                          "touhou_little_maid:maid/mode/idle36",
+                                          "touhou_little_maid:maid/mode/idle37",
+                                          "touhou_little_maid:maid/mode/idle38",
+                                          "touhou_little_maid:maid/mode/idle39",
+                                          "touhou_little_maid:maid/mode/idle40",
+                                          "touhou_little_maid:maid/mode/idle41",
+                                          "touhou_little_maid:maid/mode/idle42",
+                                          "touhou_little_maid:maid/mode/idle43",
+                                          "touhou_little_maid:maid/mode/idle44",
+                                          "touhou_little_maid:maid/mode/idle45",
+                                          "touhou_little_maid:maid/mode/idle46",
+                                          "touhou_little_maid:maid/mode/idle47",
+                                          "touhou_little_maid:maid/mode/idle48",
+                                          "touhou_little_maid:maid/mode/idle49",
+                                          "touhou_little_maid:maid/mode/idle50",
+                                          "touhou_little_maid:maid/mode/idle51",
+                                          "touhou_little_maid:maid/mode/idle52",
+                                          "touhou_little_maid:maid/mode/idle53",
+                                          "touhou_little_maid:maid/mode/idle54",
+                                          "touhou_little_maid:maid/mode/idle55",
+                                          "touhou_little_maid:maid/mode/idle56",
+                                          "touhou_little_maid:maid/mode/idle57",
+                                          "touhou_little_maid:maid/mode/idle58",
+                                          "touhou_little_maid:maid/mode/idle59",
+                                          "touhou_little_maid:maid/mode/idle60",
+                                          "touhou_little_maid:maid/mode/idle61",
+                                          "touhou_little_maid:maid/mode/idle62",
+                                          "touhou_little_maid:maid/mode/idle63",
+                                          "touhou_little_maid:maid/mode/idle64",
+                                          "touhou_little_maid:maid/mode/idle65",
+                                          "touhou_little_maid:maid/mode/idle66",
+                                          "touhou_little_maid:maid/mode/idle67",
+                                          "touhou_little_maid:maid/mode/idle68",
+                                          "touhou_little_maid:maid/mode/idle69",
+                                          "touhou_little_maid:maid/mode/idle70",
+                                          "touhou_little_maid:maid/mode/idle71",
+                                          "touhou_little_maid:maid/mode/idle72",
+                                          "touhou_little_maid:maid/mode/idle73",
+                                          "touhou_little_maid:maid/mode/idle74",
+                                          "touhou_little_maid:maid/mode/idle75",
+                                          "touhou_little_maid:maid/mode/idle76",
+                                          "touhou_little_maid:maid/mode/idle77",
+                                          "touhou_little_maid:maid/mode/idle78"
+                                      ]
+                       },
+    "maid.mode.attack":  {
+                             "category":  "neutral",
+                             "subtitle":  "subtitle.touhou_little_maid.maid.mode.attack",
+                             "sounds":  [
+                                            "touhou_little_maid:maid/mode/attack1",
+                                            "touhou_little_maid:maid/mode/attack2",
+                                            "touhou_little_maid:maid/mode/attack3",
+                                            "touhou_little_maid:maid/mode/attack4",
+                                            "touhou_little_maid:maid/mode/attack5",
+                                            "touhou_little_maid:maid/mode/attack6",
+                                            "touhou_little_maid:maid/mode/attack7",
+                                            "touhou_little_maid:maid/mode/attack8",
+                                            "touhou_little_maid:maid/mode/attack9",
+                                            "touhou_little_maid:maid/mode/attack10",
+                                            "touhou_little_maid:maid/mode/attack11",
+                                            "touhou_little_maid:maid/mode/attack12",
+                                            "touhou_little_maid:maid/mode/attack13",
+                                            "touhou_little_maid:maid/mode/attack14"
+                                        ]
+                         },
+    "maid.mode.range_attack":  {
+                                   "category":  "neutral",
+                                   "subtitle":  "subtitle.touhou_little_maid.maid.mode.range_attack",
+                                   "sounds":  [
+                                                  "touhou_little_maid:maid/mode/range_attack1",
+                                                  "touhou_little_maid:maid/mode/range_attack2",
+                                                  "touhou_little_maid:maid/mode/range_attack3",
+                                                  "touhou_little_maid:maid/mode/range_attack4",
+                                                  "touhou_little_maid:maid/mode/range_attack5",
+                                                  "touhou_little_maid:maid/mode/range_attack6",
+                                                  "touhou_little_maid:maid/mode/range_attack7",
+                                                  "touhou_little_maid:maid/mode/range_attack8",
+                                                  "touhou_little_maid:maid/mode/range_attack9",
+                                                  "touhou_little_maid:maid/mode/range_attack10",
+                                                  "touhou_little_maid:maid/mode/range_attack11",
+                                                  "touhou_little_maid:maid/mode/range_attack12",
+                                                  "touhou_little_maid:maid/mode/range_attack13",
+                                                  "touhou_little_maid:maid/mode/range_attack14",
+                                                  "touhou_little_maid:maid/mode/range_attack15",
+                                                  "touhou_little_maid:maid/mode/range_attack16",
+                                                  "touhou_little_maid:maid/mode/range_attack17",
+                                                  "touhou_little_maid:maid/mode/range_attack18",
+                                                  "touhou_little_maid:maid/mode/range_attack19",
+                                                  "touhou_little_maid:maid/mode/range_attack20",
+                                                  "touhou_little_maid:maid/mode/range_attack21",
+                                                  "touhou_little_maid:maid/mode/range_attack22",
+                                                  "touhou_little_maid:maid/mode/range_attack23",
+                                                  "touhou_little_maid:maid/mode/range_attack24",
+                                                  "touhou_little_maid:maid/mode/range_attack25",
+                                                  "touhou_little_maid:maid/mode/range_attack26",
+                                                  "touhou_little_maid:maid/mode/range_attack27",
+                                                  "touhou_little_maid:maid/mode/range_attack28",
+                                                  "touhou_little_maid:maid/mode/range_attack29"
+                                              ]
+                               },
+    "maid.mode.danmaku_attack":  {
+                                     "category":  "neutral",
+                                     "subtitle":  "subtitle.touhou_little_maid.maid.mode.danmaku_attack",
+                                     "sounds":  [
+                                                    "touhou_little_maid:maid/empty"
+                                                ]
+                                 },
+    "maid.mode.farm":  {
+                           "category":  "neutral",
+                           "subtitle":  "subtitle.touhou_little_maid.maid.mode.farm",
+                           "sounds":  [
+                                          "touhou_little_maid:maid/mode/farm1",
+                                          "touhou_little_maid:maid/mode/farm2",
+                                          "touhou_little_maid:maid/mode/farm3",
+                                          "touhou_little_maid:maid/mode/farm4",
+                                          "touhou_little_maid:maid/mode/farm5",
+                                          "touhou_little_maid:maid/mode/farm6"
+                                      ]
+                       },
+    "maid.mode.feed":  {
+                           "category":  "neutral",
+                           "subtitle":  "subtitle.touhou_little_maid.maid.mode.feed",
+                           "sounds":  [
+                                          "touhou_little_maid:maid/mode/feed1",
+                                          "touhou_little_maid:maid/mode/feed2",
+                                          "touhou_little_maid:maid/mode/feed3",
+                                          "touhou_little_maid:maid/mode/feed4",
+                                          "touhou_little_maid:maid/mode/feed5",
+                                          "touhou_little_maid:maid/mode/feed6",
+                                          "touhou_little_maid:maid/mode/feed7",
+                                          "touhou_little_maid:maid/mode/feed8",
+                                          "touhou_little_maid:maid/mode/feed9",
+                                          "touhou_little_maid:maid/mode/feed10",
+                                          "touhou_little_maid:maid/mode/feed11",
+                                          "touhou_little_maid:maid/mode/feed12",
+                                          "touhou_little_maid:maid/mode/feed13",
+                                          "touhou_little_maid:maid/mode/feed14",
+                                          "touhou_little_maid:maid/mode/feed15"
+                                      ]
+                       },
+    "maid.mode.shears":  {
+                             "category":  "neutral",
+                             "subtitle":  "subtitle.touhou_little_maid.maid.mode.shears",
+                             "sounds":  [
+                                            "touhou_little_maid:maid/empty"
+                                        ]
+                         },
+    "maid.mode.milk":  {
+                           "category":  "neutral",
+                           "subtitle":  "subtitle.touhou_little_maid.maid.mode.milk",
+                           "sounds":  [
+                                          "touhou_little_maid:maid/empty"
+                                      ]
+                       },
+    "maid.mode.torch":  {
+                            "category":  "neutral",
+                            "subtitle":  "subtitle.touhou_little_maid.maid.mode.torch",
+                            "sounds":  [
+                                           "touhou_little_maid:maid/mode/torch1",
+                                           "touhou_little_maid:maid/mode/torch2",
+                                           "touhou_little_maid:maid/mode/torch3",
+                                           "touhou_little_maid:maid/mode/torch4",
+                                           "touhou_little_maid:maid/mode/torch5",
+                                           "touhou_little_maid:maid/mode/torch6",
+                                           "touhou_little_maid:maid/mode/torch7",
+                                           "touhou_little_maid:maid/mode/torch8",
+                                           "touhou_little_maid:maid/mode/torch9",
+                                           "touhou_little_maid:maid/mode/torch10",
+                                           "touhou_little_maid:maid/mode/torch11",
+                                           "touhou_little_maid:maid/mode/torch12",
+                                           "touhou_little_maid:maid/mode/torch13",
+                                           "touhou_little_maid:maid/mode/torch14",
+                                           "touhou_little_maid:maid/mode/torch15",
+                                           "touhou_little_maid:maid/mode/torch17",
+                                           "touhou_little_maid:maid/mode/torch18",
+                                           "touhou_little_maid:maid/mode/torch19",
+                                           "touhou_little_maid:maid/mode/torch20",
+                                           "touhou_little_maid:maid/mode/torch21",
+                                           "touhou_little_maid:maid/mode/torch22",
+                                           "touhou_little_maid:maid/mode/torch23",
+                                           "touhou_little_maid:maid/mode/torch24",
+                                           "touhou_little_maid:maid/mode/torch25",
+                                           "touhou_little_maid:maid/mode/torch26",
+                                           "touhou_little_maid:maid/mode/torch27",
+                                           "touhou_little_maid:maid/mode/torch28",
+                                           "touhou_little_maid:maid/mode/torch29"
+                                       ]
+                        },
+    "maid.mode.feed_animal":  {
+                                  "category":  "neutral",
+                                  "subtitle":  "subtitle.touhou_little_maid.maid.mode.feed_animal",
+                                  "sounds":  [
+                                                 "touhou_little_maid:maid/empty"
+                                             ]
+                              },
+    "maid.mode.extinguishing":  {
+                                    "category":  "neutral",
+                                    "subtitle":  "subtitle.touhou_little_maid.maid.mode.extinguishing",
+                                    "sounds":  [
+                                                   "touhou_little_maid:maid/empty"
+                                               ]
+                                },
+    "maid.mode.snow":  {
+                           "category":  "neutral",
+                           "subtitle":  "subtitle.touhou_little_maid.maid.mode.snow",
+                           "sounds":  [
+                                          "touhou_little_maid:maid/empty"
+                                      ]
+                       },
+    "maid.mode.break":  {
+                            "category":  "neutral",
+                            "subtitle":  "subtitle.touhou_little_maid.maid.mode.break",
+                            "sounds":  [
+                                           "touhou_little_maid:maid/empty"
+                                       ]
+                        },
+    "maid.mode.furnace":  {
+                              "category":  "neutral",
+                              "subtitle":  "subtitle.touhou_little_maid.maid.mode.furnace",
+                              "sounds":  [
+                                             "touhou_little_maid:maid/mode/furnace1",
+                                             "touhou_little_maid:maid/mode/furnace2",
+                                             "touhou_little_maid:maid/mode/furnace3",
+                                             "touhou_little_maid:maid/mode/furnace4",
+                                             "touhou_little_maid:maid/mode/furnace5",
+                                             "touhou_little_maid:maid/mode/furnace6",
+                                             "touhou_little_maid:maid/mode/furnace7",
+                                             "touhou_little_maid:maid/mode/furnace8",
+                                             "touhou_little_maid:maid/mode/furnace9",
+                                             "touhou_little_maid:maid/mode/furnace10",
+                                             "touhou_little_maid:maid/mode/furnace11",
+                                             "touhou_little_maid:maid/mode/furnace12",
+                                             "touhou_little_maid:maid/mode/furnace13",
+                                             "touhou_little_maid:maid/mode/furnace14",
+                                             "touhou_little_maid:maid/mode/furnace15",
+                                             "touhou_little_maid:maid/mode/furnace16",
+                                             "touhou_little_maid:maid/mode/furnace17",
+                                             "touhou_little_maid:maid/mode/furnace18",
+                                             "touhou_little_maid:maid/mode/furnace19",
+                                             "touhou_little_maid:maid/mode/furnace20",
+                                             "touhou_little_maid:maid/mode/furnace21",
+                                             "touhou_little_maid:maid/mode/furnace22",
+                                             "touhou_little_maid:maid/mode/furnace23"
+                                         ]
+                          },
+    "maid.mode.brewing":  {
+                              "category":  "neutral",
+                              "subtitle":  "subtitle.touhou_little_maid.maid.mode.brewing",
+                              "sounds":  [
+                                             "touhou_little_maid:maid/empty"
+                                         ]
+                          },
+    "maid.ai.find_target":  {
+                                "category":  "neutral",
+                                "subtitle":  "subtitle.touhou_little_maid.maid.ai.find_target",
+                                "sounds":  [
+                                               "touhou_little_maid:maid/ai/find_target1",
+                                               "touhou_little_maid:maid/ai/find_target2",
+                                               "touhou_little_maid:maid/ai/find_target3",
+                                               "touhou_little_maid:maid/ai/find_target4",
+                                               "touhou_little_maid:maid/ai/find_target5",
+                                               "touhou_little_maid:maid/ai/find_target6",
+                                               "touhou_little_maid:maid/ai/find_target7",
+                                               "touhou_little_maid:maid/ai/find_target8",
+                                               "touhou_little_maid:maid/ai/find_target9",
+                                               "touhou_little_maid:maid/ai/find_target10",
+                                               "touhou_little_maid:maid/ai/find_target11",
+                                               "touhou_little_maid:maid/ai/find_target12",
+                                               "touhou_little_maid:maid/ai/find_target13",
+                                               "touhou_little_maid:maid/ai/find_target14",
+                                               "touhou_little_maid:maid/ai/find_target15",
+                                               "touhou_little_maid:maid/ai/find_target16",
+                                               "touhou_little_maid:maid/ai/find_target17",
+                                               "touhou_little_maid:maid/ai/find_target18"
+                                           ]
+                            },
+    "maid.ai.hurt":  {
+                         "category":  "neutral",
+                         "subtitle":  "subtitle.touhou_little_maid.maid.ai.hurt",
+                         "sounds":  [
+                                        "touhou_little_maid:maid/ai/hurt1",
+                                        "touhou_little_maid:maid/ai/hurt2",
+                                        "touhou_little_maid:maid/ai/hurt3",
+                                        "touhou_little_maid:maid/ai/hurt4",
+                                        "touhou_little_maid:maid/ai/hurt5",
+                                        "touhou_little_maid:maid/ai/hurt6",
+                                        "touhou_little_maid:maid/ai/hurt7",
+                                        "touhou_little_maid:maid/ai/hurt8",
+                                        "touhou_little_maid:maid/ai/hurt9",
+                                        "touhou_little_maid:maid/ai/hurt10",
+                                        "touhou_little_maid:maid/ai/hurt11",
+                                        "touhou_little_maid:maid/ai/hurt12",
+                                        "touhou_little_maid:maid/ai/hurt13"
+                                    ]
+                     },
+    "maid.ai.hurt_fire":  {
+                              "category":  "neutral",
+                              "subtitle":  "subtitle.touhou_little_maid.maid.ai.hurt_fire",
+                              "sounds":  [
+                                             "touhou_little_maid:maid/ai/hurt_fire1",
+                                             "touhou_little_maid:maid/ai/hurt_fire2",
+                                             "touhou_little_maid:maid/ai/hurt_fire3",
+                                             "touhou_little_maid:maid/ai/hurt_fire4",
+                                             "touhou_little_maid:maid/ai/hurt_fire5",
+                                             "touhou_little_maid:maid/ai/hurt_fire6",
+                                             "touhou_little_maid:maid/ai/hurt_fire7",
+                                             "touhou_little_maid:maid/ai/hurt_fire8",
+                                             "touhou_little_maid:maid/ai/hurt_fire9",
+                                             "touhou_little_maid:maid/ai/hurt_fire10",
+                                             "touhou_little_maid:maid/ai/hurt_fire11",
+                                             "touhou_little_maid:maid/ai/hurt_fire12"
+                                         ]
+                          },
+    "maid.ai.hurt_player":  {
+                                "category":  "neutral",
+                                "subtitle":  "subtitle.touhou_little_maid.maid.ai.hurt_player",
+                                "sounds":  [
+                                               "touhou_little_maid:maid/ai/hurt_player1",
+                                               "touhou_little_maid:maid/ai/hurt_player2",
+                                               "touhou_little_maid:maid/ai/hurt_player3",
+                                               "touhou_little_maid:maid/ai/hurt_player4",
+                                               "touhou_little_maid:maid/ai/hurt_player5",
+                                               "touhou_little_maid:maid/ai/hurt_player6",
+                                               "touhou_little_maid:maid/ai/hurt_player7"
+                                           ]
+                            },
+    "maid.ai.tamed":  {
+                          "category":  "neutral",
+                          "subtitle":  "subtitle.touhou_little_maid.maid.ai.tamed",
+                          "sounds":  [
+                                         "touhou_little_maid:maid/ai/tamed1",
+                                         "touhou_little_maid:maid/ai/tamed2",
+                                         "touhou_little_maid:maid/ai/tamed3",
+                                         "touhou_little_maid:maid/ai/tamed4",
+                                         "touhou_little_maid:maid/ai/tamed5",
+                                         "touhou_little_maid:maid/ai/tamed6",
+                                         "touhou_little_maid:maid/ai/tamed7",
+                                         "touhou_little_maid:maid/ai/tamed8",
+                                         "touhou_little_maid:maid/ai/tamed9",
+                                         "touhou_little_maid:maid/ai/tamed10",
+                                         "touhou_little_maid:maid/ai/tamed11",
+                                         "touhou_little_maid:maid/ai/tamed12",
+                                         "touhou_little_maid:maid/ai/tamed13",
+                                         "touhou_little_maid:maid/ai/tamed14",
+                                         "touhou_little_maid:maid/ai/tamed15"
+                                     ]
+                      },
+    "maid.ai.item_get":  {
+                             "category":  "neutral",
+                             "subtitle":  "subtitle.touhou_little_maid.maid.ai.item_get",
+                             "sounds":  [
+                                            "touhou_little_maid:maid/ai/item_get1",
+                                            "touhou_little_maid:maid/ai/item_get2",
+                                            "touhou_little_maid:maid/ai/item_get3",
+                                            "touhou_little_maid:maid/ai/item_get4",
+                                            "touhou_little_maid:maid/ai/item_get5",
+                                            "touhou_little_maid:maid/ai/item_get6",
+                                            "touhou_little_maid:maid/ai/item_get7",
+                                            "touhou_little_maid:maid/ai/item_get8",
+                                            "touhou_little_maid:maid/ai/item_get9",
+                                            "touhou_little_maid:maid/ai/item_get10",
+                                            "touhou_little_maid:maid/ai/item_get11",
+                                            "touhou_little_maid:maid/ai/item_get12",
+                                            "touhou_little_maid:maid/ai/item_get13",
+                                            "touhou_little_maid:maid/ai/item_get14",
+                                            "touhou_little_maid:maid/ai/item_get15"
+                                        ]
+                         },
+    "maid.ai.death":  {
+                          "category":  "neutral",
+                          "subtitle":  "subtitle.touhou_little_maid.maid.ai.death",
+                          "sounds":  [
+                                         "touhou_little_maid:maid/ai/death1",
+                                         "touhou_little_maid:maid/ai/death2",
+                                         "touhou_little_maid:maid/ai/death3",
+                                         "touhou_little_maid:maid/ai/death4",
+                                         "touhou_little_maid:maid/ai/death5",
+                                         "touhou_little_maid:maid/ai/death6",
+                                         "touhou_little_maid:maid/ai/death7",
+                                         "touhou_little_maid:maid/ai/death8",
+                                         "touhou_little_maid:maid/ai/death9",
+                                         "touhou_little_maid:maid/ai/death10",
+                                         "touhou_little_maid:maid/ai/death11",
+                                         "touhou_little_maid:maid/ai/death12",
+                                         "touhou_little_maid:maid/ai/death13",
+                                         "touhou_little_maid:maid/ai/death14",
+                                         "touhou_little_maid:maid/ai/death15",
+                                         "touhou_little_maid:maid/ai/death16",
+                                         "touhou_little_maid:maid/ai/death17",
+                                         "touhou_little_maid:maid/ai/death18",
+                                         "touhou_little_maid:maid/ai/death19",
+                                         "touhou_little_maid:maid/ai/death20",
+                                         "touhou_little_maid:maid/ai/death21",
+                                         "touhou_little_maid:maid/ai/death22",
+                                         "touhou_little_maid:maid/ai/death23",
+                                         "touhou_little_maid:maid/ai/death24",
+                                         "touhou_little_maid:maid/ai/death25"
+                                     ]
+                      },
+    "maid.ai.game_win":  {
+                             "category":  "neutral",
+                             "subtitle":  "subtitle.touhou_little_maid.maid.ai.game_win",
+                             "sounds":  [
+                                            "touhou_little_maid:maid/empty"
+                                        ]
+                         },
+    "maid.ai.game_lost":  {
+                              "category":  "neutral",
+                              "subtitle":  "subtitle.touhou_little_maid.maid.ai.game_lost",
+                              "sounds":  [
+                                             "touhou_little_maid:maid/empty"
+                                         ]
+                          },
+    "maid.environment.hot":  {
+                                 "category":  "neutral",
+                                 "subtitle":  "subtitle.touhou_little_maid.maid.environment.hot",
+                                 "sounds":  [
+                                                "touhou_little_maid:maid/environment/hot1",
+                                                "touhou_little_maid:maid/environment/hot2",
+                                                "touhou_little_maid:maid/environment/hot3"
+                                            ]
+                             },
+    "maid.environment.cold":  {
+                                  "category":  "neutral",
+                                  "subtitle":  "subtitle.touhou_little_maid.maid.environment.cold",
+                                  "sounds":  [
+                                                 "touhou_little_maid:maid/environment/cold1",
+                                                 "touhou_little_maid:maid/environment/cold2",
+                                                 "touhou_little_maid:maid/environment/cold3",
+                                                 "touhou_little_maid:maid/environment/cold4"
+                                             ]
+                              },
+    "maid.environment.rain":  {
+                                  "category":  "neutral",
+                                  "subtitle":  "subtitle.touhou_little_maid.maid.environment.rain",
+                                  "sounds":  [
+                                                 "touhou_little_maid:maid/environment/rain1",
+                                                 "touhou_little_maid:maid/environment/rain2",
+                                                 "touhou_little_maid:maid/environment/rain3"
+                                             ]
+                              },
+    "maid.environment.snow":  {
+                                  "category":  "neutral",
+                                  "subtitle":  "subtitle.touhou_little_maid.maid.environment.snow",
+                                  "sounds":  [
+                                                 "touhou_little_maid:maid/environment/snow1",
+                                                 "touhou_little_maid:maid/environment/snow2"
+                                             ]
+                              },
+    "maid.environment.morning":  {
+                                     "category":  "neutral",
+                                     "subtitle":  "subtitle.touhou_little_maid.maid.environment.morning",
+                                     "sounds":  [
+                                                    "touhou_little_maid:maid/environment/morning1",
+                                                    "touhou_little_maid:maid/environment/morning2",
+                                                    "touhou_little_maid:maid/environment/morning3",
+                                                    "touhou_little_maid:maid/environment/morning4",
+                                                    "touhou_little_maid:maid/environment/morning5",
+                                                    "touhou_little_maid:maid/environment/morning6",
+                                                    "touhou_little_maid:maid/environment/morning7",
+                                                    "touhou_little_maid:maid/environment/morning8",
+                                                    "touhou_little_maid:maid/environment/morning9",
+                                                    "touhou_little_maid:maid/environment/morning10",
+                                                    "touhou_little_maid:maid/environment/morning11",
+                                                    "touhou_little_maid:maid/environment/morning12",
+                                                    "touhou_little_maid:maid/environment/morning13",
+                                                    "touhou_little_maid:maid/environment/morning14",
+                                                    "touhou_little_maid:maid/environment/morning15",
+                                                    "touhou_little_maid:maid/environment/morning16",
+                                                    "touhou_little_maid:maid/environment/morning17",
+                                                    "touhou_little_maid:maid/environment/morning18",
+                                                    "touhou_little_maid:maid/environment/morning19",
+                                                    "touhou_little_maid:maid/environment/morning20",
+                                                    "touhou_little_maid:maid/environment/morning21",
+                                                    "touhou_little_maid:maid/environment/morning22",
+                                                    "touhou_little_maid:maid/environment/morning23"
+                                                ]
+                                 },
+    "maid.environment.night":  {
+                                   "category":  "neutral",
+                                   "subtitle":  "subtitle.touhou_little_maid.maid.environment.night",
+                                   "sounds":  [
+                                                  "touhou_little_maid:maid/environment/night1",
+                                                  "touhou_little_maid:maid/environment/night2",
+                                                  "touhou_little_maid:maid/environment/night3",
+                                                  "touhou_little_maid:maid/environment/night4",
+                                                  "touhou_little_maid:maid/environment/night5",
+                                                  "touhou_little_maid:maid/environment/night6",
+                                                  "touhou_little_maid:maid/environment/night7",
+                                                  "touhou_little_maid:maid/environment/night8",
+                                                  "touhou_little_maid:maid/environment/night9",
+                                                  "touhou_little_maid:maid/environment/night10",
+                                                  "touhou_little_maid:maid/environment/night11",
+                                                  "touhou_little_maid:maid/environment/night12",
+                                                  "touhou_little_maid:maid/environment/night13",
+                                                  "touhou_little_maid:maid/environment/night14",
+                                                  "touhou_little_maid:maid/environment/night15",
+                                                  "touhou_little_maid:maid/environment/night16",
+                                                  "touhou_little_maid:maid/environment/night17",
+                                                  "touhou_little_maid:maid/environment/night18"
+                                              ]
+                               },
+    "maid.credit":  {
+                        "category":  "voice",
+                        "subtitle":  "subtitle.touhou_little_maid.other.credit",
+                        "sounds":  [
+                                       "touhou_little_maid:maid/other/credit"
+                                   ]
+                    },
+    "maid.ai_chat":  {
+                         "category":  "voice",
+                         "subtitle":  "subtitle.touhou_little_maid.ai_chat",
+                         "sounds":  [
+                                        {
+                                            "name":  "touhou_little_maid:maid/empty",
+                                            "stream":  true
+                                        }
+                                    ]
+                     },
+    "item.camera_use":  {
+                            "category":  "voice",
+                            "subtitle":  "subtitle.touhou_little_maid.item.camera_use",
+                            "sounds":  [
+                                           {
+                                               "name":  "touhou_little_maid:item/camera_use",
+                                               "stream":  true
+                                           }
+                                       ]
+                        },
+    "block.altar_craft":  {
+                              "category":  "voice",
+                              "subtitle":  "subtitle.touhou_little_maid.block.altar_craft",
+                              "sounds":  [
+                                             "touhou_little_maid:block/altar_craft_1",
+                                             "touhou_little_maid:block/altar_craft_2"
+                                         ]
+                          },
+    "block.gomoku":  {
+                         "category":  "block",
+                         "subtitle":  "subtitle.touhou_little_maid.block.gomoku",
+                         "sounds":  [
+                                        "touhou_little_maid:block/piece"
+                                    ]
+                     },
+    "block.gomoku_reset":  {
+                               "category":  "block",
+                               "subtitle":  "subtitle.touhou_little_maid.block.gomoku_reset",
+                               "sounds":  [
+                                              "touhou_little_maid:block/gomoku_reset"
+                                          ]
+                           },
+    "entity.box":  {
+                       "category":  "voice",
+                       "subtitle":  "subtitle.touhou_little_maid.entity.box",
+                       "sounds":  [
+                                      "touhou_little_maid:entity/box"
+                                  ]
+                   },
+    "item.compass":  {
+                         "category":  "voice",
+                         "subtitle":  "subtitle.touhou_little_maid.item.compass",
+                         "sounds":  [
+                                        "touhou_little_maid:item/point"
+                                    ]
+                     },
+    "entity.fairy.ambient":  {
+                                 "sounds":  [
+                                                "minecraft:mob/rabbit/idle1",
+                                                "minecraft:mob/rabbit/idle2",
+                                                "minecraft:mob/rabbit/idle3",
+                                                "minecraft:mob/rabbit/idle4"
+                                            ],
+                                 "subtitle":  "touhou_little_maid.subtitles.entity.fairy.ambient"
+                             },
+    "entity.fairy.death":  {
+                               "sounds":  [
+                                              "minecraft:mob/rabbit/bunnymurder"
+                                          ],
+                               "subtitle":  "touhou_little_maid.subtitles.entity.fairy.death"
+                           },
+    "entity.fairy.hurt":  {
+                              "sounds":  [
+                                             "minecraft:mob/rabbit/hurt1",
+                                             "minecraft:mob/rabbit/hurt2",
+                                             "minecraft:mob/rabbit/hurt3",
+                                             "minecraft:mob/rabbit/hurt4"
+                                         ],
+                              "subtitle":  "touhou_little_maid.subtitles.entity.fairy.hurt"
+                          },
+    "maid_voice.tamed":  {
+                             "sounds":  [
+                                            "touhou_little_maid:maid/ai/tamed1",
+                                            "touhou_little_maid:maid/ai/tamed2",
+                                            "touhou_little_maid:maid/ai/tamed3",
+                                            "touhou_little_maid:maid/ai/tamed4",
+                                            "touhou_little_maid:maid/ai/tamed5",
+                                            "touhou_little_maid:maid/ai/tamed6",
+                                            "touhou_little_maid:maid/ai/tamed7",
+                                            "touhou_little_maid:maid/ai/tamed8",
+                                            "touhou_little_maid:maid/ai/tamed9",
+                                            "touhou_little_maid:maid/ai/tamed10",
+                                            "touhou_little_maid:maid/ai/tamed11",
+                                            "touhou_little_maid:maid/ai/tamed12",
+                                            "touhou_little_maid:maid/ai/tamed13",
+                                            "touhou_little_maid:maid/ai/tamed14",
+                                            "touhou_little_maid:maid/ai/tamed15"
+                                        ]
+                         },
+    "maid_voice.hurt":  {
+                            "sounds":  [
+                                           "touhou_little_maid:maid/ai/hurt1",
+                                           "touhou_little_maid:maid/ai/hurt2",
+                                           "touhou_little_maid:maid/ai/hurt3",
+                                           "touhou_little_maid:maid/ai/hurt4",
+                                           "touhou_little_maid:maid/ai/hurt5",
+                                           "touhou_little_maid:maid/ai/hurt6",
+                                           "touhou_little_maid:maid/ai/hurt7",
+                                           "touhou_little_maid:maid/ai/hurt8",
+                                           "touhou_little_maid:maid/ai/hurt9",
+                                           "touhou_little_maid:maid/ai/hurt10",
+                                           "touhou_little_maid:maid/ai/hurt11",
+                                           "touhou_little_maid:maid/ai/hurt12",
+                                           "touhou_little_maid:maid/ai/hurt13"
+                                       ]
+                        },
+    "maid_voice.death":  {
+                             "sounds":  [
+                                            "touhou_little_maid:maid/ai/death1",
+                                            "touhou_little_maid:maid/ai/death2",
+                                            "touhou_little_maid:maid/ai/death3",
+                                            "touhou_little_maid:maid/ai/death4",
+                                            "touhou_little_maid:maid/ai/death5",
+                                            "touhou_little_maid:maid/ai/death6",
+                                            "touhou_little_maid:maid/ai/death7",
+                                            "touhou_little_maid:maid/ai/death8",
+                                            "touhou_little_maid:maid/ai/death9",
+                                            "touhou_little_maid:maid/ai/death10",
+                                            "touhou_little_maid:maid/ai/death11",
+                                            "touhou_little_maid:maid/ai/death12",
+                                            "touhou_little_maid:maid/ai/death13",
+                                            "touhou_little_maid:maid/ai/death14",
+                                            "touhou_little_maid:maid/ai/death15",
+                                            "touhou_little_maid:maid/ai/death16",
+                                            "touhou_little_maid:maid/ai/death17",
+                                            "touhou_little_maid:maid/ai/death18",
+                                            "touhou_little_maid:maid/ai/death19",
+                                            "touhou_little_maid:maid/ai/death20",
+                                            "touhou_little_maid:maid/ai/death21",
+                                            "touhou_little_maid:maid/ai/death22",
+                                            "touhou_little_maid:maid/ai/death23",
+                                            "touhou_little_maid:maid/ai/death24",
+                                            "touhou_little_maid:maid/ai/death25"
+                                        ]
+                         }
+}
