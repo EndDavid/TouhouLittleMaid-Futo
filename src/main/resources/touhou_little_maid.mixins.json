@@ -13,7 +13,8 @@
   "client": [
     "client.HumanoidModelMixin",
     "client.ItemInHandRendererMixin",
-    "client.ItemInHandLayerMixin"
+    "client.ItemInHandLayerMixin",
+    "client.ItemRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
