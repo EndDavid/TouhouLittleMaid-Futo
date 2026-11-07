@@ -7,8 +7,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.world.InteractionResult;
@@ -111,29 +109,16 @@ public class ItemPhoto extends AbstractStoreMaidItem {
     /**
      * 提示文本。
      *
-     * <p>与上游的差异：上游这里只负责「没有数据」那一行，女仆的名字与三维预览
-     * 由 {@code ClientMaidTooltip} 在提示框里绘制（高度 70 的那个）。本移植版没有
-     * 那个提示框组件（见 {@link AbstractStoreMaidItem} 的类注释），
-     * 所以把<b>自定义名</b>降级成一行普通文本，至少能分辨这张照片是谁。</p>
-     *
-     * <p>上游在没有自定义名时会显示「模型名」（{@code ParseI18n} 把
-     * {@code {model.ns.path.name}} 转成可翻译组件）。那个工具类尚未移植，
-     * 而模型名本身就是一串未解析的 lang key，直接显示没有意义，故略过。</p>
+     * <p>与上游一致：这里<b>只</b>负责「没有数据」那一行。
+     * 女仆名字与三维预览由 {@code ClientMaidTooltip} 在提示框里绘制（高度 70 的那一块），
+     * 数据来自 {@link AbstractStoreMaidItem#getTooltipImage}。
+     * 在这里再贴一次名字会与它重复。</p>
      */
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         if (!hasMaidData(stack)) {
             tooltip.add(new TranslatableComponent(
                     "tooltips.touhou_little_maid.photo.no_data.desc").withStyle(ChatFormatting.DARK_RED));
-            return;
-        }
-        CompoundTag maidData = getMaidData(stack);
-        if (maidData.contains(CUSTOM_NAME, Tag.TAG_STRING)) {
-            Component name = Component.Serializer.fromJson(maidData.getString(CUSTOM_NAME));
-            if (name != null) {
-                tooltip.add(name.copy().withStyle(ChatFormatting.GRAY));
-            }
         }
     }
 }
-
