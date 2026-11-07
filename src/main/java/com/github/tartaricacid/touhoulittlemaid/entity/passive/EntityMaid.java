@@ -1132,6 +1132,35 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
+     * 冒出 20 个白色烟雾粒子（上游 {@code EntityMaid#spawnExplosionParticle}）。
+     *
+     * <p>相机把女仆收进照片、照片再把女仆放出来时都会调它 ——
+     * 这是「收纳 / 放出」唯一的视觉反馈，少了它女仆会像凭空消失。</p>
+     *
+     * <p><b>只在客户端执行</b>（上游同款）：粒子本身是纯表现，
+     * 服务端调 {@code Level#addParticle} 什么也不会发生，白白跑一遍循环。
+     * 由于相机与照片的逻辑在两端都会走到这一句，客户端能立刻看到效果，
+     * 不必等实体同步包。</p>
+     *
+     * <p>速度给 {@code ±0.01} 的极小值而不是 0：完全静止的粒子在部分光影下
+     * 会因为三角面朝向不变而看起来像一团固定的白块。</p>
+     */
+    public void spawnExplosionParticle() {
+        if (this.level.isClientSide) {
+            for (int i = 0; i < 20; ++i) {
+                float mx = (this.random.nextFloat() - 0.5F) * 0.02F;
+                float my = (this.random.nextFloat() - 0.5F) * 0.02F;
+                float mz = (this.random.nextFloat() - 0.5F) * 0.02F;
+                this.level.addParticle(ParticleTypes.CLOUD,
+                        this.getX() + this.random.nextFloat() - 0.5F,
+                        this.getY() + this.random.nextFloat() - 0.5F,
+                        this.getZ() + this.random.nextFloat() - 0.5F,
+                        mx, my, mz);
+            }
+        }
+    }
+
+    /**
      * 把「原本手上拿的东西」暂存进隐藏栏（上游 {@code EntityMaid#memoryHandItemStack}）。
      *
      * <p>若隐藏栏里已经有东西（上一轮换手还没还回去），先把它掉到地上再存新的 ——

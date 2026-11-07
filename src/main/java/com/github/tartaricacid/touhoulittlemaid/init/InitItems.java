@@ -59,6 +59,22 @@ public final class InitItems {
             TouhouLittleMaid.rl("sanae_gohei"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemHakureiGohei());
 
+    /**
+     * 文文的相机（上游 {@code InitItems.CAMERA}）。
+     *
+     * <p>对着自己的女仆右键即可把她收进一张照片，用于跨维度 / 远距离搬运。</p>
+     */
+    public static final Item CAMERA = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("camera"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemCamera());
+
+    /**
+     * 照片（上游 {@code InitItems.PHOTO}）：相机拍出来的结果，右击方块放出女仆。
+     */
+    public static final Item PHOTO = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("photo"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemPhoto());
+
     // ------------------------------------------------------------------ P 点
 
     /**

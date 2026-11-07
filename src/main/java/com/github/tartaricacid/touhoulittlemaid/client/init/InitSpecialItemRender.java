@@ -94,14 +94,16 @@ public final class InitSpecialItemRender {
      *     <tr><td>{@code hakurei_gohei}</td><td>是</td><td>博丽御币</td></tr>
      *     <tr><td>{@code sanae_gohei}</td><td>是</td><td>东风谷御币</td></tr>
      *     <tr><td>{@code extinguisher}</td><td>是</td><td>灭火器</td></tr>
-     *     <tr><td>{@code camera}</td><td>否</td><td>上游 {@code ItemCamera}（拍照子系统），未移植</td></tr>
+     *     <tr><td>{@code camera}</td><td>是</td><td>文文的相机（拍照 → 照片）</td></tr>
      *     <tr><td>{@code maid_beacon}</td><td>否</td><td>上游 {@code ItemMaidBeacon}（方块 + 方块实体 + GUI），未移植</td></tr>
      * </table>
      *
-     * <p>表格后两件<b>物品本身还没移植</b>，所以游戏永远不会去请求
-     * {@code touhou_little_maid:camera#inventory}，这两项目前是「备好的挂点」；
-     * 一旦物品注册完成，无需再改这里就能直接生效。
-     * 模型与贴图（{@code camera_2d/camera_3d/maid_beacon}）在资源里都已齐备。</p>
+     * <p>前四项均已生效。最后一项 {@code maid_beacon} 的物品本身还没移植，
+     * 所以游戏永远不会去请求 {@code touhou_little_maid:maid_beacon#inventory}，
+     * 这一项目前是「备好的挂点」 —— 一旦物品注册完成，
+     * 无需再改这里就能直接生效。
+     * 模型与贴图（{@code block/maid_beacon} 与 {@code maid_beacon_in_hand} 引用的同一张）
+     * 在资源里都已齐备。</p>
      */
     private static final String[] IN_HAND_ITEMS = {
             "hakurei_gohei",

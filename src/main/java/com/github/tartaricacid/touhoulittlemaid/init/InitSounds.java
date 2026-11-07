@@ -51,6 +51,17 @@ public final class InitSounds {
     public static final SoundEvent MAID_COLD = register("maid.environment.cold");
     public static final SoundEvent MAID_HOT = register("maid.environment.hot");
 
+    // ------------------------------------------------------------------ 道具音效
+
+    /**
+     * 相机快门声（上游 {@code InitSounds.CAMERA_USE}）。
+     *
+     * <p>{@code sounds.json} 里的键是 {@code item.camera_use}，
+     * 音源为 {@code sounds/item/camera_use.ogg}，分类是 {@code voice}
+     * （与其它女仆语音同槽，会被玩家的「语音」音量控制）。</p>
+     */
+    public static final SoundEvent CAMERA_USE = register("item.camera_use");
+
     // ------------------------------------------------------------------ 女仆妖精
     /**
      * 妖精音效。{@code sounds.json} 里直接指向原版兔子音效
