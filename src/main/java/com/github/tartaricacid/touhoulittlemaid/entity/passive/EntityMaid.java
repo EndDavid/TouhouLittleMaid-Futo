@@ -2244,9 +2244,55 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         return !list.isEmpty();
     }
 
+    /**
+     * 乘客每一 tick 的朝向同步，逐字照抄上游 {@code EntityMaid#rideTick}（1.18.2 第 516–524 行）：
+     *
+     * <pre>
+     * public void rideTick() {
+     *     super.rideTick();
+     *     if (this.getVehicle() != null) {
+     *         Entity vehicle = this.getVehicle();
+     *         this.setYHeadRot(vehicle.getYRot());
+     *         this.setYBodyRot(vehicle.getYRot());
+     *     }
+     * }
+     * </pre>
+     *
+     * <p><b>为什么少了这一段就会「固定看向一侧」：</b>反编译 {@code Entity#rideTick} 可以看到它是
+     * {@code setDeltaMovement(ZERO) → tick() → positionRider(this)} —— 也就是说乘客的
+     * <b>tick() 照常执行</b>（所以 {@code yBodyRotO}/{@code yHeadRotO} 会被刷新，插值是平滑的），
+     * 但 {@code tick()} 里**没有任何一步**把「载具的朝向」写给乘客：</p>
+     *
+     * <ul>
+     *     <li>{@code yBodyRot} 只有 {@code Mob#aiStep} 那条「跟随移动方向 / 看向控制」的路径会改写，
+     *         而乘客的寻路与看向控制都不工作（{@code canBrainMoving()} 已经把 AI 停掉）；</li>
+     *     <li>船的 {@code Boat#clampRotation} 只给乘客写 {@code yRot}，不碰 {@code yBodyRot} /
+     *         {@code yHeadRot}。</li>
+     * </ul>
+     *
+     * <p>而模型整体的偏航角取自 {@code Mth.rotLerp(partialTick, yBodyRotO, yBodyRot)}
+     * （见 {@code GeoReplacedEntityRenderer#render} 里的 {@code lerpBodyRot} 与
+     * {@code LivingEntityRenderer#setupRotations}），头部再加一个 {@code yHeadRot - yBodyRot}。
+     * 于是这两个值一旦冻在「上船那一刻」，女仆就会永远朝着那个方向 ——
+     * 船怎么转都不跟着动。</p>
+     *
+     * <p>上游为此重写了 {@code rideTick}；本移植版之前只在这里调了
+     * {@code updateCarriedPosition()}，漏掉了这段同步。</p>
+     *
+     * <p><b>与「被玩家抱着」的关系：</b>抱着她时载具是玩家，此时她必须跟随玩家的
+     * <b>上半身骨骼</b>（{@code yBodyRot}）而不是 {@code yRot}，所以
+     * {@link #updateCarriedPosition()} 放在后面调用 —— 它在能解析出载运者时会把三个角度
+     * 覆盖成 {@code carrier.yBodyRot}，正好把这里的 {@code vehicle.getYRot()} 顶掉；
+     * 解析不到载运者（船 / 矿车 / 其他模组坐骑）时它直接返回，只保留上面这段同步。</p>
+     */
     @Override
     public void rideTick() {
         super.rideTick();
+        if (this.getVehicle() != null) {
+            Entity vehicle = this.getVehicle();
+            this.setYHeadRot(vehicle.getYRot());
+            this.setYBodyRot(vehicle.getYRot());
+        }
         this.updateCarriedPosition();
     }
 

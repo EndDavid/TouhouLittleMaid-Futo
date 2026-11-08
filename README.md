@@ -1287,6 +1287,45 @@ register("boat", Priority.HIGH,
 
 旧版模型因此落到下面的 `chair`（`isPassenger()`），与上游行为一致；
 Gecko 模型不受影响，照旧播 `boat`。
+### 坐船后「固定看向一侧」：`rideTick` 里漏了朝向同步
+
+上一节的修法让旧版模型在船里用对了姿势，但紧接着暴露出第二个问题：
+女仆整个人（不只是头）**冻在某个方向**，船怎么转都不跟着动。
+
+上游为此重写了 `rideTick`（1.18.2 第 516–524 行）：
+
+```java
+@Override
+public void rideTick() {
+    super.rideTick();
+    if (this.getVehicle() != null) {
+        Entity vehicle = this.getVehicle();
+        this.setYHeadRot(vehicle.getYRot());
+        this.setYBodyRot(vehicle.getYRot());
+    }
+}
+```
+
+本移植版之前在这个方法里只调了 `updateCarriedPosition()`，把这段同步漏了。
+
+**为什么原版机制不会自己修正。** 反编译 `Entity#rideTick` 可见其顺序是
+`setDeltaMovement(ZERO) → tick() → positionRider(this)` —— 乘客的 `tick()` **照常执行**，
+所以 `yBodyRotO` / `yHeadRotO` 会正常刷新（插值是平滑的，不会有抖动）。但 `tick()` 里
+**没有任何一步**把载具朝向写给乘客：
+
+- `yBodyRot` 只会被 `Mob#aiStep` 那条「跟随移动方向 / 看向控制」的路径改写，
+  而乘客的寻路与看向控制都不工作（`canBrainMoving()` 已经把 AI 停掉）；
+- `Boat#clampRotation` 只给乘客写 `yRot`，不碰 `yBodyRot` / `yHeadRot`。
+
+而模型整体偏航来自 `Mth.rotLerp(partialTick, yBodyRotO, yBodyRot)`
+（`GeoReplacedEntityRenderer#render` 的 `lerpBodyRot` → `LivingEntityRenderer#setupRotations`），
+头部再叠一个 `yHeadRot - yBodyRot`。这两个值一旦冻在「上船那一刻」，人就会一直朝那个方向。
+
+**与「被玩家抱着」的兼容。** 抱着她时载具是玩家，此时她必须跟随玩家的**上半身骨骼**
+（`yBodyRot`）而不是 `yRot`。所以 `updateCarriedPosition()` 仍放在这段**之后**调用：
+能解析出载运者时它会把 `yRot` / `yHeadRot` / `yBodyRot` 一起覆盖成 `carrier.yBodyRot`，
+正好顶掉这里的 `vehicle.getYRot()`；解析不到载运者（船 / 矿车 / 其他模组坐骑）时它直接返回，
+只保留 `rideTick` 的同步。
 ## 饮食系统（工作餐 / 回血餐）
 
 ### 结论先说：吃东西与喝药的入口是「AI 主动 `startUsingItem`」
