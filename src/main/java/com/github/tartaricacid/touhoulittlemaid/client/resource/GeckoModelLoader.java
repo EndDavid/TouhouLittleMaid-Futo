@@ -161,6 +161,7 @@ public final class GeckoModelLoader {
         for (MaidModelInfo info : models) {
             try {
                 info.decorate();
+                info.setAnimation(filterUsableAnimations(info.getAnimation()));
             } catch (Exception e) {
                 TouhouLittleMaid.LOGGER.error("Illegal model entry in pack {}", namespace, e);
                 continue;
@@ -240,6 +241,37 @@ public final class GeckoModelLoader {
             list.add(element.getAsString());
         }
         return list;
+    }
+
+    /**
+     * 只保留本移植版真正能读的动画文件。
+     *
+     * <p><b>为什么必须过滤。</b>模型包的 maid_model.json 里，旧版模型的 animation 字段
+     * 列的是上游 InnerAnimation 的伪路径 —— 形如
+     * animation/maid/default/head/default.js 的 .js 条目，每个模型十几条。
+     * 上游有 JS 动画引擎（CustomJsAnimationManger），这些条目由它接管；
+     * 本移植版没有，于是每一条都会走 readJson → 资源不存在 → 抛异常并打印完整堆栈。</p>
+     *
+     * <p>代价是致命的：换肤界面一屏 55 个模型 × 每个十几条 = 数百次带堆栈的 ERROR 日志，
+     * 日志 I/O 直接把渲染线程拖到「未响应」；选中一个新模型时又要在实体上重建一次，
+     * 所以点击也会卡死。</p>
+     *
+     * <p>过滤掉 .js 之后，能读的就只剩真正的 *.animation.json；空列表会让
+     * buildAnimations 直接回落到预解析好的默认动画集，不再有任何资源查找。</p>
+     */
+    private static java.util.List<ResourceLocation> filterUsableAnimations(
+            @Nullable java.util.List<ResourceLocation> animations) {
+        java.util.List<ResourceLocation> kept = new java.util.ArrayList<>();
+        if (animations == null) {
+            return kept;
+        }
+        for (ResourceLocation id : animations) {
+            // 只要真正的基岩动画文件；.js 是上游脚本动画的占位路径
+            if (id.getPath().endsWith(".animation.json")) {
+                kept.add(id);
+            }
+        }
+        return kept;
     }
 
     // ------------------------------------------------------------------ 几何

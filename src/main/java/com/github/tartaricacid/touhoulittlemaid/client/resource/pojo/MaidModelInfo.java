@@ -91,6 +91,14 @@ public class MaidModelInfo {
         return animation;
     }
 
+    /**
+     * 覆盖动画文件列表。加载器会把本移植版执行不了的 {@code .js} 条目剔除后再写回
+     * （本移植版没有 JS 动画引擎，见 GeckoModelLoader 的说明）。
+     */
+    public void setAnimation(List<ResourceLocation> animation) {
+        this.animation = animation;
+    }
+
     public ResourceLocation getModelId() {
         return modelId;
     }
