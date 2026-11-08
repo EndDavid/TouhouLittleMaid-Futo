@@ -104,6 +104,15 @@ public final class MaidConfigPacket {
      */
     public static final byte RIDEABLE = 14;
 
+    /**
+     * 更换皮肤 / 模型（附带模型 id 字符串）。
+     *
+     * <p>对应上游 {@code MaidModelMessage}。{@code ModelId} 是
+     * {@code SynchedEntityData}，客户端直接写会被服务端下一次同步覆盖，
+     * 所以必须走这个包，由服务端校验归属后再写。
+     */
+    public static final byte MODEL = 15;
+
     private MaidConfigPacket() {
     }
 
@@ -141,6 +150,10 @@ public final class MaidConfigPacket {
                             String name = buf.readUtf(32);
                             boolean alwaysShow = buf.readBoolean();
                             server.execute(() -> handleNameTag(player, name, alwaysShow, entityId));
+                        }
+                        case MODEL -> {
+                            String modelId = buf.readUtf(128);
+                            server.execute(() -> handleModel(player, modelId, entityId));
                         }
                         case RIDEABLE -> {
                             boolean value = buf.readBoolean();
@@ -342,6 +355,24 @@ public final class MaidConfigPacket {
      * 都还没移植，所以那份豁免表暂时是空的。不清的话会出现「关掉了却还被抱在怀里」，
      * 只能靠潜行右键（{@code tryDismount}）补救。</p>
      */
+    /**
+     * 服务端写入 {@code ModelId}。
+     *
+     * <p>校验三件事：女仆归请求者所有、模型 id 能解析成合法 {@code ResourceLocation}、
+     * 长度合理。上游只做第一项；这里多挡一层，是因为这个包完全是玩家可控的 ——
+     * 写进一个随意的长字符串会在渲染时反复尝试解析并刷日志。</p>
+     */
+    private static void handleModel(ServerPlayer player, String modelId, int entityId) {
+        EntityMaid maid = findOwnedMaid(player, entityId);
+        if (maid == null || modelId == null || modelId.isEmpty() || modelId.length() > 128) {
+            return;
+        }
+        if (!net.minecraft.resources.ResourceLocation.isValidResourceLocation(modelId)) {
+            return;
+        }
+        maid.setModelId(modelId);
+    }
+
     private static void handleRideable(ServerPlayer player, boolean value, int entityId) {
         EntityMaid maid = findOwnedMaid(player, entityId);
         if (maid == null) {

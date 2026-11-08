@@ -115,4 +115,17 @@ public final class MaidClientPacketSender {
         buf.writeInt(entityId);
         ClientPlayNetworking.send(MaidEffectPacket.CHANNEL, buf);
     }
+    /**
+     * 更换皮肤 / 模型。
+     *
+     * <p>只发意图：{@code ModelId} 是 {@code SynchedEntityData}，
+     * 客户端自写会被服务端同步覆盖，而且这里还需要服务端复核归属。</p>
+     */
+    public static void sendModel(String modelId, int entityId) {
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeByte(MaidConfigPacket.MODEL);
+        buf.writeInt(entityId);
+        buf.writeUtf(modelId, 128);
+        ClientPlayNetworking.send(MaidConfigPacket.CHANNEL, buf);
+    }
 }
