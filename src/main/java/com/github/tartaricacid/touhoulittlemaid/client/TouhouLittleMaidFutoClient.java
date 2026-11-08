@@ -88,6 +88,19 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                     });
                 });
 
+        // 神社庭灯：服务端通知「打开界面」（S2C）。界面本身是纯 Screen，
+        // 不是菜单，所以不走 ScreenRegistry，直接 setScreen。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.MaidBeaconPacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    byte action = buf.readByte();
+                    net.minecraft.core.BlockPos pos = buf.readBlockPos();
+                    if (action == com.github.tartaricacid.touhoulittlemaid.network.MaidBeaconPacket.OPEN_GUI) {
+                        client.execute(() -> com.github.tartaricacid.touhoulittlemaid.client.gui.block.MaidBeaconGui
+                                .openIfPresent(client, pos));
+                    }
+                });
+
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(
                 new SimpleSynchronousResourceReloadListener() {
                     @Override

@@ -137,6 +137,25 @@ public class EntityPowerPoint extends Entity {
         }
     }
 
+    /**
+     * 在 P 点所在位置冒一小团白烟（被神社庭灯吸收 / 溢出删除时的反馈）。
+     *
+     * <p>上游在服务端会给「追踪这个实体的玩家」发 {@code BeaconAbsorbMessage}，
+     * 客户端收到再调用上面的静态方法。本移植版没有这个包，改为直接用原版的
+     * {@code ServerLevel#sendParticles} —— 它同样只发给附近的玩家，视觉效果等价，
+     * 而且顺带省掉一个自定义网络包。</p>
+     */
+    public void spawnExplosionParticle() {
+        float x = (float) this.position().x;
+        float y = (float) this.position().y + 0.125F;
+        float z = (float) this.position().z;
+        if (this.level.isClientSide) {
+            spawnExplosionParticle(this.level, x, y, z, this.random);
+        } else if (this.level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.CLOUD, x, y, z, 5, 0.5, 0.5, 0.5, 0.02);
+        }
+    }
+
     // ------------------------------------------------------------------ 数据
 
     public int getValue() {

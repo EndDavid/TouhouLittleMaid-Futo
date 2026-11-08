@@ -75,6 +75,19 @@ public final class InitItems {
             TouhouLittleMaid.rl("photo"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemPhoto());
 
+    // ------------------------------------------------------------------ 神社庭灯
+
+    /**
+     * 神社庭灯（上游 {@code InitItems.MAID_BEACON}）。
+     *
+     * <p>方块本体与方块实体在 {@code InitBlocks} 注册，这里只注册物品形态。
+     * 类构造器里会读 {@code InitBlocks.MAID_BEACON}，因此主入口必须先调用
+     * {@code InitBlocks.init()} 再调用 {@code InitItems.init()}。</p>
+     */
+    public static final Item MAID_BEACON = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("maid_beacon"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemMaidBeacon());
+
     // ------------------------------------------------------------------ P 点
 
     /**

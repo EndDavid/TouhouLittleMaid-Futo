@@ -66,6 +66,7 @@ loom_version=1.15.5
 | 弹幕攻击 / 御币 | 完成 |
 | 钓鱼 | 完成（岸钓） |
 | **灵力（Power / P 点）** | 完成（Mixin 挂在玩家实体上） |
+| **神社庭灯（maid_beacon）** | **完成**（方块 + 方块实体 + GUI + 网络包；获得途径仍依赖祭坛） |
 | 经验球 吸收 / 附魔之瓶 | **完成** |
 | **女仆妖精（*EntityFairy*）** | 完成（旧模型；新模型缺 JSON，见渲染一节） |
 | 网络层 / 容器 / 存档兼容 | 完成 |
@@ -782,11 +783,78 @@ Fabric 没有 capability 系统，本移植版改成三个小件：
 |---|---|---|
 | 钩子 | `ModelEvent.BakingCompleted`（烘焙完之后） | `ModelLoadingRegistry#registerVariantProvider`（加载阶段） |
 | 做法 | 往 `bakedTopLevelModels` 塞一个 `ReplaceableBakedModel` 包装器，每帧按配置决定用哪个 | 直接返回另一个 `UnbakedModel` |
-| 代价 | 可以在游戏内热切换 | **只能在加载时\u51B3\u5B9A**\uFF0C\u6539\u914D\u7F6E需重进游戏 / F3+T |
+| 代价 | 可以在游戏内热切换 | **只能在加载时决定**，改配置需重进游戏 / F3+T |
 
 好处是不需要写那个把十几个 `BakedModel` 方法全部转发的包装类；
 坏处是配置不能在运行时热生效 —— 图标替换本来也不需要。
 
+---
+
+## 神社庭灯（maid_beacon）
+
+上游那个两格高的「灯」：既是装饰与光源（上半格亮度 15），也是 P 点的存储器与女仆增益道具。
+右击**上半格**开界面；界面里能存取灵力、选增益效果、决定溢出 P 点是删还是留。
+
+| 上游 | 本移植版 |
+|---|---|
+| `block/BlockMaidBeacon` | `block/BlockMaidBeacon` |
+| `tileentity/TileEntityMaidBeacon` | `tileentity/TileEntityMaidBeacon` |
+| `item/ItemMaidBeacon` | `item/ItemMaidBeacon` |
+| `client/gui/block/MaidBeaconGui` + `client/gui/widget/button/BeaconEffectButton` | 同名 |
+| `OpenBeaconGuiMessage` / `SetBeaconPotionMessage` / `SetBeaconOverflowMessage` / `StorageAndTakePowerMessage` | `network/MaidBeaconPacket`（单通道 + 动作码） |
+| `init/InitBlocks` 的 15 个方块 | 只注册 `maid_beacon`（其余依赖未移植系统） |
+
+**方块结构**
+
+- 两格高：下半格 `position=down` 只有灯座模型、没有方块实体；上半格
+  `position=up_n_s` / `up_w_e` 才是本体，方块实体、光源、界面都挂它上面。
+  朝向由放置时玩家朝向决定（南北 / 东西两套模型）。
+- 两格**互锁**：`updateShape` 把另一半变成空气；物品由方块实体的 `onRemove` 弹出
+  （带存储的 P 点）。所以拆任意一半都只掉一个庭灯，既不丢数据也不会复制。
+- **掉落不走战利品表**：上游也没有给 `maid_beacon` 战利品表
+  （`port/upstream-data` 里只有 bookshelf / computer / keyboard / maid_bed /
+  model_switcher / scarecrow / shrine 这 7 个），掉落完全由 `onRemove` 负责 ——
+  再挂表就会掉两份。
+- **活塞免疫**：原版 1.18.2 没有 `Block#getPistonPushReaction`（Forge 补丁），
+  改用自定义 `Material`（`PushReaction.BLOCK`，其余参数与 `Material.WOOD` 相同）实现同样效果，
+  否则活塞会把上半格推走、留下没有实体的灯座。
+
+**方块实体**
+
+- 每 80 tick（4 秒）跑一次：先扣效果消耗，再吸收半径内的 `EntityPowerPoint`
+  （`P / 100` 换算成灵力，满储或「删除溢出」时把 P 点销毁）。
+- 效果间隔 100 tick、等级 II，范围 8 格，只作用于**存活的女仆**。
+- 上游 NBT 写在 `getTileData()` / `getPersistentData()`（Forge 补丁）。本移植版存档走标准
+  `saveAdditional` / `load`；**物品形态**仍保留 `StorageData.ForgeData.*` 层级，
+  便于读取上游存档里的庭灯（见 `TileEntityMaidBeacon#saveToItemTag`）。
+- 配置读取走 `MiscConfig#shrineLamp*()` 空安全取值器 —— 这个 tick 每 4 秒一次，
+  直接 `.get()` 在配置未加载时会从 tick 里抛异常崩服。
+
+**界面与网络**
+
+- 不是 Menu，而是纯客户端 `Screen`：服务端下发 `OPEN_GUI`（携带方块坐标），
+  客户端从**客户端侧方块实体**读数据。上游同样如此。
+- C2S 三个动作：选效果 / 切换溢出 / 存取灵力。服务端会复核「坐标处确有庭灯」
+  「玩家距离 ≤ 8 格」「效果序号在 `-1~4`」，负数 / NaN 数量直接丢弃。
+- 存取规则与上游逐行一致（玩家不够就什么都不做；庭灯满则只存得下多少存多少）。
+- 1.18.2 的 `Screen` 没有 `renderables` 字段（1.19+ 才有），效果按钮由界面自己记列表；
+  按 E 关闭用的是 `KeyMapping#matches(int, int)`（`isActiveAndMatches` 是 Forge 1.19+ 补丁）。
+
+**配置项**（`MiscConfig`，键名与上游一致）：
+`ShrineLampEffectCost`（0.9 灵力 / 小时）、`ShrineLampMaxStorage`（100）、
+`ShrineLampMaxRange`（6 格）。
+
+> **获得途径**：上游靠祭坛合成
+> （`port/upstream-data/data/touhou_little_maid/recipes/altar/craft_maid_beacon.json`）。
+> 祭坛系统尚未移植，所以目前只能从创造模式物品栏取得。物品、方块模型、GUI 贴图、
+> 手持模型与全部语言键在资源里本来就有，不需要补。
+
+```
+# 手测
+/give @s touhou_little_maid:maid_beacon
+/give @s touhou_little_maid:power_point 16      # 丢在庭灯附近，等 4 秒看是否被吸走
+/tlm power @s set 5                             # 存进去 → 再取出来，观察两条进度条
+```
 
 ## 语音频率与交互提示
 
@@ -806,7 +874,7 @@ if (event.getSound() instanceof MaidSoundInstance maidSound) {
 也就是说它拦的不只是待机碎碎念，还包括**捡到东西的「哎嘿」、被驯服的欢呼、
 受伤 / 死亡的叫声** —— 因为在上游这些声音全都走同一个自定义 SoundEngine 通道。
 
-本移植版有三处偏差，合起来\u5C31\u662F\u300C\u628A 0% 拖到底还是能听见她说话」：
+本移植版有三处偏差，合起来就是「把 0% 拖到底还是能听见她说话」：
 
 | 偏差 | 后果 |
 |---|---|
@@ -853,7 +921,7 @@ private boolean shouldPlayVoice() {
 
 上游 1.20.1 `client/overlay/MaidTipsOverlay`：准星指向女仆时，在准星右上方画出
 「手持物图标 + 提示图标 + 一行说明」，例如拿着空玻璃瓶指向有经验的女仆会显示
-**「右击取出经验，Shift右击全部取出」**\u3002
+**「右击取出经验，Shift右击全部取出」**。
 
 文本与图标本来就在资源里（`assets/touhou_little_maid/lang/*.json` 的
 `overlay.touhou_little_maid.*.tips`、`textures/gui/maid_tips_icon.png`），

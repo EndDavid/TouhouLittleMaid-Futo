@@ -27,6 +27,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
     public void onInitialize() {
         InitSounds.init();
         InitEntities.init();
+        // 方块 / 方块实体必须在物品之前：ItemMaidBeacon 的构造器要读 InitBlocks.MAID_BEACON
+        com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.init();
         InitItems.init();
         InitMenu.init();
 
@@ -52,6 +54,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
 
         // 网络包：GUI 里切换居家 / 拾取时，由服务端写入同步数据
         com.github.tartaricacid.touhoulittlemaid.network.MaidConfigPacket.initServer();
+        // 网络包：神社庭灯（选效果 / 溢出开关 / 存取的 C2S，打开界面的 S2C）
+        com.github.tartaricacid.touhoulittlemaid.network.MaidBeaconPacket.initServer();
 
         // 灵力（Power）：死亡扣减、重生复制、脏数据向客户端同步。
         // P 点的唯一常规来源是女仆妖精（见 InitEntities.FAIRY），
