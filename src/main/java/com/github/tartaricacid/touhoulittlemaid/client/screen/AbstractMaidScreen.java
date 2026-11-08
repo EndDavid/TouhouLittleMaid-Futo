@@ -11,6 +11,11 @@ import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.AbstractMaidContainer;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidMainContainer;
 import com.github.tartaricacid.touhoulittlemaid.network.MaidConfigPacket;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.MaidModelRegistry;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.datafixers.util.Pair;
@@ -37,6 +42,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 /**
@@ -116,6 +122,7 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
     private ImageButton pageUpButton;
     private ImageButton pageDownButton;
     private ImageButton pageCloseButton;
+    private ImageButton infoButton;
 
     /**
      * 全部任务按钮（一次建完，靠 {@code visible} 分页）。
@@ -222,7 +229,16 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         this.addRenderableWidget(this.rideButton);
         this.lastSyncedRideable = this.maid.isRideable();
 
-        // 皮肤按钮（模型选择界面属于后续里程碑，这里先占位）
+        // 详细信息按钮（蓝色感叹号）。上游 AbstractMaidContainerGui#addStateButton 里的 `info`，
+        // 位置与 UV 逐像素一致：leftPos+8, topPos+14，9x9，UV(72,65)，hover 下移 10。
+        // 上游给它挂的是 NO_ACTION —— 点它不做任何事，功能全在悬停提示里（见 renderMaidInfo）。
+        this.infoButton = new ImageButton(this.leftPos + 8, this.topPos + 14, 9, 9,
+                72, 65, 10, BUTTON, b -> {
+        });
+        this.addRenderableWidget(this.infoButton);
+
+        // 皮肤 / 模型按钮（上游在此调用 CacheIconManager.openMaidModelGui）。
+        // 模型选择界面尚未移植，这里先保留上游的位置与 UV，点击暂不响应。
         ImageButton skinButton = new ImageButton(this.leftPos + 62, this.topPos + 14, 9, 9,
                 72, 43, 10, BUTTON, b -> {
         });
@@ -720,7 +736,124 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
      * <p>不用 {@code isHoveredOrFocused()}：那个值只在 {@code AbstractWidget#render}
      * 里被刷新，容器渲染顺序一旦变动就会读到旧值。这里直接拿鼠标坐标与按钮包围盒比较。</p>
      */
+    /**
+     * 详细信息提示：逐项对齐上游 {@code AbstractMaidContainerGui#renderMaidInfo}。
+     *
+     * <p>上游的格式是「标题行（金色下划线）+ 若干 <b>█</b> 开头的条目」，条目里字段名青色、
+     * 值白色。标题行后面还会追加两个状态符号：</p>
+     *
+     * <ul>
+     *     <li>{@code ❀}（暗红）—— 被闪电击中过（{@code isStruckByLightning()}）</li>
+     *     <li>{@code ✟}（蓝色）—— 无敌（{@code isInvulnerable()}）</li>
+     * </ul>
+     *
+     * <p>条目的取舍：</p>
+     * <ul>
+     *     <li><b>主人</b>：上游用 {@code maid.getOwner()}，客户端可能取不到实体，所以只在非空时加；
+     *         本移植版更稳一点 —— 先试 {@code getOwner()}，取不到但 UUID 是本地玩家就用本地名字，
+     *         否则退回 UUID 前 8 位，避免出现「主人：null」。</li>
+     *     <li><b>模型名</b>：走 {@code MaidModelRegistry}。旧版模型的 {@code name} 字段是
+     *         {@code {model.ns.path.name}} 这种带花括号的翻译键，要按上游
+     *         {@code ParseI18n.parse} 的语义处理 —— 见 {@link #parseModelName}。</li>
+     *     <li><b>经验 / 好感度</b>：直接读同步字段。</li>
+     *     <li><b>五子棋战绩</b>：依赖尚未移植的 {@code GameRecordManager} 与
+     *         {@code MaidGomokuAI}，这里整行省略（不显示空数据比显示 0 更诚实）。</li>
+     * </ul>
+     *
+     * <p>用鼠标坐标判断悬停而不是 {@code isHoveredOrFocused()}，理由同
+     * {@link #renderButtonTooltips}。</p>
+     */
+    private void renderMaidInfo(PoseStack poseStack, int mouseX, int mouseY) {
+        if (this.infoButton == null || !isMouseOver(this.infoButton, mouseX, mouseY)) {
+            return;
+        }
+        List<Component> list = new ArrayList<>();
+        // 上游的前缀：一个绿色方块 + 空格
+        String prefix = ChatFormatting.GREEN + "\u2588\u0020";
+
+        MutableComponent title = new TextComponent("")
+                .append(new TranslatableComponent("tooltips.touhou_little_maid.info.title")
+                        .withStyle(ChatFormatting.GOLD, ChatFormatting.UNDERLINE))
+                .append(new TextComponent("  "));
+        if (this.maid.isStruckByLightning()) {
+            title.append(new TextComponent("\u2740").withStyle(ChatFormatting.DARK_RED));
+        }
+        if (this.maid.isInvulnerable()) {
+            title.append(new TextComponent("\u271F").withStyle(ChatFormatting.BLUE));
+        }
+        list.add(title);
+
+        Component ownerName = this.resolveOwnerName();
+        if (ownerName != null) {
+            list.add(new TextComponent(prefix).withStyle(ChatFormatting.WHITE)
+                    .append(new TranslatableComponent("tooltips.touhou_little_maid.info.owner")
+                            .append(": ").withStyle(ChatFormatting.AQUA))
+                    .append(ownerName));
+        }
+        MaidModelInfo modelInfo = MaidModelRegistry.get(this.maid.getModelId());
+        if (modelInfo != null) {
+            list.add(new TextComponent(prefix).withStyle(ChatFormatting.WHITE)
+                    .append(new TranslatableComponent("tooltips.touhou_little_maid.info.model_name")
+                            .append(": ").withStyle(ChatFormatting.AQUA))
+                    .append(parseModelName(modelInfo)));
+        }
+        list.add(new TextComponent(prefix).withStyle(ChatFormatting.WHITE)
+                .append(new TranslatableComponent("tooltips.touhou_little_maid.info.experience")
+                        .append(": ").withStyle(ChatFormatting.AQUA))
+                .append(String.valueOf(this.maid.getExperience())));
+        list.add(new TextComponent(prefix).withStyle(ChatFormatting.WHITE)
+                .append(new TranslatableComponent("tooltips.touhou_little_maid.info.favorability")
+                        .append(": ").withStyle(ChatFormatting.AQUA))
+                .append(String.valueOf(this.maid.getFavorability())));
+
+        this.renderComponentTooltip(poseStack, list, mouseX, mouseY);
+    }
+
+    /**
+     * 取主人显示名。
+     *
+     * <p>上游直接 {@code maid.getOwner().getDisplayName()}，但客户端上
+     * {@code TamableAnimal#getOwner()} 依赖「按 UUID 找到已加载的玩家实体」，
+     * 主人离线 / 不在附近时永远为 {@code null}。这里做三级回退：
+     * {@code getOwner()} → 本地玩家（UUID 相同）→ UUID 前 8 位。</p>
+     */
+    @Nullable
+    private Component resolveOwnerName() {
+        LivingEntity owner = this.maid.getOwner();
+        if (owner != null) {
+            return owner.getDisplayName();
+        }
+        UUID ownerUUID = this.maid.getOwnerUUID();
+        if (ownerUUID == null) {
+            return null;
+        }
+        LocalPlayer self = Minecraft.getInstance().player;
+        if (self != null && ownerUUID.equals(self.getUUID())) {
+            return self.getDisplayName();
+        }
+        return new TextComponent(ownerUUID.toString().substring(0, 8));
+    }
+
+    /**
+     * 把模型的 {@code name} 字段转成可显示文本，对应上游 {@code ParseI18n.parse}。
+     *
+     * <p>旧版模型没写 {@code name} 时，{@code MaidModelInfo} 会自动生成
+     * {@code {model.ns.path.name}}；包进花括号的一律当翻译键处理（去掉花括号再
+     * {@link TranslatableComponent}），否则按字面量显示。</p>
+     */
+    private static Component parseModelName(MaidModelInfo info) {
+        String name = info.getName();
+        if (name == null || name.isEmpty()) {
+            return new TextComponent(info.getModelId().toString());
+        }
+        if (name.length() > 2 && name.startsWith("{") && name.endsWith("}")) {
+            return new TranslatableComponent(name.substring(1, name.length() - 1));
+        }
+        return new TextComponent(name);
+    }
+
     private void renderButtonTooltips(PoseStack poseStack, int mouseX, int mouseY) {
+        this.renderMaidInfo(poseStack, mouseX, mouseY);
         this.renderStateTooltip(this.homeButton, poseStack, mouseX, mouseY,
                 "gui.touhou_little_maid.button.home");
         this.renderStateTooltip(this.pickButton, poseStack, mouseX, mouseY,
