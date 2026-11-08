@@ -1326,6 +1326,49 @@ public void rideTick() {
 能解析出载运者时它会把 `yRot` / `yHeadRot` / `yBodyRot` 一起覆盖成 `carrier.yBodyRot`，
 正好顶掉这里的 `vehicle.getYRot()`；解析不到载运者（船 / 矿车 / 其他模组坐骑）时它直接返回，
 只保留 `rideTick` 的同步。
+### 「第一人称糊脸」的真正原因 —— 不是摄像机，是护甲片
+
+曾经有一轮把第一人称「糊脸」归因为摄像机钻进了模型，并加了一个
+`MaidCarryFirstPersonOffset`（默认 0.4）把抱着的女仆往前推。**那是个误判**：
+`setupRotations` 里那套 `translate(-0.375, 0.8325, 0.375)` + 两个 `mulPose`
+从移植之初就与上游逐字一致，本来就是对的。代价是把女仆推得过远，第一人称看起来
+「抱了个空气」。该项已整体撤回（配置项一并删除），抱着的姿态回到纯上游链。
+
+真凶是**模型自带的护甲片没有被隐藏**。
+
+#### 芙兰朵露的红色缎带与棒子
+
+`flandre_scarlet.json` 里，那两件装饰挂在左手、并且是护甲片的子骨骼：
+
+```
+armLeft
+  chestPlateLeft   ← 护甲片（0 cube，纯容器）
+    bone257        ← 手握的棒子（8 cube）
+      bow2         ← 红色缎带蝴蝶结（1 cube）
+      bone258      ← 棒身（6 cube）
+```
+
+上游 `MaidArmorAnimation#getArmorDefault` 有一条规则：**没穿对应部位的护甲时，
+隐藏模型自带的护甲片**：
+
+```java
+if (helmet != null)         helmet.setHidden(!maid.hasHelmet());
+if (chestPlate != null)     chestPlate.setHidden(!maid.hasChestPlate());
+if (chestPlateLeft != null) chestPlateLeft.setHidden(!maid.hasChestPlate());
+if (chestPlateMiddle != null) chestPlateMiddle.setHidden(!maid.hasChestPlate());
+if (chestPlateRight != null) chestPlateRight.setHidden(!maid.hasChestPlate());
+// leggings / boots 同理
+```
+
+`setHidden` 是**整棵子树**语义，所以 `chestPlateLeft` 一隐藏，棒子和缎带一起消失。
+默认没穿护甲 → 上游看不到这两件；本移植版缺这条规则 → 一直显示，而且正好贴在左手上，
+第一人称抱着时直接糊到摄像机上。这就是那张截图的来源 —— 模型本身没问题，也没有被弃用。
+
+已在 `MaidRenderer#updateArmorBones` 里按上游逐条补齐（`helmet` / `chestPlate` ×3 /
+`leggings` ×4 / `boots` ×2），用双参 `setHidden(selfHidden, skipChildRendering)`
+保证子骨骼一起跳过。护甲槽判定直接读 `EquipmentSlot`，语义与上游
+`IMaid#hasChestPlate()` 等默认方法一致。反向变体（`_helmet` / `_chestPlate` …）的
+名字以下划线开头，`GeckoModelLoader` 改名时不会动它们，按原名查即可。
 ## 饮食系统（工作餐 / 回血餐）
 
 ### 结论先说：吃东西与喝药的入口是「AI 主动 `startUsingItem`」

@@ -60,26 +60,6 @@ public final class MaidConfig {
     public static ForgeConfigSpec.IntValue MAID_GUN_MEDIUM_DISTANCE;
     public static ForgeConfigSpec.IntValue MAID_GUN_NEAR_DISTANCE;
 
-    /**
-     * 第一人称抱着女仆时，把她额外往前推的距离（单位：方块）。
-     *
-     * <p><b>为什么需要这一项（上游没有）：</b>把 1.18.2、1.20.1 Forge、1.20.1 Fabric
-     * 三个发布 jar 全部分类扫过，{@code isFirstPerson} / {@code getCameraType} /
-     * {@code CameraType} 在渲染链路里只出现在 HUD 提示（{@code MaidTipsOverlay}）与 Molang
-     * 的 {@code query.is_first_person}；动画 JSON 里唯一的 {@code first_person} 也是
-     * YSM 模型专用的 {@code ysm.first_person_mod_hide}。也就是说上游<b>没有</b>任何
-     * 第一人称搬运处理，它只做了一件事：{@code CarryMaidHideArmEvent} 取消
-     * {@code RenderHandEvent}，把玩家自己的手藏掉。</p>
-     *
-     * <p>上游不处理并不会出问题，是因为它<b>把摄像机塞在女仆体内也无所谓</b>——
-     * 反变换回模型局部系后，第一人称摄像机（眼高 1.62）距她小腿外表面只有约
-     * <b>1.6 cm</b>，投影后整块布料糊满屏幕。本移植版若不处理就是这个现象。</p>
-     *
-     * <p>因此这里加一个只影响渲染、不影响实体位置的推进量：默认 {@code 0.4}，
-     * 作用在实体本地系（沿女仆正前方），第三人称完全不受影响。
-     * 想让她在视野里更靠前 / 更小就调大，设为 {@code 0} 可关闭（回到「糊脸」）。</p>
-     */
-    public static ForgeConfigSpec.DoubleValue MAID_CARRY_FIRST_PERSON_OFFSET;
 
     private MaidConfig() {
     }
@@ -201,11 +181,6 @@ public final class MaidConfig {
         builder.comment("Recognition distance of a maid under the gun task, Suitable for pistols and shotguns");
         MAID_GUN_NEAR_DISTANCE = builder.defineInRange("MaidGunNearDistance", 32, 0, 512);
 
-        builder.comment("How far to push the carried maid forward when the player is in first person,",
-                "so the camera does not end up inside her body (see the field javadoc).",
-                "Upstream TLM has no such handling; 0 disables it.");
-        MAID_CARRY_FIRST_PERSON_OFFSET = builder.defineInRange("MaidCarryFirstPersonOffset", 0.4D, 0.0D, 2.0D);
-
         builder.pop();
     }
 
@@ -262,12 +237,6 @@ public final class MaidConfig {
         }
     }
 
-    /**
-     * 第一人称抱着女仆时的渲染推进量（方块）。默认 {@code 0.4}，见 {@link #MAID_CARRY_FIRST_PERSON_OFFSET}。
-     */
-    public static double carryFirstPersonOffset() {
-        return doubleOr(MAID_CARRY_FIRST_PERSON_OFFSET, 0.4D);
-    }
 
     public static int workRange() {
         return intOr(MAID_WORK_RANGE, 12);

@@ -4,21 +4,20 @@ import com.github.tartaricacid.touhoulittlemaid.client.entity.GeckoMaidEntity;
 import com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.geckolayer.GeckoLayerMaidHeld;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.MaidModelRegistry;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
-import com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.processor.IBone;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoModel;
+import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoBone;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.GeoLayerRenderer;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.GeoReplacedEntityRenderer;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.IGeoEntity;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.IGeoEntityRenderer;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EquipmentSlot;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -194,6 +193,78 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
         if (hurt != null) {
             hurt.setHidden(entity.hurtTime <= 0);
         }
+
+
+        // 3) 模型自带的护甲贴片：上游 MaidArmorAnimation#getArmorDefault
+        //
+        //      if (helmet != null)         helmet.setHidden(!maid.hasHelmet());
+        //      if (chestPlate != null)     chestPlate.setHidden(!maid.hasChestPlate());
+        //      if (chestPlateLeft != null) chestPlateLeft.setHidden(!maid.hasChestPlate());
+        //      ... leggings / boots 同理
+        //
+        //    也就是说：没穿对应部位的护甲时，模型里自带的护甲片应当隐藏。
+        updateArmorBones(entity, model);
+    }
+
+    /**
+     * 隐藏「模型自带护甲片」里当前没有穿对应护甲的那些。
+     *
+     * <p><b>这不只是护甲问题。</b>有些模型把装饰品挂在护甲片下面当子骨骼，
+     * 芙兰朵露（{@code flandre_scarlet}）就是典型：</p>
+     *
+     * <pre>
+     * armLeft
+     *   chestPlateLeft   ← 护甲片（0 cube，纯容器）
+     *     bone257        ← 手握的棒子（8 cube）
+     *       bow2         ← 红色缎带蝴蝶结（1 cube）
+     *       bone258      ← 棒身（6 cube）
+     *             wingLeft / wingRight 各自挂着 crystal1..14 的水晶链
+     * </pre>
+     *
+     * <p>上游默认没穿护甲 → {@code chestPlateLeft} 被隐藏 → 整棵子树（棒子 + 缎带）
+     * 一起不画。本移植版之前没有这条规则，于是它们一直显示；它们正好挂在左手上，
+     * 第一人称抱着她时就会糊到摄像机上 —— 这才是那张「模型糊脸」截图里多出来的东西。
+     * 模型本身没有问题，也没有被弃用。</p>
+     *
+     * <p>另有一套「反向」变体（{@code _helmet} / {@code _chestPlate} …，
+     * 见上游 {@code MaidArmorAnimation#getArmorReverse}）。旧版骨骼名经过
+     * {@code GeckoModelLoader} 改名时以 {@code _} 开头的名字不受影响，按原名查即可。</p>
+     *
+     * <p>护甲槽判定直接用 {@link EquipmentSlot} 取物品，语义与上游
+     * {@code IMaid#hasChestPlate()} 那些默认方法完全一致。</p>
+     */
+    private static void updateArmorBones(EntityMaid entity, AnimatedGeoModel model) {
+        hideUnless(model, "helmet", hasArmor(entity, EquipmentSlot.HEAD));
+        hideUnless(model, "chestPlate", hasArmor(entity, EquipmentSlot.CHEST));
+        hideUnless(model, "chestPlateLeft", hasArmor(entity, EquipmentSlot.CHEST));
+        hideUnless(model, "chestPlateMiddle", hasArmor(entity, EquipmentSlot.CHEST));
+        hideUnless(model, "chestPlateRight", hasArmor(entity, EquipmentSlot.CHEST));
+        hideUnless(model, "leggings", hasArmor(entity, EquipmentSlot.LEGS));
+        hideUnless(model, "leggingsLeft", hasArmor(entity, EquipmentSlot.LEGS));
+        hideUnless(model, "leggingsMiddle", hasArmor(entity, EquipmentSlot.LEGS));
+        hideUnless(model, "leggingsRight", hasArmor(entity, EquipmentSlot.LEGS));
+        hideUnless(model, "bootsLeft", hasArmor(entity, EquipmentSlot.FEET));
+        hideUnless(model, "bootsRight", hasArmor(entity, EquipmentSlot.FEET));
+    }
+
+    private static boolean hasArmor(EntityMaid entity, EquipmentSlot slot) {
+        return !entity.getItemBySlot(slot).isEmpty();
+    }
+
+    /**
+     * 骨头存在时按 {@code visible} 设置隐藏；不存在就跳过（多数模型没有护甲片）。
+     *
+     * <p>用双参重载 {@code setHidden(selfHidden, skipChildRendering)}：只隐藏这根骨头
+     * 本身不够 —— 护甲片通常是 0 cube 的纯容器，要挡掉的其实是它<b>底下</b>的装饰品，
+     * 所以必须连子骨骼一起跳过渲染。上游 {@code ModelRendererWrapper#setHidden}
+     * 也是「整棵子树」语义。</p>
+     */
+    private static void hideUnless(AnimatedGeoModel model, String boneName, boolean visible) {
+        AnimatedGeoBone bone = model.bones().get(boneName);
+        if (bone == null) {
+            return;
+        }
+        bone.setHidden(!visible, !visible);
     }
 
     /**
@@ -266,14 +337,9 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
         if (!maid.isCarried()) {
             return;
         }
-        // 第一人称「往前推」—— 见 firstPersonPush 的说明。
         // 必须写在下面两次 mulPose **之前**：此刻坐标系还是实体本地系
         // （+Y 朝上、-Z 是实体正前方），translate 的方向不会被之后的旋转带歪；
         // 写在后头的话这 0.4 会被 Rz(-65°)/Ry(80°) 一起转掉，方向就错了。
-        double firstPersonPush = this.firstPersonPush(maid);
-        if (firstPersonPush > 0.0D) {
-            poseStack.translate(0.0D, 0.0D, -firstPersonPush);
-        }
         // 逐字照抄上游，顺序不能换：平移写在旋转前面，作用在未旋转的本地坐标系里；
         // 反过来的话位移方向会被一起转掉。
         //
@@ -344,45 +410,4 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
         this.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
     }
 
-    /**
-     * 第一人称下把抱着的女仆往前推多少格。
-     *
-     * <h2>为什么需要（上游没有）</h2>
-     *
-     * <p>把 1.18.2、1.20.1 Forge、1.20.1 Fabric 三个发布 jar 的<b>全部</b> {@code .class}
-     * 和<b>全部</b> {@code .json} 都扫过：{@code isFirstPerson} / {@code getCameraType} /
-     * {@code CameraType} 在渲染链路里只出现在 HUD 提示 {@code MaidTipsOverlay} 和 Molang 的
-     * {@code query.is_first_person}；动画里唯一的 {@code first_person} 是 YSM 模型专用的
-     * {@code ysm.first_person_mod_hide}。上游针对第一人称只做了一件事：
-     * {@code CarryMaidHideArmEvent} 取消 {@code RenderHandEvent}，把玩家自己的手藏掉
-     * （本移植版已用 {@code ItemInHandRendererMixin} 等价实现）。</p>
-     *
-     * <h2>为什么本移植版必须做</h2>
-     *
-     * <p>按模型 JSON 逐骨骼算到世界空间：实体轴心在「玩家脚底朝前 0.75、抬高 0.15」，
-     * 再叠加 {@code setupRotations} 的 {@code translate(-0.375, 0.8325, 0.375)}，
-     * 她的躯干只落在玩家正前方 {@code 0.375} 格。把第一人称摄像机（眼高 1.62）
-     * 反变换回模型局部系，距她小腿外表面只有约 <b>1.6 cm</b> —— 任何网格贴到
-     * 近平面 1.6 cm 处，投影后都会铺满整个视野，也就是「模型糊脸」。
-     * 第三人称相机在 4 格外，同样的姿态完全正常。</p>
-     *
-     * <h2>只影响渲染</h2>
-     *
-     * <p>这里返回的推进量只写进 {@link PoseStack}，<b>不碰实体坐标</b>：
-     * 第三人称、碰撞、乘客同步、平滑插值全部不受影响，退出第一人称立刻恢复。
-     * 数值来自 {@code MaidConfig#carryFirstPersonOffset()}（默认 {@code 0.4}，{@code 0} 关闭）。</p>
-     */
-    private double firstPersonPush(EntityMaid maid) {
-        Minecraft minecraft = Minecraft.getInstance();
-        LocalPlayer player = minecraft.player;
-        if (player == null || !minecraft.options.getCameraType().isFirstPerson()) {
-            return 0.0D;
-        }
-        // 乘客关系是两端各自复现的（见 EntityMaid#isCarried），所以同时看 getVehicle 与同步字段
-        boolean carriedByCamera = maid.getVehicle() == player || maid.getCarrierId() == player.getId();
-        if (!carriedByCamera || maid.distanceToSqr(player) > 4.0D) {
-            return 0.0D;
-        }
-        return MaidConfig.carryFirstPersonOffset();
-    }
 }
