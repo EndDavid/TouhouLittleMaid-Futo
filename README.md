@@ -1369,7 +1369,7 @@ if (chestPlateRight != null) chestPlateRight.setHidden(!maid.hasChestPlate());
 保证子骨骼一起跳过。护甲槽判定直接读 `EquipmentSlot`，语义与上游
 `IMaid#hasChestPlate()` 等默认方法一致。反向变体（`_helmet` / `_chestPlate` …）的
 名字以下划线开头，`GeckoModelLoader` 改名时不会动它们，按原名查即可。
-### 抱着的姿态为什么必须把旧版那 0.3 留在旋转之后
+### 抱着的姿态：旧版那 0.3 的真实方向
 
 上游 `client/renderer/entity/EntityMaidRenderer#setupRotations` 原文（1.18.2 与 1.20.1 一致）：
 
@@ -1381,24 +1381,47 @@ if (mob.getVehicle() instanceof Player && !this.mainInfo.isGeckoModel()) {
 }
 ```
 
-注意 **Y 恒为 0.8325**：旧版模型那点额外位移并不在这一段里，而是
-`MaidBaseAnimation#ridingPosture` 末尾的 `GlWrapper.translate(0, 0.3, 0)`，
-它在 `super.render(...)` 内部执行，因此排在 `setupRotations` 的两个旋转**之后**。
+**Y 恒为 0.8325**。旧版那点额外位移不在这一段里，而是
+`MaidBaseAnimation#ridingPosture` 末尾的 `GlWrapper.translate(0, 0.3, 0)`。
 
-之前把这两步合并成了 `0.8325 - 0.3`（即「主 translate 的 Y 少 0.3」），这是错的。
-把 0.3 当作纯 Y 位移的前提是它作用在旋转**之前**；实际它作用在两个旋转之后，
-于是会被 `Rz(-65)` / `Ry(80)` 一起转，变成一个带水平分量的向量：
+要算清它到底贡献了多少，必须知道它在矩阵链的哪个位置。用 `javap` 反编译
+`LivingEntityRenderer#render`，调用顺序是：
 
 ```
-Rz(-65) · Ry(80) · (0, 0.3, 0)  ->  约 (-0.272, +0.127, 0)
+poseStack.pushPose()
+setupRotations(entity, poseStack, ...)        <-- 上面那段
+poseStack.scale(-1, -1, 1)
+this.scale(entity, poseStack, partialTick)    <-- renderEntityScale
+poseStack.translate(0, -1.501, 0)
+prepareMobModel(...)
+setupAnim(...)                                <-- GlWrapper.translate 在这里
+renderToBuffer(...)
 ```
 
-也就是说这 0.3 同时贡献 **-0.272 格的水平位移**。只从 Y 里扣掉 0.3，
-就把这个水平分量丢了 —— 表现正是「女仆整体偏到一侧」（而前后/高低看起来还是对的）。
+关键结论：`GlWrapper.translate(0, 0.3, 0)` 在 **`setupAnim`** 里执行，而 `setupAnim`
+排在 `scale(-1, -1, 1)` **之后**。也就是说这 0.3 作用在**已经被 Y 翻转的模型空间**里，
+它在 y-up 实体系里的等效位移要再翻一次号：
 
-现在与上游一致：主 translate 恒为 0.8325，旧版的 0.3 单独写成
-`LEGACY_RIDING_LIFT`，放在两次 `mulPose` 之后、并按原符号 `+0.3` 应用。
-两者合起来才是上游的完整矩阵链，水平与垂直分量都对得上。
+```
+Δ = Rz(-65) · S(-1,-1,1) · (0, 0.3, 0)
+  = Rz(-65) · (0, -0.3, 0)
+  = (-0.272, -0.127, 0)
+```
+
+所以它是**向下、并朝 -X 偏 0.272 格**，而不是向上。这一步的符号曾经搞错过两次：
+
+| 写法 | 实际位移 | 结果 |
+|---|---|---|
+| `translate(…, 0.8325 - 0.3, …)`（旋转前扣 Y） | `(0, -0.3, 0)` | 丢失 -0.272 的 X 分量，**偏一侧** |
+| `translate(0, 0.0, 0)` 后 `translate(0, +0.3, 0)` | `(+0.272, +0.127, 0)` | 符号反了，**偏到另一侧且更高** |
+| `translate(0, 0.0, 0)` 后 `translate(0, -0.3, 0)` | `(-0.272, -0.127, 0)` | 与上游一致 |
+
+最终实现：主 translate 恒为 `0.8325`（与上游逐字一致），旧版单独应用
+`LEGACY_RIDING_LIFT`，写在两次 `mulPose` **之后**并**取负号**。
+
+> 附带一条：`scale(k)`（`renderEntityScale`）在 `setupRotations` **之后**，
+> 因此它只缩放模型本体，不缩放这里的位移；模型包调小比例不会连带改变抱持偏移。
+
 ## 饮食系统（工作餐 / 回血餐）
 
 ### 结论先说：吃东西与喝药的入口是「AI 主动 `startUsingItem`」

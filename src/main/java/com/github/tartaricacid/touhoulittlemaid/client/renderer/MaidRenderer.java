@@ -88,18 +88,16 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
      */
     private static final String HURT_BONE = "hurtBlink";
 
-        /**
-         * Legacy-model lift while carried (blocks), from the
-         * {@code GlWrapper.translate(0, 0.3, 0)} at the end of upstream
-         * {@code MaidBaseAnimation#ridingPosture}.
-         *
-         * <p>It acts in model space and is applied AFTER the two rotations in
-         * {@code setupRotations}, so it must NOT be folded into the translate Y:
-         * after Rz(-65) / Ry(80) the 0.3 also contributes a horizontal component
-         * of about -0.272 blocks, and subtracting it from Y alone would shift the
-         * whole body sideways.</p>
-         */
-        private static final double LEGACY_RIDING_LIFT = 0.3D;
+    /**
+     * 旧版模型被抱着时的额外位移（格），来自上游 MaidBaseAnimation#ridingPosture
+     * 末尾的 {@code GlWrapper.translate(0, 0.3, 0)}。
+     *
+     * <p>方向是<b>向下、并带一个水平分量</b>：它作用在已被 Y 翻转的模型空间里
+     * （{@code setupAnim} 排在 {@code scale(-1,-1,1)} 之后），所以等价于 y-up 系里的
+     * -0.3，再被 Rz(-65) 转成约 (-0.272, -0.127, 0)。常量保留 0.3 这个上游原值，
+     * 符号在调用处取负。</p>
+     */
+    private static final double LEGACY_RIDING_LIFT = 0.3D;
 
     /**
      * 表情贴片沿模型前方向外推的距离（单位：模型单位，1 单位 = 1/16 方块）。
@@ -372,11 +370,17 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
         poseStack.mulPose(com.mojang.math.Vector3f.YP.rotationDegrees(80));
         // 旧版模型：上游 MaidBaseAnimation#ridingPosture 末尾还有一句
         //     GlWrapper.translate(0, 0.3, 0)
-        // 它作用在模型空间、且排在两个旋转之后（GlWrapper 在 super.render 里、
-        // setupRotations 之后才执行），所以必须写在这里，并保留 +0.3 的原符号 ——
-        // 这样它才会像上游那样同时贡献 X 与 Y 分量。
+        //
+        // 它在 setupAnim 里执行。用 javap 核对过 LivingEntityRenderer#render 的调用顺序：
+        //     setupRotations -> scale(-1,-1,1) -> scale(k) -> translate(0,-1.501,0)
+        //     -> prepareMobModel -> setupAnim -> renderToBuffer
+        // 所以这 0.3 作用在**已经被 Y 翻转的模型空间**里，等价位移是
+        //     Rz(-65) * S(-1,-1,1) * (0, 0.3, 0) = Rz(-65) * (0, -0.3, 0)
+        //                                           = (-0.272, -0.127, 0)
+        // 因此在这里（两次 mulPose 之后的 y-up 系）必须写 **-0.3**。
+        // 写 +0.3 会把它翻成 (+0.272, +0.127, 0)，正好偏到另一侧。
         if (this.getAnimatableEntity(maid).isLegacyModel()) {
-            poseStack.translate(0.0D, LEGACY_RIDING_LIFT, 0.0D);
+            poseStack.translate(0.0D, -LEGACY_RIDING_LIFT, 0.0D);
         }
     }
 
