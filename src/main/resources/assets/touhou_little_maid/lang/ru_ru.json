@@ -187,6 +187,7 @@
   "block.touhou_little_maid.garage_kit": "Фигурка",
   "block.touhou_little_maid.garage_kit.prefix": "Фигурка: ",
   "block.touhou_little_maid.maid_beacon": "Лампа Святыни",
+  "effect.duration.infinite": "\u221e",
   "block.touhou_little_maid.model_switcher": "Переключатель моделей",
   "block.touhou_little_maid.gomoku": "Гомоку",
   "block.touhou_little_maid.keyboard": "Клавиатура",

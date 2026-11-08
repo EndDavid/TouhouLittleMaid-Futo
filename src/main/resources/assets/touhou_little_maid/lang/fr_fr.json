@@ -179,6 +179,7 @@
   "block.touhou_little_maid.garage_kit": "Statuette",
   "block.touhou_little_maid.garage_kit.prefix": "Statuette: ",
   "block.touhou_little_maid.maid_beacon": "Lanterne de Sanctuaire",
+  "effect.duration.infinite": "\u221e",
   "block.touhou_little_maid.model_switcher": "Changeur de Modèle",
   "block.touhou_little_maid.gomoku": "Gomoku",
   "block.touhou_little_maid.keyboard": "Piano",

@@ -5,6 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.MaidTabButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.TaskButton;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidEffectData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.TabIndex;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.AbstractMaidContainer;
@@ -20,12 +21,15 @@ import net.minecraft.client.gui.components.StateSwitchingButton;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.StringUtil;
+import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
@@ -133,6 +137,14 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
     private boolean lastSyncedHome;
     private boolean lastSyncedPickup;
     private boolean lastSyncedRideable;
+
+    /**
+     * 状态效果的刷新计时器，每 20 tick（1 秒）向服务端拉一次。
+     *
+     * <p>用界面自己的计数而不是 {@code maid.tickCount}：换页签会重建 Screen，
+     * 两个界面在同一个 tick 里各发一次请求并不会「合并」，但也没必要为这个再引入共享状态。</p>
+     */
+    private int effectTick;
 
     protected AbstractMaidScreen(T menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -406,6 +418,9 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
 
         super.render(poseStack, mouseX, mouseY, partialTick);
 
+        // 左侧状态效果列表（上游 drawEffectInfo）：画在界面之外，必须在 super.render 之后
+        this.drawEffectInfo(poseStack);
+
         // 当前任务的图标与名称：必须晚于 super.render，否则会被 taskSwitch 按钮底图盖住
         this.drawCurrentTaskText(poseStack);
 
@@ -441,6 +456,75 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
                 this.lastSyncedRideable = rideable;
             }
         }
+    }
+
+    /**
+     * 界面打开期间每秒向服务端要一次状态效果。
+     *
+     * <p><b>为什么必须主动问：</b>原版只把<b>玩家自己</b>的效果下发给客户端
+     * （{@code ClientPacketListener#handleUpdateMobEffect} 的接收方写死 {@code LocalPlayer}），
+     * 别的实体挂什么效果客户端永远收不到，{@code maid.getActiveEffects()} 在客户端恒为空。</p>
+     *
+     * <p>上游 {@code AbstractMaidContainerGui#containerTick} 同样是 {@code % 20 == 0}。</p>
+     */
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        if (this.maid == null) {
+            return;
+        }
+        if (++this.effectTick % 20 == 0) {
+            MaidClientPacketSender.requestEffect(this.maid.getId());
+        }
+    }
+
+    /**
+     * 把女仆身上的状态效果画在界面<b>左侧外面</b>（上游 {@code drawEffectInfo}）。
+     *
+     * <p>任务列表展开时直接不画 —— 那块面板正好占据 {@code leftPos - 93 .. leftPos - 1}，
+     * 与文字位置完全重叠。上游也是这么处理的。</p>
+     *
+     * <p>每行格式与上游逐字一致：{@code 效果名 [等级] 剩余时间}。
+     * 等级只在 1~9<i>（即 II~X 级）</i>时显示，与药水提示框的规则相同；
+     * 时间用原版 {@code StringUtil.formatTickDuration}，因此是 {@code 1:23} 这种格式。</p>
+     *
+     * <p>坐标是<b>绝对</b>的：它在 {@code render()} 里被调用，PoseStack 没有被平移到 GUI 原点。</p>
+     */
+    private void drawEffectInfo(PoseStack poseStack) {
+        if (TASK_LIST_OPEN) {
+            return;
+        }
+        List<MaidEffectData> effects = this.maid.getEffects();
+        int yOffset = 5;
+        for (MaidEffectData effect : effects) {
+            MutableComponent text = new TranslatableComponent(effect.descriptionId());
+            if (effect.amplifier() >= 1 && effect.amplifier() <= 9) {
+                text = text.append(" ").append(new TranslatableComponent("enchantment.level." + (effect.amplifier() + 1)));
+            }
+            String duration = effect.duration() == -1
+                    ? I18n.get("effect.duration.infinite")
+                    : StringUtil.formatTickDuration(effect.duration());
+            text = text.append(" ").append(duration);
+            this.font.draw(poseStack, text, this.leftPos - this.font.width(text) - 3,
+                    this.topPos + yOffset + 5, getPotionColor(effect.category()));
+            yOffset += 10;
+        }
+    }
+
+    /**
+     * 按效果的正负面着色：正面绿、负面红、中立蓝。
+     *
+     * <p>上游直接 {@code switch (category)} 写 0/1/2。这里改用
+     * {@link MobEffectCategory#ordinal()} 比较，免得哪天原版调整枚举顺序时变成「药水全变绿」。</p>
+     */
+    private static int getPotionColor(int category) {
+        if (category == MobEffectCategory.BENEFICIAL.ordinal()) {
+            return ChatFormatting.GREEN.getColor();
+        }
+        if (category == MobEffectCategory.HARMFUL.ordinal()) {
+            return ChatFormatting.RED.getColor();
+        }
+        return ChatFormatting.BLUE.getColor();
     }
 
     @Override

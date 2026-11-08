@@ -56,6 +56,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.MaidConfigPacket.initServer();
         // 网络包：神社庭灯（选效果 / 溢出开关 / 存取的 C2S，打开界面的 S2C）
         com.github.tartaricacid.touhoulittlemaid.network.MaidBeaconPacket.initServer();
+        // 网络包：女仆界面左侧的状态效果列表（客户端每 20 tick 拉一次，服务端现查现回）
+        com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.initServer();
 
         // 灵力（Power）：死亡扣减、重生复制、脏数据向客户端同步。
         // P 点的唯一常规来源是女仆妖精（见 InitEntities.FAIRY），

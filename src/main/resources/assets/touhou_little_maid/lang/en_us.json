@@ -190,6 +190,7 @@
   "block.touhou_little_maid.garage_kit": "Garage Kit",
   "block.touhou_little_maid.garage_kit.prefix": "Garage Kit: ",
   "block.touhou_little_maid.maid_beacon": "Shrine Lamp",
+  "effect.duration.infinite": "\u221e",
   "block.touhou_little_maid.model_switcher": "Model Switcher",
   "block.touhou_little_maid.gomoku": "Gomoku",
   "block.touhou_little_maid.keyboard": "Keyboard",

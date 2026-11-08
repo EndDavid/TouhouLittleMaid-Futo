@@ -3,6 +3,7 @@ package com.github.tartaricacid.touhoulittlemaid.client.screen;
 import com.github.tartaricacid.touhoulittlemaid.entity.data.AttackListData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.PickType;
 import com.github.tartaricacid.touhoulittlemaid.network.MaidConfigPacket;
+import com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
@@ -99,5 +100,19 @@ public final class MaidClientPacketSender {
         buf.writeUtf(name, 32);
         buf.writeBoolean(alwaysShow);
         ClientPlayNetworking.send(MaidConfigPacket.CHANNEL, buf);
+    }
+
+    /**
+     * 请求某只女仆的当前状态效果。
+     *
+     * <p>界面打开期间每 20 tick 调一次（见 {@code AbstractMaidScreen#containerTick}）。
+     * 效果本身不是同步数据，客户端手里的 {@code maid.getActiveEffects()} 永远为空，
+     * 所以必须现问现答 —— 上游 {@code RequestEffectMessage} 也是这么做的。</p>
+     */
+    public static void requestEffect(int entityId) {
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeByte(MaidEffectPacket.REQUEST);
+        buf.writeInt(entityId);
+        ClientPlayNetworking.send(MaidEffectPacket.CHANNEL, buf);
     }
 }

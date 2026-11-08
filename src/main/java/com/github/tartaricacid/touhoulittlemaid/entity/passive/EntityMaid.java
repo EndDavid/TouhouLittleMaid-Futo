@@ -1303,6 +1303,36 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
+     * 客户端专用的「当前状态效果」快照（上游 {@code EntityMaid#effects}）。
+     *
+     * <p><b>这个字段只在客户端有意义。</b>原版不会把「非玩家实体」的状态效果同步到客户端
+     * —— {@code ClientPacketListener#handleUpdateMobEffect} 的接收方写死为
+     * {@code this.minecraft.player}，别的实体挂什么效果客户端根本收不到。
+     * 所以客户端这份列表只能靠 {@code MaidEffectPacket} 主动向服务端要；
+     * 服务端侧它永远是空集合，没有任何代码读取。</p>
+     *
+     * <p><b>为什么挂在实体上而不是界面上：</b>三个页签（主界面 / 任务设置 / 女仆配置）
+     * 是三个独立的 Screen，切页签时旧实例会被销毁重建；数据挂在实体上，
+     * 切页签的瞬间不会闪一下空白。上游同样挂在实体上。</p>
+     */
+    private final List<MaidEffectData> effects = new java.util.ArrayList<>();
+
+    public List<MaidEffectData> getEffects() {
+        return this.effects;
+    }
+
+    /**
+     * 用服务端回传的数据整体替换本地列表。
+     *
+     * <p>是「替换」而不是「合并」：服务端回传的就是该时刻的完整快照，
+     * 合并只会留下已经到期、但这次没被回传的残留项。</p>
+     */
+    public void setEffects(List<MaidEffectData> effects) {
+        this.effects.clear();
+        this.effects.addAll(effects);
+    }
+
+    /**
      * 上游 {@code EntityMaid#tameMaid} 的移植：数量上限 + 驯服物品 / NTR 物品判定。
      */
     private InteractionResult tameMaid(ItemStack stack, Player player) {

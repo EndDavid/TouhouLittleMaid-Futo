@@ -1176,6 +1176,41 @@ if (source.getEntity() instanceof Player player && this.isAlliedTo(player)) {
 
 ---
 
+### 状态效果列表（上游 `RequestEffectMessage` / `SendEffectMessage`）
+
+界面左侧、任务列表之外的空白处会列出女仆身上每个状态效果：`效果名 等级 剩余时间`，
+正面绿色 / 负面红色 / 中立蓝色（上游 `drawEffectInfo` + `getPotionColor`）。
+等级只在 II~X 级时显示，与药水提示框的规则一致；剩余时间走原版
+`StringUtil.formatTickDuration`。任务列表展开时这块不画 —— 两者位置完全重叠。
+
+**为什么必须自己写网络包。** 原版只把**玩家自己**的状态效果同步到客户端：
+`ClientPacketListener#handleUpdateMobEffect` 的接收方写死 `this.minecraft.player`。
+别的实体挂了什么效果，客户端永远收不到 —— 在客户端上
+`maid.getActiveEffects()` 恒为空集合。
+
+| 方向 | 常量 | 载荷 |
+|---|---|---|
+| C2S | `MaidEffectPacket.REQUEST` | 实体 id |
+| S2C | `MaidEffectPacket.SYNC` | 实体 id + 条数 + 每条四元组 |
+
+拉取节奏与上游一致：界面打开期间 `containerTick` 每 20 tick 请求一次
+（`AbstractContainerScreen#tick` 是 final 的，只有它会调 `containerTick`）。
+是「拉」不是「推」—— 效果会自然到期，也会被药水 / 神社庭灯改写，
+靠推送就得在服务端每 tick 比对全体女仆的效果集合，太贵。
+
+服务端两项复核：实体 id 确实是一只女仆，且 `isOwnedByPlayer(请求者)`，
+否则任何人都能拉取别人女仆的效果。客户端还会挡掉 `size > 64` 的包，
+防止伪造的「20 亿条」把内存打爆。
+
+**数据挂点。** 快照存在 `EntityMaid#effects`（`List<MaidEffectData>`），不在 Screen 上：
+三个页签是三个独立 Screen，切页签会重建实例，挂在实体上才不会闪一下空白。
+四元组只带 `descriptionId / amplifier / duration / category`，不发 `MobEffect` 本体 ——
+GUI 只需要这四样，而且 `MobEffectInstance` 的时长会按 tick 递减，两端对不上。
+
+**顺手补了一个原版缺失的语言键。** 上游对无限时长用
+`I18n.get("effect.duration.infinite")`，但 1.18.2 的原版语言文件里**没有这个键**
+（15 个语言文件逐个查过），原版到 1.19 才加。不补的话这里会显示成裸键名，
+所以本移植版在自己的 `assets/touhou_little_maid/lang/*.json` 里补了这一项，值为 `∞`。
 ## 饮食系统（工作餐 / 回血餐）
 
 ### 结论先说：吃东西与喝药的入口是「AI 主动 `startUsingItem`」

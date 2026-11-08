@@ -101,6 +101,39 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                     }
                 });
 
+        // 女仆界面左侧的状态效果列表（S2C 回传，上游 SendEffectMessage）。
+        // 效果不是同步数据 —— 原版只把玩家自己的效果下发给 LocalPlayer ——
+        // 所以界面每 20 tick 问一次，服务端把那一刻的完整快照发回来。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    byte action = buf.readByte();
+                    int entityId = buf.readInt();
+                    if (action != com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.SYNC) {
+                        return;
+                    }
+                    int size = buf.readInt();
+                    // 条数是网络来的，先挡住异常值再分配集合，否则伪造的「20 亿条」会直接 OOM
+                    if (size < 0 || size > com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.MAX_EFFECTS) {
+                        return;
+                    }
+                    java.util.List<com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidEffectData> effects =
+                            new java.util.ArrayList<>(size);
+                    for (int i = 0; i < size; i++) {
+                        effects.add(com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidEffectData.fromBuf(buf));
+                    }
+                    client.execute(() -> {
+                        if (client.level == null) {
+                            return;
+                        }
+                        if (client.level.getEntity(entityId)
+                                instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid
+                                && maid.isAlive()) {
+                            maid.setEffects(effects);
+                        }
+                    });
+                });
+
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(
                 new SimpleSynchronousResourceReloadListener() {
                     @Override

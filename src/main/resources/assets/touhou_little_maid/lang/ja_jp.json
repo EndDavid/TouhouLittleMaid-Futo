@@ -186,6 +186,7 @@
   "block.touhou_little_maid.garage_kit": "ガレージキット",
   "block.touhou_little_maid.garage_kit.prefix": "ガレージキット: ",
   "block.touhou_little_maid.maid_beacon": "神社の灯篭",
+  "effect.duration.infinite": "\u221e",
   "block.touhou_little_maid.model_switcher": "モデルの切り替え",
   "block.touhou_little_maid.gomoku": "五目並べ",
   "block.touhou_little_maid.keyboard": "キーボード",
