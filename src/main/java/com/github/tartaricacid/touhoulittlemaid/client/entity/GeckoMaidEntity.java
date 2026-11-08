@@ -11,6 +11,7 @@ import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.event.predicate.A
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.molang.context.AnimationContext;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.processor.IBone;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.IGeoEntity;
+import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoBone;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoModel;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.ILocationModel;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.model.provider.data.EntityModelData;
@@ -166,6 +167,9 @@ public class GeckoMaidEntity<T extends Mob> extends AnimatableEntity<T> implemen
         if (currentModel != null && !extraData.isEmpty() && extraData.get(0) instanceof EntityModelData data) {
             updateHead(data, currentModel, update);
         }
+        if (currentModel != null && isLegacyModel()) {
+            updateWing(event, currentModel);
+        }
         return update;
     }
 
@@ -192,6 +196,61 @@ public class GeckoMaidEntity<T extends Mob> extends AnimatableEntity<T> implemen
         }
         head.setRotationX(this.headRot.x() + (float) Math.toRadians(data.headPitch));
         head.setRotationY(this.headRot.y() + (float) Math.toRadians(data.netHeadYaw));
+    }
+
+    /**
+     * 让翅膀来回扇动 —— 逐字对齐上游 {@code MaidBaseAnimation#getWingDefault()}。
+     *
+     * <pre>
+     * wingLeft .setRotateAngleY((float) (-Math.cos(ageInTicks * 0.3) * 0.2 + wingLeft .getInitRotateAngleY()));
+     * wingRight.setRotateAngleY((float) ( Math.cos(ageInTicks * 0.3) * 0.2 + wingRight.getInitRotateAngleY()));
+     * wingLeft / wingRight.setHidden(maid.isSleeping());
+     * </pre>
+     *
+     * <p><b>为什么必须逐帧算，而不是写成关键帧动画：</b>这是一条
+     * {@code cos(age * 0.3)} 的<b>连续曲线</b>，幅度 0.2 rad（约 ±11.5°）、周期约 21 tick。
+     * 关键帧当然也能逼近它，但上游压根没这么做 —— 它在 {@code MaidBaseAnimation.init()}
+     * 第 43 行把这段 Java 挂在一个<b>并不存在的伪路径</b>
+     * {@code animation/maid/default/wing/default.js} 上（我核对过 1.18.2 与 1.20.1 的 jar，
+     * 这个 {@code .js} 都没打包，默认模型包里的脚本只有 {@code arm.js} / {@code float.js}），
+     * 也就是「用同名的 Java 实现顶替脚本」。</p>
+     *
+     * <p>同理它只对<b>旧版模型</b>生效：上游的 Gecko 模型走 {@code maid.animation.json}，
+     * 那 91 支动画里没有任何一支摇翅膀。芙兰朵露（{@code flandre_scarlet}）与
+     * 蕾米莉亚（{@code remilia_scarlet}）都是旧版模型，骨骼名就叫
+     * {@code wingLeft} / {@code wingRight} —— 而且这两个名字<b>不在</b>
+     * {@code GeckoModelLoader#LEGACY_BONE_ALIASES} 的重命名表里，所以取到的键与上游一致。</p>
+     *
+     * <p>{@code ageInTicks} 用 {@code tickCount + partialTick}，与上游渲染器里那个
+     * {@code lerpedAge} 同源；{@code getInitRotateAngleY()} 对应
+     * {@link IBone#getInitialSnapshot()} 的 {@code rotationValueY}
+     * （旧版模型这两根骨头都没有初始旋转，所以实际是 0，但保留这一项才与上游对齐）。</p>
+     */
+    private void updateWing(@NotNull AnimationEvent<?> event, AnimatedGeoModel currentModel) {
+        IMaid maid = this.getMaid();
+        if (maid == null) {
+            return;
+        }
+        float ageInTicks = maid.asEntity().tickCount + event.getPartialTick();
+        double swing = Math.cos(ageInTicks * 0.3D) * 0.2D;
+        boolean sleeping = maid.asEntity().isSleeping();
+        setWingBone(currentModel, "wingLeft", -swing, sleeping);
+        setWingBone(currentModel, "wingRight", swing, sleeping);
+    }
+
+    /**
+     * 写一根翅膀骨骼：先叠回初始角度，再按睡眠状态决定是否隐藏。
+     *
+     * <p>骨头不存在时直接跳过 —— 带翅膀的模型才有这两根，绝大多数模型没有，
+     * 缺骨是正常情况而不是错误。</p>
+     */
+    private static void setWingBone(AnimatedGeoModel model, String boneName, double swing, boolean sleeping) {
+        AnimatedGeoBone bone = model.bones().get(boneName);
+        if (bone == null) {
+            return;
+        }
+        bone.setRotationY((float) (swing + bone.getInitialSnapshot().rotationValueY));
+        bone.setHidden(sleeping);
     }
 
     // ------------------------------------------------------------------ 资源定位

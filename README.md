@@ -1211,6 +1211,82 @@ GUI 只需要这四样，而且 `MobEffectInstance` 的时长会按 tick 递减�
 `I18n.get("effect.duration.infinite")`，但 1.18.2 的原版语言文件里**没有这个键**
 （15 个语言文件逐个查过），原版到 1.19 才加。不补的话这里会显示成裸键名，
 所以本移植版在自己的 `assets/touhou_little_maid/lang/*.json` 里补了这一项，值为 `∞`。
+## 旧版模型的动画（摇翅 / 坐船）
+
+本移植版为了复用默认动画集，把旧版（1.10 / 1.12）模型的骨骼改名成 Gecko 命名
+（`GeckoModelLoader#LEGACY_BONE_ALIASES`：`head`→`Head`、`body`→`UpBody`、
+`armLeft`→`LeftArm`…）。这是**近似**：旧版骨架没有 `DownBody` / `UpperBody` /
+`AllBody` / `AllHead` 这些补偿层，所以凡是「靠上层骨骼补偿」的动画在旧版模型上都会走形。
+下面两条都是按上游 `MaidBaseAnimation` 的行为补的。
+
+### 摇翅：`MaidBaseAnimation#getWingDefault()`
+
+上游摇翅**不是关键帧动画**，是一段每帧执行的 Java 曲线（1.18.2 第 500–514 行）：
+
+```java
+wingLeft .setRotateAngleY((float) (-Math.cos(ageInTicks * 0.3) * 0.2 + wingLeft .getInitRotateAngleY()));
+wingRight.setRotateAngleY((float) ( Math.cos(ageInTicks * 0.3) * 0.2 + wingRight.getInitRotateAngleY()));
+wingLeft / wingRight.setHidden(maid.isSleeping());
+```
+
+幅度 0.2 rad（约 ±11.5°）、周期约 21 tick。它在 `MaidBaseAnimation.init()` 第 43 行
+被挂在一条**并不存在的伪路径**上：
+
+```java
+INNER_ANIMATION.put(new ResourceLocation("touhou_little_maid:animation/maid/default/wing/default.js"), getWingDefault());
+```
+
+我核对过 1.18.2 与 1.20.1 的 jar：这个 `.js` 都没有打包（默认模型包
+`tlm_custom_pack/touhou_little_maid-1.0.0.zip` 里只有 `arm.js` / `float.js`），
+也就是「用同名的 Java 实现顶替脚本」。所以本移植版也在
+`GeckoMaidEntity#updateWing` 里逐帧写骨骼，而不是去改 JSON。
+
+| 项 | 上游 | 本移植版 |
+|---|---|---|
+| 骨骼名 | `wingLeft` / `wingRight` | 同名（这两个名字**不在**改名表里） |
+| 角度 | `±cos(age*0.3)*0.2 + initY` | 同式，`initY` 取 `getInitialSnapshot().rotationValueY` |
+| `ageInTicks` | `tickCount + partialTick` | 同（`event.getPartialTick()`） |
+| 睡觉隐藏 | `setHidden(maid.isSleeping())` | 同 |
+| 生效范围 | 仅旧版模型 | 仅旧版模型（`isLegacyModel()`） |
+
+只对旧版模型生效是刻意的：Gecko 模型走 `maid.animation.json`，那 91 支动画里
+没有任何一支摇翅膀，上游对它们也不会摇。芙兰朵露（`flandre_scarlet`）与
+蕾米莉亚（`remilia_scarlet`）都是旧版模型，骨骼里确实有 `wingLeft` / `wingRight`。
+
+### 坐船：旧版模型不能吃 Gecko 的 `boat`
+
+症状是「坐在船里整个人上下颠倒」。
+
+排查过程中排除了几个常见猜测，值得记下来：
+
+- `boat` 动画数据**没错**：本移植版 `maid.animation.json` 的 `boat` 段与上游 1.18.2
+  逐行比对完全一致（`Root` rotation `[-90,0,0]`、position `[0,18,-15]`，加
+  `UpBody +120` / `DownBody +70` 与四肢那一串角度）。
+- 状态表**没错**：`AnimationRegister` 与上游同名文件逐条对应，`boat` 与 `chair`
+  都在 `HIGH` 且 `boat` 先注册，`AnimationManager#predicateMain` 在 `HIGH` 先走
+  `getVehicleAnimation`，顺序与上游相同。
+- `shouldRiderSit()` **不存在**：用 `javap` 查了 1.18.2 的 `Entity` 与 `Boat`，
+  只有 `rideTick` / `positionRider` / `clampRotation`。上游 1.18.2 能编译，
+  是因为该方法是 Forge 的 `IForgeEntity` 补丁；它对所有载具的默认实现就是 `true`，
+  所以本移植版「是乘客就算坐着」是等价写法。
+
+真正的原因是**骨骼层**：`boat` 那支动画是为 Gecko 骨架写的 —— 靠 `Root` 绕 X 轴
+转 -90 度，再靠 `AllBody` / `DownBody` 把身体折回来，做出「半躺在船里」。
+旧版骨架的 `Root` 是加载时**合成**出来的（旧版模型没有根骨骼），没有任何骨盆枢轴补偿，
+也没有 `DownBody` / `AllBody`，于是整条链算下来就只剩那个 -90 度 —— 人整个翻过去。
+
+上游对旧版模型的载具姿态只有一条规则：`ridingPosture`（双腿前屈 65 度、
+左右各外撇 15 度，外加 `setupRotations` 里的 `translate(0, 0.3, 0)`），
+**从不**把 `boat` 套到旧版骨架上。本移植版已经把这套数值移植成
+`maid_legacy.animation.json` 里的 `chair`，所以修法是让旧版模型跳过 `boat`：
+
+```java
+register("boat", Priority.HIGH,
+        (maid, event) -> !isLegacyModel(event) && maid.asEntity().getVehicle() instanceof Boat);
+```
+
+旧版模型因此落到下面的 `chair`（`isPassenger()`），与上游行为一致；
+Gecko 模型不受影响，照旧播 `boat`。
 ## 饮食系统（工作餐 / 回血餐）
 
 ### 结论先说：吃东西与喝药的入口是「AI 主动 `startUsingItem`」
