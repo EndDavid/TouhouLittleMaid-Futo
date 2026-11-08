@@ -240,7 +240,7 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         // 皮肤 / 模型按钮：上游 CacheIconManager.openMaidModelGui，本移植版直接开界面
         ImageButton skinButton = new ImageButton(this.leftPos + 62, this.topPos + 14, 9, 9,
                 72, 43, 10, BUTTON,
-                b -> this.minecraft.setScreen(new MaidModelScreen(this.maid, this)));
+                b -> MaidModelGui.open(this.maid));
         this.addRenderableWidget(skinButton);
 
         // 任务列表：开关 + 翻页 + 全部任务按钮

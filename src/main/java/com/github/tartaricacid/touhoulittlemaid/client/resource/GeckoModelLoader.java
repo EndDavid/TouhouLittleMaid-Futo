@@ -1,6 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.client.resource;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.CustomModelPack;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.condition.ConditionManager;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.builder.Animation;
@@ -156,6 +157,7 @@ public final class GeckoModelLoader {
         if (models == null) {
             return;
         }
+        java.util.List<MaidModelInfo> validModels = new java.util.ArrayList<>();
         for (MaidModelInfo info : models) {
             try {
                 info.decorate();
@@ -177,7 +179,67 @@ public final class GeckoModelLoader {
                     GeckoLibCache.getInstance().putAnimationFile(info.getModelId(), animationFile);
                 }
             }
+            validModels.add(info);
         }
+
+        MaidModelRegistry.putPack(buildPack(namespace, root, validModels));
+    }
+
+    /**
+     * 从同一个 maid_model.json 里取出包级别的元数据，构造一个 {@link CustomModelPack}。
+     *
+     * <p>上游把这些字段（pack_name / description / author / version / date / icon）
+     * 直接反序列化进 {@code CustomModelPack}；这里手工读，字段名与上游保持一致。</p>
+     */
+    private static CustomModelPack buildPack(String namespace, JsonObject root,
+                                             java.util.List<MaidModelInfo> models) {
+        CustomModelPack pack = new CustomModelPack();
+        pack.setPackName(getStringOr(root, "pack_name", namespace));
+        pack.setDescription(getStringList(root, "description"));
+        pack.setAuthor(getStringList(root, "author"));
+        pack.setVersion(getStringOrNull(root, "version"));
+        pack.setDate(getStringOrNull(root, "date"));
+        String icon = getStringOrNull(root, "icon");
+        if (icon != null && !icon.isEmpty()) {
+            ResourceLocation iconId = ResourceLocation.tryParse(icon);
+            if (iconId != null) {
+                pack.setIcon(iconId);
+            }
+        }
+        pack.setModelList(models);
+        return pack.decorate();
+    }
+
+    private static String getStringOr(JsonObject root, String key, String fallback) {
+        if (root.has(key) && root.get(key).isJsonPrimitive()) {
+            return root.get(key).getAsString();
+        }
+        return fallback;
+    }
+
+    private static String getStringOrNull(JsonObject root, String key) {
+        if (root.has(key) && root.get(key).isJsonPrimitive()) {
+            return root.get(key).getAsString();
+        }
+        return null;
+    }
+
+    private static java.util.List<String> getStringList(JsonObject root, String key) {
+        java.util.List<String> list = new java.util.ArrayList<>();
+        if (!root.has(key)) {
+            return list;
+        }
+        com.google.gson.JsonElement element = root.get(key);
+        if (element.isJsonArray()) {
+            for (com.google.gson.JsonElement child : element.getAsJsonArray()) {
+                if (child.isJsonPrimitive()) {
+                    list.add(child.getAsString());
+                }
+            }
+        } else if (element.isJsonPrimitive()) {
+            list.add(element.getAsString());
+        }
+        return list;
     }
 
     // ------------------------------------------------------------------ 几何

@@ -5,7 +5,10 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.CustomModelPack;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,15 +29,28 @@ public final class MaidModelRegistry {
 
     private static final Map<ResourceLocation, MaidModelInfo> MODELS = new LinkedHashMap<>();
 
+    /** 妯″瀷鍖呭垪琛紝椤哄簭鍗崇晫闈㈤《閮ㄩ〉绛剧殑椤哄簭銆?*/
+    private static final List<CustomModelPack> PACKS = new ArrayList<>();
+
     private MaidModelRegistry() {
     }
 
     public static void clear() {
         MODELS.clear();
+        PACKS.clear();
     }
 
     public static void put(MaidModelInfo info) {
         MODELS.put(info.getModelId(), info);
+    }
+
+    public static void putPack(CustomModelPack pack) {
+        PACKS.add(pack);
+    }
+
+    /** 妯″瀷鍖呭垪琛紙鎹㈣偆鐣岄潰鐢級銆傜┖鍒楄〃琛ㄧず杩樻病鍔犺浇杩囪祫婧愩€?*/
+    public static List<CustomModelPack> allPacks() {
+        return PACKS;
     }
 
     public static Collection<MaidModelInfo> all() {
