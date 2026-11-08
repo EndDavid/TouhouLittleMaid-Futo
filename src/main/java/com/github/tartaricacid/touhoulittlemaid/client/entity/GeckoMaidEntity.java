@@ -3,6 +3,9 @@ package com.github.tartaricacid.touhoulittlemaid.client.entity;
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.api.entity.IMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationManager;
+import com.github.tartaricacid.touhoulittlemaid.client.animation.inner.InnerAnimations;
+import com.github.tartaricacid.touhoulittlemaid.client.animation.inner.MaidInnerAnimation;
+import com.github.tartaricacid.touhoulittlemaid.client.animation.inner.MaidInnerContext;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.MaidModelRegistry;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.AnimatableEntity;
@@ -64,6 +67,8 @@ public class GeckoMaidEntity<T extends Mob> extends AnimatableEntity<T> implemen
     private static final Map<Integer, GeckoMaidEntity<?>> CACHE = new HashMap<>();
 
     private final Vector3f headRot = new Vector3f();
+    /** Inner animations declared by the current model, in declaration order. */
+    private final List<MaidInnerAnimation> innerAnimations = new java.util.ArrayList<>();
     @Nullable
     private MaidModelInfo maidInfo;
     /** 模型被换掉时置位，强制下一次渲染重新求值动画谓词（上游同名字段）。 */
@@ -169,8 +174,50 @@ public class GeckoMaidEntity<T extends Mob> extends AnimatableEntity<T> implemen
         }
         if (currentModel != null && isLegacyModel()) {
             updateWing(event, currentModel);
+            // 内建动画（上游 InnerAnimation）：按模型 animation 字段声明的顺序求值。
+            // 必须放在 updateHead / updateWing 之后 —— 上游旧版模型的头部朝向、
+            // 眨眼、尾巴、翅膀都是这些内建动画管的，后写者胜出才与上游一致。
+            applyInnerAnimations(event, currentModel);
         }
         return update;
+    }
+
+    /**
+     * 依次执行模型声明的内建动画。
+     *
+     * <p>这些动画来自 {@code maid_model.json} 的 {@code animation} 数组，形如
+     * {@code animation/maid/default/head/default.js}。那串 {@code .js} 在上游 jar 里
+     * <b>并不存在</b>，是 InnerAnimation 用同名 Java 实现顶替的伪路径；
+     * 本移植版由 InnerAnimations 提供同样的实现。</p>
+     *
+     * <p><b>为什么不能把它们当资源读：</b>先前版本正是这么做的 —— 每条都走
+     * readJson、找不到资源、抛异常并打印完整堆栈。一屏 55 个模型 × 每个十几条
+     * 就是数百次带堆栈的 ERROR 写盘，渲染线程直接卡到「未响应」。</p>
+     *
+     * @param event        动画事件，提供部分刻与四肢摆动量
+     * @param currentModel 已构建好的几何，内建动画直接改它的骨骼
+     */
+    private void applyInnerAnimations(@NotNull AnimationEvent<?> event, AnimatedGeoModel currentModel) {
+        IMaid maid = this.getMaid();
+        if (maid == null || this.innerAnimations.isEmpty()) {
+            return;
+        }
+        // headPitch / netHeadYaw 在 EntityModelData 里取过反（-x），这里还原成正向，
+        // 与上游 setRotationAngles 收到的实参同号
+        float headPitch = 0.0F;
+        float netHeadYaw = 0.0F;
+        List extraData = event.getExtraData();
+        if (!extraData.isEmpty() && extraData.get(0) instanceof EntityModelData data) {
+            headPitch = -data.headPitch;
+            netHeadYaw = -data.netHeadYaw;
+        }
+        MaidInnerContext ctx = new MaidInnerContext(maid, currentModel,
+                event.getLimbSwing(), event.getLimbSwingAmount(),
+                maid.asEntity().tickCount + event.getPartialTick(),
+                netHeadYaw, headPitch);
+        for (MaidInnerAnimation animation : this.innerAnimations) {
+            animation.apply(ctx);
+        }
     }
 
     /** 诊断用：主控制器上一次被请求的动画名。 */
@@ -380,6 +427,11 @@ public class GeckoMaidEntity<T extends Mob> extends AnimatableEntity<T> implemen
 
     @Override
     public void setMaidInfo(MaidModelInfo info) {
+        // Re-resolve when the model changes; order matters, so no dedup.
+        this.innerAnimations.clear();
+        if (info != null) {
+            this.innerAnimations.addAll(InnerAnimations.resolve(info.getAnimation()));
+        }
         if (this.maidInfo != info) {
             this.maidInfo = info;
             this.modelDirty = true;
