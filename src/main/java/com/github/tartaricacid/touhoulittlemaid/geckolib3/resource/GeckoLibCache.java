@@ -31,11 +31,11 @@ public class GeckoLibCache {
     private static final Map<String, ObjectBinding> EXTRA_BINDING = new HashMap<>();
     private static GeckoLibCache INSTANCE;
     public final MolangParser parser = createMolangParser();
-    private final Map<ResourceLocation, AnimationFile> animations = Maps.newHashMap();
-    private final Map<ResourceLocation, GeoModel> geoModels = Maps.newHashMap();
+    private final Map<ResourceLocation, AnimationFile> animations = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<ResourceLocation, GeoModel> geoModels = new java.util.concurrent.ConcurrentHashMap<>();
     /** 构建失败的 id，避免每帧重复尝试（否则每次渲染都会抛出异常刷屏）。 */
-    private final Set<ResourceLocation> failedGeoModels = new HashSet<>();
-    private final Set<ResourceLocation> failedAnimations = new HashSet<>();
+    private final Set<ResourceLocation> failedGeoModels = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<ResourceLocation> failedAnimations = java.util.concurrent.ConcurrentHashMap.newKeySet();
     @Nullable
     private Function<ResourceLocation, GeoModel> geoModelResolver;
     @Nullable
@@ -64,6 +64,16 @@ public class GeckoLibCache {
         this.animationResolver = resolver;
     }
 
+    /** 鍑犱綍鏄惁宸茬粡鏋勫缓濂斤紙鍙鎺㈡祴锛岀粷涓嶈Е鍙戞瀯寤猴級銆?*/
+    public boolean isGeoModelReady(ResourceLocation id) {
+        return geoModels.containsKey(id);
+    }
+
+    /** 璇?id 鏄惁宸茶鍒ゅ畾涓烘瀯寤哄け璐ワ紙鍙鎺㈡祴锛夈€?*/
+    public boolean isGeoModelFailed(ResourceLocation id) {
+        return failedGeoModels.contains(id);
+    }
+
     /** 立即构建并登记（重载时预构建少量常用模型时用）。 */
     public void putGeoModel(ResourceLocation id, GeoModel model) {
         geoModels.put(id, model);
@@ -81,7 +91,7 @@ public class GeckoLibCache {
      * @return 模型不存在或构建失败时返回 {@code null}
      */
     @Nullable
-    public GeoModel getGeoModel(ResourceLocation id) {
+    public synchronized GeoModel getGeoModel(ResourceLocation id) {
         GeoModel model = geoModels.get(id);
         if (model != null) {
             return model;
@@ -102,7 +112,7 @@ public class GeckoLibCache {
      * 取模型的动画集合；未构建过则按需构建。
      */
     @Nullable
-    public AnimationFile getAnimationFile(ResourceLocation id) {
+    public synchronized AnimationFile getAnimationFile(ResourceLocation id) {
         AnimationFile file = animations.get(id);
         if (file != null) {
             return file;

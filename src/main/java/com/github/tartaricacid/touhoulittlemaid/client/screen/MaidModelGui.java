@@ -1,6 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.client.screen;
 
 import com.github.tartaricacid.touhoulittlemaid.client.resource.MaidModelRegistry;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.MaidModelPrewarm;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.CustomModelPack;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -60,9 +61,9 @@ public class MaidModelGui extends AbstractModelGui<EntityMaid> {
     private static int ROW_INDEX = 0;
 
     /** 每帧花在构建几何上的时间上限（纳秒）。3ms 足够让界面保持流畅。 */
-    private static final long BUILD_BUDGET_NANOS = 3_000_000L;
+    private static final long BUILD_BUDGET_NANOS = 2_000_000L;
     /** 每帧最多构建几个，避免模型特别便宜时一口气吞掉整帧。 */
-    private static final int MAX_BUILDS_PER_FRAME = 4;
+    private static final int MAX_BUILDS_PER_FRAME = 1;
     /** 已构建几何的模型（跨界面实例保留，翻页 / 重开不重复构建）。 */
     private static final Set<ResourceLocation> BUILD_DONE = new HashSet<>();
     /** 待构建队列（跨实例保留，重开界面不丢进度）。 */
@@ -83,6 +84,8 @@ public class MaidModelGui extends AbstractModelGui<EntityMaid> {
     @Override
     protected void init() {
         super.init();
+        // 兜底：即使加载阶段没启动预构建，打开界面时也立刻在后台补齐
+        MaidModelPrewarm.start();
         this.enqueueCurrentPage();
         // 当前模型要显示在左边，排到队首
         enqueueModel(ResourceLocation.tryParse(this.entity.getModelId()), true);
@@ -127,10 +130,15 @@ public class MaidModelGui extends AbstractModelGui<EntityMaid> {
     }
 
     /**
-     * 按预算推进构建队列。
+     * 每帧最多处理一个模型，且只做「动画合并」这件轻活。
      *
-     * <p>直接调 {@code GeckoLibCache#getGeoModel} 会触发按需构建并缓存结果，
-     * 所以这里不用自己解析 JSON；动画文件一并构建，免得渲染时又踩一次。</p>
+     * <p><b>几何不在这里构建。</b>它由 {@code MaidModelPrewarm} 在后台线程预先做好
+     * （见那里的类注释：一屏 55 个模型同步构建会把渲染线程卡死）。
+     * 这里的 {@code getGeoModel} 只是一次 map 读取；如果预构建还没轮到这个模型，
+     * 就跳过、下次再试 —— 绝不在渲染线程上触发构建。</p>
+     *
+     * <p>动画合并必须留在渲染线程：{@code buildAnimations} 会用到共享的
+     * {@code MolangParser}，它不是线程安全的。</p>
      */
     private static void pumpBuildQueue() {
         long deadline = System.nanoTime() + BUILD_BUDGET_NANOS;
@@ -141,8 +149,16 @@ public class MaidModelGui extends AbstractModelGui<EntityMaid> {
                 continue;
             }
             GeckoLibCache cache = GeckoLibCache.getInstance();
+            if (!cache.isGeoModelReady(id)) {
+                // 预构建线程还没做完：放回队尾，下一帧再看；坏条目直接标记，避免反复重试
+                if (cache.isGeoModelFailed(id)) {
+                    BUILD_DONE.add(id);
+                } else {
+                    BUILD_QUEUE.addLast(id);
+                }
+                continue;
+            }
             // 构建失败（资源缺失）也记为已处理，否则会每帧重试同一个坏条目
-            cache.getGeoModel(id);
             cache.getAnimationFile(id);
             BUILD_DONE.add(id);
             built++;

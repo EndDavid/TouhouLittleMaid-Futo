@@ -137,6 +137,10 @@ public final class GeckoModelLoader {
                 MaidModelRegistry.all().size(),
                 GeckoLibCache.getInstance().getGeoModels().size(),
                 GeckoLibCache.getInstance().getAnimations().size());
+
+        // 后台线程预构建全部几何：懒构建如果留到换肤界面里做，一屏 55 个模型会让
+        // 渲染线程同步解析数百 KB 的 JSON 而卡死（见 MaidModelPrewarm 的类注释）
+        MaidModelPrewarm.start();
     }
 
     // ------------------------------------------------------------------ 模型包
