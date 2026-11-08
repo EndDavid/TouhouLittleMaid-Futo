@@ -42,6 +42,21 @@ public class SkinGuiNumber {
         return (this.modelPackList.size() - 1) / PACK_INTERVAL + 1;
     }
 
+    /**
+     * 当前包落在本页的第几个页签上（0~6）。
+     *
+     * <p>界面靠它决定「哪个页签画成按下态」，所以必须与 {@link #tabToPackIndex} 互逆。</p>
+     */
+    public int getTabIndex(int packIndex) {
+        return packIndex % PACK_INTERVAL;
+    }
+
+    /**
+     * 当前页实际有几个页签。
+     *
+     * <p>最后一页可能不满 7 个，所以不能一律按 7 画 —— 多出来的页签要隐藏，
+     * 否则会出现「点了没反应的空页签」。</p>
+     */
     public int getTabSize(int packIndex) {
         if (packIndex < (getPageSize() - 1) * PACK_INTERVAL) {
             return PACK_INTERVAL;
@@ -77,4 +92,3 @@ public class SkinGuiNumber {
         return Mth.clamp((float) (rowIndex * (1.0 / ((getModelSize(packIndex) - 1) / MODEL_PER_ROW - 4))), 0, 1);
     }
 }
-

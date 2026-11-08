@@ -145,20 +145,42 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
         addScrollButton(startX, startY);
     }
 
+    /**
+     * 一个模型包页签。三个分支与上游 {@code AbstractModelGui#addTabButton} 一一对应，
+     * 且<b>互斥</b>：
+     *
+     * <ul>
+     *     <li><b>当前选中</b>的页签：只画那张 28x31 的「按下」底图（UV 116/224），
+     *         不叠可点击按钮 —— 再点也没用，所以上游干脆不给它按钮；</li>
+     *     <li><b>本页存在的其它</b>页签：画 28x25 的普通按钮（UV 116/194）并挂点击，
+     *         点击时只改包索引并把行号归零；</li>
+     *     <li><b>本页不存在</b>的页签：同样画 28x25，但 {@code visible = false}。</li>
+     * </ul>
+     *
+     * <p>之前把「底图 + 可点按钮」两层都画了出来，于是选中态与普通态重叠、
+     * 而且选中页签仍可点击 —— 那就是页签看起来选不中、特效互相压叠的原因。</p>
+     */
     private void addTabButton(int startX, int startY, int index) {
-        // 底图（不可点）
-        this.addOwnedWidget(new ImageButton(startX - 98 + 28 * index, startY - 108,
-                28, 31, 116, 224, 0, BG, NO_PRESS));
-        // 可点的图标层：只有「当前页里存在这个 tab」时才可见
-        ImageButton clickable = new ImageButton(startX - 98 + 28 * index, startY - 105,
-                28, 25, 116, 194, 0, BG, b -> {
-            setPageIndex(getPageIndex());
-            setPackIndex(guiNumber.tabToPackIndex(index, getPageIndex()));
-            setRowIndex(0);
-            this.init();
-        });
-        clickable.visible = index < guiNumber.getTabSize(getPackIndex());
-        this.addOwnedWidget(clickable);
+        if (index == guiNumber.getTabIndex(getPackIndex())) {
+            // 选中态：只有底图，没有点击响应
+            this.addOwnedWidget(new ImageButton(startX - 98 + 28 * index, startY - 108,
+                    28, 31, 116, 224, 0, BG, NO_PRESS));
+        } else if (index < guiNumber.getTabSize(getPackIndex())) {
+            // 普通态：可点击。index 是 effectively-final 的循环变量，直接捕获即可
+            int tabIndex = index;
+            this.addOwnedWidget(new ImageButton(startX - 98 + 28 * tabIndex, startY - 105,
+                    28, 25, 116, 194, 0, BG, b -> {
+                setRowIndex(0);
+                setPackIndex(guiNumber.tabToPackIndex(tabIndex, getPageIndex()));
+                this.init();
+            }));
+        } else {
+            // 本页不存在的页签：不显示
+            ImageButton empty = new ImageButton(startX - 98 + 28 * index, startY - 105,
+                    28, 25, 116, 194, 0, BG, NO_PRESS);
+            empty.visible = false;
+            this.addOwnedWidget(empty);
+        }
     }
 
     private void addPageButton(int startX, int startY) {
