@@ -88,6 +88,19 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
      */
     private static final String HURT_BONE = "hurtBlink";
 
+        /**
+         * Legacy-model lift while carried (blocks), from the
+         * {@code GlWrapper.translate(0, 0.3, 0)} at the end of upstream
+         * {@code MaidBaseAnimation#ridingPosture}.
+         *
+         * <p>It acts in model space and is applied AFTER the two rotations in
+         * {@code setupRotations}, so it must NOT be folded into the translate Y:
+         * after Rz(-65) / Ry(80) the 0.3 also contributes a horizontal component
+         * of about -0.272 blocks, and subtracting it from Y alone would shift the
+         * whole body sideways.</p>
+         */
+        private static final double LEGACY_RIDING_LIFT = 0.3D;
+
     /**
      * 表情贴片沿模型前方向外推的距离（单位：模型单位，1 单位 = 1/16 方块）。
      *
@@ -337,28 +350,34 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
         if (!maid.isCarried()) {
             return;
         }
-        // 必须写在下面两次 mulPose **之前**：此刻坐标系还是实体本地系
-        // （+Y 朝上、-Z 是实体正前方），translate 的方向不会被之后的旋转带歪；
-        // 写在后头的话这 0.4 会被 Rz(-65°)/Ry(80°) 一起转掉，方向就错了。
-        // 逐字照抄上游，顺序不能换：平移写在旋转前面，作用在未旋转的本地坐标系里；
-        // 反过来的话位移方向会被一起转掉。
+        // 逐字照抄上游 client/renderer/entity/EntityMaidRenderer#setupRotations：
         //
-        // 旧版模型还有一步：上游 `MaidBaseAnimation#ridingPosture` 末尾的
-        //     GlWrapper.translate(0, 0.3, 0)
+        //     if (mob.getVehicle() instanceof Player && !mainInfo.isGeckoModel()) {
+        //         poseStack.translate(-0.375, 0.8325, 0.375);
+        //         poseStack.mulPose(Vector3f.ZN.rotationDegrees(65));
+        //         poseStack.mulPose(Vector3f.YN.rotationDegrees(-80));
+        //     }
         //
-        // 它在 `EntityModel#setupAnim` 里 push，是整条矩阵链的**最后一环**，也就是
-        // 顶点先经过它。而上游链尾是
-        //     ... · Rz(-65°) · Ry(80°) · S(-1,-1,1) · T(0,-1.501,0) · T(0,0.3,0)
-        // `S(-1,-1,1)` 会把模型空间的 +0.3 翻成 -0.3，所以这两段平移可以合并成
-        //     T(0,-1.801,0)·S   （原来是 T(0,-1.501,0)·S）
-        // 也就是说它等价于「主 translate 的 Y 少 0.3」，**不是**「旋转之后再抬 0.3」。
-        // 这一点很要命：如果写成旋转之后的 translate(0,-0.3,0)，那 0.3 会被
-        // Rz(-65°)/Ry(80°) 一起转掉，实际位移变成「往玩家怀里收 0.27 格」——
-        // 第一人称的摄像机因此直接钻进她的身体里，画面就是「模型糊脸」。
-        double y = this.getAnimatableEntity(maid).isLegacyModel() ? 0.8325D - 0.3D : 0.8325D;
-        poseStack.translate(-0.375D, y, 0.375D);
+        // 三个数字原样照搬，尤其 Y 恒为 0.8325：旧版模型那点额外位移不在这一段里
+        // （见下面的 LEGACY_RIDING_LIFT），所以这里不能按模型种类改数值。
+        //
+        // 之前写成 0.8325 - 0.3（把模型空间的那 0.3 折进 Y）是错的。那 0.3 作用在
+        // 两个旋转之后，会被 Rz(-65) / Ry(80) 一起转，因此它同时带一个水平分量
+        // （约 -0.272 格）。只扣 Y 就把这个水平分量丢了，人整体偏到一侧。
+        //
+        // 平移写在旋转前面：此刻坐标系还是实体本地系（+Y 朝上、-Z 是正前方），
+        // 位移方向不会被之后的旋转带歪。
+        poseStack.translate(-0.375D, 0.8325D, 0.375D);
         poseStack.mulPose(com.mojang.math.Vector3f.ZN.rotationDegrees(65));
         poseStack.mulPose(com.mojang.math.Vector3f.YP.rotationDegrees(80));
+        // 旧版模型：上游 MaidBaseAnimation#ridingPosture 末尾还有一句
+        //     GlWrapper.translate(0, 0.3, 0)
+        // 它作用在模型空间、且排在两个旋转之后（GlWrapper 在 super.render 里、
+        // setupRotations 之后才执行），所以必须写在这里，并保留 +0.3 的原符号 ——
+        // 这样它才会像上游那样同时贡献 X 与 Y 分量。
+        if (this.getAnimatableEntity(maid).isLegacyModel()) {
+            poseStack.translate(0.0D, LEGACY_RIDING_LIFT, 0.0D);
+        }
     }
 
     @Override
