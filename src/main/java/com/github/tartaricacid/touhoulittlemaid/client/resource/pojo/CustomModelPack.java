@@ -1,5 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.client.resource.pojo;
 
+import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
@@ -38,7 +39,8 @@ public class CustomModelPack {
     /** 图标动画状态与参数，由界面首次绘制时探测后写回。 */
     private AnimationState iconAnimation = AnimationState.UNCHECK;
     private int iconAspectRatio = 1;
-    private int iconDelay = 1;
+    /** 每帧停留的 tick 数，对应 JSON 字段 {@code icon_delay}（上游缺省 2）。 */
+    private int iconDelay = 2;
 
     public String getPackName() {
         return this.packName;
@@ -119,6 +121,10 @@ public class CustomModelPack {
         return this.iconDelay;
     }
 
+    public void setIconDelay(int iconDelay) {
+        this.iconDelay = iconDelay;
+    }
+
     /**
      * 补齐缺省值。模型列表为空时整包丢弃（由加载器判断）。
      */
@@ -131,6 +137,15 @@ public class CustomModelPack {
         }
         if (this.modelList == null) {
             this.modelList = Collections.emptyList();
+        }
+        // 与上游 CustomModelPack#decorate 一致：没有 icon 就退回内置的空白包图标，
+        // 否则页签上会缺一块。
+        if (this.icon == null) {
+            this.icon = new ResourceLocation(TouhouLittleMaid.MOD_ID,
+                    "textures/gui/empty_model_pack_icon.png");
+        }
+        if (this.iconDelay <= 0) {
+            this.iconDelay = 1;
         }
         return this;
     }

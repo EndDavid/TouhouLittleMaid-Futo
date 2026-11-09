@@ -6,6 +6,7 @@ import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelIn
 import com.github.tartaricacid.touhoulittlemaid.util.ParseI18n;
 import com.google.common.collect.Lists;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -24,6 +25,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -309,11 +311,22 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
     }
 
     /**
-     * 包页签的图标。竖向图集按帧播放，横向图集直接贴。
+     * 包页签的图标。竖向图集（高 &gt; 宽）按帧播放，否则直接贴。
      *
-     * <p>上游靠自定义的 {@code SizeTexture} 读贴图尺寸来判断；本移植版没有那个类，
-     * 因此统一按「静态图标」处理（{@code AnimationState.FALSE}）——
-     * 表现差异只是动态图标不会动，不影响选择功能。</p>
+     * <p>逐行移植自上游 {@code AbstractModelGui#drawTabIcon}：</p>
+     * <ul>
+     *     <li>{@code time = getTickTime() / iconDelay}，{@code iconIndex = time % aspectRatio}；</li>
+     *     <li>静态图标：{@code blit(x, y, 0, 0, 16, 16, 16, 16)}；</li>
+     *     <li>动画图标：{@code blit(x, y, 0, iconIndex*16, 16, 16, 16, 16*aspectRatio)}。</li>
+     * </ul>
+     *
+     * <p>源贴图尺寸在 1.18.2 里没有公开查询接口，上游是在自定义的 {@code SizeTexture}
+     * 上记录了宽高。这里改为第一次绘制时用 {@code NativeImage} 读一次 PNG 头，
+     * 结果写回包对象的三态字段（{@code UNCHECK} → {@code TRUE}/{@code FALSE}），
+     * 因此每个包每次资源重载只读一次文件。</p>
+     *
+     * <p>之前这里把整张竖向图集（例如 32x480，15 帧）一次压进 16x16 的格子里，
+     * 于是页签上看到的是一堆挤在一起的重影 —— 就是「动态纹理显示异常」的原因。</p>
      */
     private void drawTabIcon(PoseStack poseStack, int middleX, int middleY) {
         for (int index = 0; index < guiNumber.getTabSize(getPackIndex()); index++) {
@@ -322,11 +335,69 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
             if (icon == null) {
                 continue;
             }
+            if (pack.getIconAnimation() == CustomModelPack.AnimationState.UNCHECK) {
+                this.checkIconAnimation(pack, icon);
+            }
             RenderSystem.setShader(GameRenderer::getPositionTexShader);
             RenderSystem.setShaderTexture(0, icon);
-            blit(poseStack, middleX - 92 + 28 * index, middleY - 98, 0, 0, 16, 16, 16, 16);
+            if (pack.getIconAnimation() == CustomModelPack.AnimationState.FALSE) {
+                blit(poseStack, middleX - 92 + 28 * index, middleY - 98, 0, 0, 16, 16, 16, 16);
+            } else {
+                int aspectRatio = pack.getIconAspectRatio();
+                int time = getTickTime() / pack.getIconDelay();
+                int iconIndex = time % aspectRatio;
+                blit(poseStack, middleX - 92 + 28 * index, middleY - 98,
+                        0, iconIndex * 16, 16,
+                        16, 16, 16 * aspectRatio);
+            }
         }
     }
+
+    /** 与上游同义：{@code (int) System.currentTimeMillis() / 50}，即一个 tick 一步。 */
+    private static int getTickTime() {
+        return (int) System.currentTimeMillis() / 50;
+    }
+
+    /**
+     * 判断图标是否为竖向图集，并记录帧数。
+     *
+     * <p>对应上游 {@code AbstractModelGui#checkIconAnimation}，唯一差别是尺寸来源：
+     * 上游读 {@code SizeTexture#getWidth/getHeight}，这里直接读 PNG 头。
+     * 读不到（缺文件 / 非法 PNG）时按静态图标处理，不会抛异常影响界面。</p>
+     */
+    private void checkIconAnimation(CustomModelPack pack, ResourceLocation icon) {
+        int[] size = readImageSize(icon);
+        if (size == null) {
+            pack.setIconAnimation(CustomModelPack.AnimationState.FALSE);
+            return;
+        }
+        int width = size[0];
+        int height = size[1];
+        if (width <= 0 || width >= height) {
+            pack.setIconAnimation(CustomModelPack.AnimationState.FALSE);
+        } else {
+            pack.setIconAnimation(CustomModelPack.AnimationState.TRUE);
+            pack.setIconAspectRatio(height / width);
+        }
+    }
+
+    /**
+     * 读一张 PNG 的像素尺寸；失败返回 {@code null}。
+     *
+     * <p>只读文件头，不解码进显存，代价在微秒级 —— 而且每个包每次资源重载只调用一次。</p>
+     */
+    @Nullable
+    private int[] readImageSize(ResourceLocation location) {
+        try (net.minecraft.server.packs.resources.Resource resource =
+                     Minecraft.getInstance().getResourceManager().getResource(location);
+             NativeImage image = NativeImage.read(resource.getInputStream())) {
+            return new int[]{image.getWidth(), image.getHeight()};
+        } catch (Exception e) {
+            TouhouLittleMaid.LOGGER.warn("[Futo] Cannot read pack icon size: {}", location);
+            return null;
+        }
+    }
+
 
     /** 网格 + 包信息文本。 */
     private void drawEntity(PoseStack poseStack, int middleX, int middleY) {

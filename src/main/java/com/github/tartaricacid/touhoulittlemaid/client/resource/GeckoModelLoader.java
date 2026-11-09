@@ -212,6 +212,14 @@ public final class GeckoModelLoader {
                 pack.setIcon(iconId);
             }
         }
+        // 图标动画每帧停留的 tick 数；缺省值与上游一致（2）。
+        if (root.has("icon_delay") && root.get("icon_delay").isJsonPrimitive()) {
+            try {
+                pack.setIconDelay(root.get("icon_delay").getAsInt());
+            } catch (RuntimeException ignored) {
+                // 非法值退回缺省，不影响加载
+            }
+        }
         pack.setModelList(models);
         return pack.decorate();
     }
