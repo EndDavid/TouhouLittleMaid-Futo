@@ -45,7 +45,7 @@ import java.util.Optional;
  * <p>职责：
  * <ol>
  *     <li>从 {@code assets/<ns>/maid_model.json} 读取模型包索引，登记到 {@link MaidModelRegistry}</li>
- *     <li>把每个基岩版（{@code is_gecko=true}）模型解析进 {@link GeckoLibCache}</li>
+ *     <li>把每个模型的几何构建进 {@link GeckoLibCache}（旧版 1.10.0 与 Gecko 两种格式都走同一套管线）</li>
  *     <li>把模型包自带的动画文件与默认动画（{@code animation/maid.animation.json} 等）合并后登记</li>
  * </ol>
  *
@@ -97,9 +97,10 @@ public final class GeckoModelLoader {
     }
 
     /**
-     * 登记惰性构建回调（客户端初始化时调用一次）。
+     * 登记兜底构建回调（客户端初始化时调用一次）。
      *
-     * <p>模型几何与动画集合都改为「第一次被用到时构建」，见 {@link GeckoLibCache}。</p>
+     * <p>重载时已经构建了全部模型，正常情况下这个回调不会被调用；保留它只是为了
+     * 万一某个 id 在重载之后才出现时不至于直接渲染失败。</p>
      */
     public static void installResolvers() {
         GeckoLibCache cache = GeckoLibCache.getInstance();
@@ -129,18 +130,17 @@ public final class GeckoModelLoader {
         defaultChairAnimation = readAnimationFile(DEFAULT_CHAIR_ANIMATION);
         legacySitAnimation = readAnimationFile(LEGACY_SIT_ANIMATION);
 
+        long startNanos = System.nanoTime();
         for (String namespace : MAID_PACKS) {
             loadMaidPack(namespace);
         }
+        long millis = (System.nanoTime() - startNanos) / 1_000_000L;
 
-        TouhouLittleMaid.LOGGER.info("[Futo] Loaded {} maid models ({} gecko prebuilt), {} animation files",
+        TouhouLittleMaid.LOGGER.info("[Futo] Model loading time: {} ms ({} maid models, {} geometries, {} animation files)",
+                millis,
                 MaidModelRegistry.all().size(),
                 GeckoLibCache.getInstance().getGeoModels().size(),
                 GeckoLibCache.getInstance().getAnimations().size());
-
-        // 后台线程预构建全部几何：懒构建如果留到换肤界面里做，一屏 55 个模型会让
-        // 渲染线程同步解析数百 KB 的 JSON 而卡死（见 MaidModelPrewarm 的类注释）
-        MaidModelPrewarm.start();
     }
 
     // ------------------------------------------------------------------ 模型包
@@ -170,18 +170,20 @@ public final class GeckoModelLoader {
                 continue;
             }
             MaidModelRegistry.put(info);
-            // 基岩（Gecko）模型数量很少（4~5 个），重载时直接预构建，避免首帧卡顿。
-            // 旧版（1.10.0）模型有 189 个，全部预构建会阻塞渲染线程到客户端卡死，
-            // 因此交给 GeckoLibCache 的惰性回调，实体第一次用到时才构建。
-            if (info.isGeckoModel()) {
-                GeoModel geoModel = buildGeoModel(info);
-                if (geoModel != null) {
-                    GeckoLibCache.getInstance().putGeoModel(info.getModelId(), geoModel);
-                }
-                AnimationFile animationFile = buildAnimations(info);
-                if (animationFile != null) {
-                    GeckoLibCache.getInstance().putAnimationFile(info.getModelId(), animationFile);
-                }
+            // 与上游一致：加载阶段就把每个模型的几何与动画都构建好，运行期只读缓存。
+            //
+            // 上游 CustomPackLoader#loadModelElement 对模型包里的每个条目都调用一次
+            // loadMaidModel(...)；ReloadResourceEvent#asyncReloadAllPack 把整轮加载交给
+            // Util.backgroundExecutor()，结束时打印 "Model loading time: {} ms"。
+            // 本移植版读资源走 ResourceManager（上游是直接读磁盘上的模型包），只能在
+            // 重载线程上构建 —— 换线程会与它的内部锁互相等待，表现为卡在 Loading terrain。
+            GeoModel geoModel = buildGeoModel(info);
+            if (geoModel != null) {
+                GeckoLibCache.getInstance().putGeoModel(info.getModelId(), geoModel);
+            }
+            AnimationFile animationFile = buildAnimations(info);
+            if (animationFile != null) {
+                GeckoLibCache.getInstance().putAnimationFile(info.getModelId(), animationFile);
             }
             validModels.add(info);
         }

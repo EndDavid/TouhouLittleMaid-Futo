@@ -6,7 +6,6 @@ import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.molang.MolangPars
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.file.AnimationFile;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.built.GeoModel;
 import com.github.tartaricacid.touhoulittlemaid.molang.runtime.binding.ObjectBinding;
-import com.google.common.collect.Maps;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,23 +18,37 @@ import java.util.function.Function;
 /**
  * 模型 / 动画缓存。
  *
- * <p>上游在资源重载时会把<b>全部</b>模型的几何一次性构建好。1.18.2 的内置模型包共 194 个,
- * 其中 189 个是旧版（1.10.0）模型，一次性构建会把渲染线程阻塞到客户端卡死
- * （实测日志停在贴图集创建之后不再前进）。</p>
+ * <h2>加载时机与上游一致：资源重载时一次性建好</h2>
  *
- * <p>因此这里改为「按需惰性构建」：重载时只登记加载回调，实体第一次用到某个
- * {@code model_id} 时才构建那一个几何（之后进缓存）。代价是首次渲染某个模型时
- * 有一次几毫秒的抖动，换来的是启动不再卡死、且旧版模型（含默认灵梦）全部可用。</p>
+ * <p>上游 {@code CustomPackLoader#loadModelElement} 对模型包里的<b>每个</b>条目都调用一次
+ * {@code loadMaidModel(...)}，也就是在加载阶段就把全部模型（1.18.2 的默认包共 194 个）
+ * 构建成内存对象；{@code ReloadResourceEvent#asyncReloadAllPack()} 把这一整轮工作交给
+ * {@code Util.backgroundExecutor()}，结束时打印 {@code "Model loading time: {} ms"}。
+ * 因此换肤界面里切换 {@code ModelId}、画 55 个缩略图都没有任何构建开销。</p>
+ *
+ * <h2>为什么这里不用后台线程</h2>
+ *
+ * <p>上游可以放到后台，是因为它<b>直接读磁盘</b>上的模型包（{@code Path} / {@code ZipFile}）。
+ * 本移植版走原版 {@code ResourceManager#getResource}：它内部有自己的锁，并且只在资源重载
+ * 的那个线程上安全。把这份工作丢到别的线程会和它互相等待 —— 之前的实现正是如此，
+ * 表现为卡在 {@code Loading terrain...}。所以这里保持普通 {@link HashMap}，
+ * 全部内容在 {@code GeckoModelLoader#reload()} 里同步填好，运行期只读。</p>
  */
 public class GeckoLibCache {
     private static final Map<String, ObjectBinding> EXTRA_BINDING = new HashMap<>();
     private static GeckoLibCache INSTANCE;
     public final MolangParser parser = createMolangParser();
-    private final Map<ResourceLocation, AnimationFile> animations = new java.util.concurrent.ConcurrentHashMap<>();
-    private final Map<ResourceLocation, GeoModel> geoModels = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<ResourceLocation, AnimationFile> animations = new HashMap<>();
+    private final Map<ResourceLocation, GeoModel> geoModels = new HashMap<>();
     /** 构建失败的 id，避免每帧重复尝试（否则每次渲染都会抛出异常刷屏）。 */
-    private final Set<ResourceLocation> failedGeoModels = java.util.concurrent.ConcurrentHashMap.newKeySet();
-    private final Set<ResourceLocation> failedAnimations = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<ResourceLocation> failedGeoModels = new HashSet<>();
+    private final Set<ResourceLocation> failedAnimations = new HashSet<>();
+    /**
+     * 兜底用的按需构建回调。
+     *
+     * <p>重载时已经把所有模型都构建好了，正常情况下不会走到这里；保留它是为了
+     * 「某个 id 在重载之后才出现」这种意外情况不至于直接渲染失败。</p>
+     */
     @Nullable
     private Function<ResourceLocation, GeoModel> geoModelResolver;
     @Nullable
@@ -55,7 +68,7 @@ public class GeckoLibCache {
         return new MolangParser(EXTRA_BINDING);
     }
 
-    /** 登记惰性构建回调（由 {@code GeckoModelLoader} 在客户端初始化时调用一次）。 */
+    /** 登记兜底构建回调（由 {@code GeckoModelLoader} 在客户端初始化时调用一次）。 */
     public void setGeoModelResolver(@Nullable Function<ResourceLocation, GeoModel> resolver) {
         this.geoModelResolver = resolver;
     }
@@ -64,17 +77,12 @@ public class GeckoLibCache {
         this.animationResolver = resolver;
     }
 
-    /** 鍑犱綍鏄惁宸茬粡鏋勫缓濂斤紙鍙鎺㈡祴锛岀粷涓嶈Е鍙戞瀯寤猴級銆?*/
-    public boolean isGeoModelReady(ResourceLocation id) {
+    /** 是否已经有构建好的几何（只读探测，不触发构建）。 */
+    public boolean hasGeoModel(ResourceLocation id) {
         return geoModels.containsKey(id);
     }
 
-    /** 璇?id 鏄惁宸茶鍒ゅ畾涓烘瀯寤哄け璐ワ紙鍙鎺㈡祴锛夈€?*/
-    public boolean isGeoModelFailed(ResourceLocation id) {
-        return failedGeoModels.contains(id);
-    }
-
-    /** 立即构建并登记（重载时预构建少量常用模型时用）。 */
+    /** 立即登记一个已经构建好的几何。 */
     public void putGeoModel(ResourceLocation id, GeoModel model) {
         geoModels.put(id, model);
         failedGeoModels.remove(id);
@@ -86,12 +94,12 @@ public class GeckoLibCache {
     }
 
     /**
-     * 取模型几何；未构建过则按需构建。
+     * 取模型几何。
      *
      * @return 模型不存在或构建失败时返回 {@code null}
      */
     @Nullable
-    public synchronized GeoModel getGeoModel(ResourceLocation id) {
+    public GeoModel getGeoModel(ResourceLocation id) {
         GeoModel model = geoModels.get(id);
         if (model != null) {
             return model;
@@ -109,10 +117,10 @@ public class GeckoLibCache {
     }
 
     /**
-     * 取模型的动画集合；未构建过则按需构建。
+     * 取模型的动画集合。
      */
     @Nullable
-    public synchronized AnimationFile getAnimationFile(ResourceLocation id) {
+    public AnimationFile getAnimationFile(ResourceLocation id) {
         AnimationFile file = animations.get(id);
         if (file != null) {
             return file;
@@ -127,11 +135,6 @@ public class GeckoLibCache {
         }
         animations.put(id, file);
         return file;
-    }
-
-    /** 是否已经构建过（不触发构建）。 */
-    public boolean hasGeoModel(ResourceLocation id) {
-        return geoModels.containsKey(id);
     }
 
     public Map<ResourceLocation, AnimationFile> getAnimations() {
@@ -150,3 +153,4 @@ public class GeckoLibCache {
         failedAnimations.clear();
     }
 }
+
