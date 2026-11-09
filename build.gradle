@@ -53,6 +53,9 @@ dependencies {
 	modImplementation files("libs/ForgeConfigAPIPort-v3.2.4-1.18.2-Fabric.jar")
 	// Cloth Config：ForgeConfigAPIPort 的配置界面依赖它（仅客户端需要）
 	modImplementation files("libs/cloth-config-6.5.133-fabric.jar")
+	// Patchouli：可选的书籍 API，编译期依赖，运行时可选加载。
+	modCompileOnly files("libs/Patchouli-1.18.2-71.1-FABRIC.jar")
+	modLocalRuntime files("libs/Patchouli-1.18.2-71.1-FABRIC.jar")
 	// night-config：ForgeConfigAPIPort 的配置读写依赖它。
 	//
 	// 原版 ForgeConfigAPIPort 是把这两个 jar 作为 JiJ（jar-in-jar）内嵌的，

@@ -5,6 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.item.ItemExtinguisher;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemMaidBackpack;
 import net.fabricmc.fabric.api.client.itemgroup.FabricItemGroupBuilder;
 import net.fabricmc.fabric.api.item.v1.FabricItemSettings;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
@@ -16,6 +17,22 @@ public final class InitItems {
     public static final CreativeModeTab MAIN_TAB = FabricItemGroupBuilder
             .create(TouhouLittleMaid.rl("main"))
             .icon(() -> new ItemStack(InitItems.MAID_SPAWN_EGG))
+            // 帕秋莉手册是可选前置：装了才把《记忆中的幻想乡》摆进物品栏，
+            // 顺序也与 TLMO 1.20.1 一致（手册排在最前面）。
+            //
+            // 注意 Fabric 的 appendItems 是【替换】默认填充，不会自己调一遍原版逻辑
+            // （反编译 FabricItemGroupBuilder$1#fillItemList 可见：stacksForDisplay 非空时
+            // 只调它、不调 super）。所以这里必须自己按原版规则把物品补回去，否则物品栏会空掉。
+            .appendItems((items, tab) -> {
+                NonNullList<ItemStack> defaults = NonNullList.create();
+                for (Item item : Registry.ITEM) {
+                    item.fillItemCategory(tab, defaults);
+                }
+                if (com.github.tartaricacid.touhoulittlemaid.compat.patchouli.PatchouliCompat.isLoaded()) {
+                    com.github.tartaricacid.touhoulittlemaid.compat.patchouli.CreativeTabCompat.appendBook(items);
+                }
+                items.addAll(defaults);
+            })
             .build();
 
     public static final Item MAID_SPAWN_EGG = Registry.register(Registry.ITEM,

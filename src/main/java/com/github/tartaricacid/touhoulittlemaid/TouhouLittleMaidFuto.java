@@ -42,6 +42,10 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
                 net.minecraftforge.fml.config.ModConfig.Type.SERVER,
                 com.github.tartaricacid.touhoulittlemaid.config.ServerConfig.init());
 
+        // 判据触发器必须在任何数据包（进度 JSON）被解析之前注册，
+        // 否则 grant_book_on_first_join 里的自定义触发器会被当成「未知判据」而整条进度不加载。
+        com.github.tartaricacid.touhoulittlemaid.init.InitTrigger.init();
+
         // 工作模式注册表（idle / attack …），必须在任何女仆实体创建之前就绪：
         // EntityMaid 的同步数据默认值与存档读取都会查这张表
         TaskManager.init();
@@ -51,6 +55,10 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
 
         // 背包注册表（empty 等），同样必须早于任何女仆创建
         BackpackManager.init();
+
+        // 帕秋莉手册兼容：注册祭坛多方块 + 客户端「点侧边栏开书」监听。
+        // 未安装 Patchouli 时本方法内部直接返回，不会加载任何 vazkii.patchouli 类型。
+        com.github.tartaricacid.touhoulittlemaid.compat.patchouli.PatchouliCompat.init();
 
         // 网络包：GUI 里切换居家 / 拾取时，由服务端写入同步数据
         com.github.tartaricacid.touhoulittlemaid.network.MaidConfigPacket.initServer();
@@ -63,10 +71,15 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // P 点的唯一常规来源是女仆妖精（见 InitEntities.FAIRY），
         // 之前那个「女仆击杀掉 P 点」的临时入口已删除。
         com.github.tartaricacid.touhoulittlemaid.event.PowerEvents.init();
-        // 抱着女仆时拿鞍右击空气 = 放下（上游 CancelSaddleMaidEvent）
+        // 抱着的女仆时拿鞍右击空气 = 放下（上游 CancelSaddleMaidEvent）
         com.github.tartaricacid.touhoulittlemaid.event.MaidSaddleEvents.init();
         // carried maid position: ticked from the vehicle side, see MaidCarryTicker
         com.github.tartaricacid.touhoulittlemaid.event.MaidCarryTicker.initServer();
+        // 玩家登录时主动敲一次「首次登录送手册」判据（对应上游 EnterServerEvent）
+        com.github.tartaricacid.touhoulittlemaid.event.EnterServerEvent.init();
+
+        // 合成表：帕秋莉手册的《记忆中的幻想乡》（touhou_little_maid:memorizable_gensokyo）
+        com.github.tartaricacid.touhoulittlemaid.init.InitRecipes.init();
 
         // /tlm 管理命令（GUI 之外的批量修改 / 调试入口）
         MaidCommand.init();

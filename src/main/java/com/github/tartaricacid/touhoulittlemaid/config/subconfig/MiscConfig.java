@@ -111,6 +111,16 @@ public final class MiscConfig {
     }
 
     /**
+     * 首次进入世界时是否寄一本 {@code patchouli:guide_book}（帕秋莉手册）。
+     *
+     * <p>上游的判据触发器每次登录都会读一次它，必须走空安全入口：
+     * 配置尚未加载（专用服务端刚启动 / 数据包刷新）时 {@code .get()} 会抛异常。</p>
+     */
+    public static boolean givePatchouliBook() {
+        return boolOr(GIVE_PATCHOULI_BOOK, true);
+    }
+
+    /**
      * 是否使用新版女仆妖精模型。
      *
      * <p><b>本移植版暂不生效：</b>新版模型是 {@code simplebedrockmodel} 的 JSON 模型，

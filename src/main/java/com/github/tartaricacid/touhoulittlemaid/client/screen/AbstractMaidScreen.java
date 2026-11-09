@@ -1,9 +1,13 @@
 package com.github.tartaricacid.touhoulittlemaid.client.screen;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.api.event.client.OpenPatchouliBookEvent;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
+import com.github.tartaricacid.touhoulittlemaid.client.event.PlayerLoggedInNotice;
+import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.MaidSideTabButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.MaidTabButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.TaskButton;
+import com.github.tartaricacid.touhoulittlemaid.compat.patchouli.PatchouliCompat;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidEffectData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.TabIndex;
@@ -38,6 +42,7 @@ import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraftforge.common.MinecraftForge;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -123,6 +128,14 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
     private ImageButton pageDownButton;
     private ImageButton pageCloseButton;
     private ImageButton infoButton;
+    /**
+     * 右侧侧边栏的「任务手册」按钮（帕秋莉手册入口）。
+     *
+     * <p>与上游 {@code MaidSideTabs} 一样，未安装 Patchouli 时按钮<b>仍然显示</b>，
+     * 点了才提示缺少前置 —— 藏起来反而让人以为功能不存在。</p>
+     */
+    @Nullable
+    private MaidSideTabButton taskBookButton;
 
     /**
      * 全部任务按钮（一次建完，靠 {@code visible} 分页）。
@@ -253,6 +266,9 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         this.tabButtons.clear();
         this.addTabButtons();
 
+        // 右侧侧边栏（帕秋莉手册入口）
+        this.addSideTabButtons();
+
         this.initAdditionWidgets();
     }
 
@@ -272,6 +288,43 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
             this.tabButtons.add(button);
             this.addRenderableWidget(button);
         }
+    }
+
+    // --------------------------------------------------- 右侧侧边栏（手册入口）
+
+    /**
+     * 右侧侧边栏：目前只有「任务手册」一个按钮。
+     *
+     * <p>位置与上游一致：{@code leftPos + 251, topPos + 37}，按钮 26x24，
+     * 图标由 {@link MaidSideTabButton} 从 {@code maid_gui_side.png} 取。</p>
+     */
+    private void addSideTabButtons() {
+        this.taskBookButton = new MaidSideTabButton(this.leftPos + 251, this.topPos + 37, 0,
+                List.of(new TranslatableComponent("gui.touhou_little_maid.button.task_book"),
+                        new TranslatableComponent("gui.touhou_little_maid.button.task_book.desc")),
+                b -> this.openTaskBook());
+        this.addRenderableWidget(this.taskBookButton);
+    }
+
+    /**
+     * 点「任务手册」按钮。
+     *
+     * <p>装了 Patchouli：发一个 {@link OpenPatchouliBookEvent}，由
+     * {@code compat/patchouli/OpenDefaultBook} 打开本模组的手册；其它模组可以监听同一事件
+     * 给自己的任务打开自己的书。</p>
+     *
+     * <p>没装 Patchouli：在聊天栏给出与上游登录提示同款的「点这里安装」消息
+     * （上游这里弹出的是警告界面，本移植版按需求改为聊天栏，信息一字不差）。</p>
+     */
+    private void openTaskBook() {
+        if (this.maid == null) {
+            return;
+        }
+        if (!PatchouliCompat.isLoaded()) {
+            PlayerLoggedInNotice.sendMissingPatchouliMessage(Minecraft.getInstance().player);
+            return;
+        }
+        MinecraftForge.EVENT_BUS.post(new OpenPatchouliBookEvent(this.maid, this.maid.getTask()));
     }
 
     // ------------------------------------------------------- 任务列表（左侧面板）
@@ -564,6 +617,9 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
 
         // 模组贴图的空槽提示（只有主界面有这种槽位）
         this.drawManualSlotHints(poseStack);
+
+        // 右侧侧边栏外框（帕秋莉手册入口）
+        this.drawSideTabBg(poseStack);
     }
 
     /**
@@ -579,6 +635,19 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderTexture(0, TASK);
         this.blit(poseStack, this.leftPos - 93, this.topPos + 5, 0, 0, 92, 251);
+    }
+
+    /**
+     * 右侧侧边栏的外框。
+     *
+     * <p>贴图里这是一整块 21x50、上下两个槽位的框；本移植版只实现了一个手册按钮，
+     * 所以只画上面那一格 —— 贴图在 {@code (235,107)} 处正好是一个完整的 21x25 圆角框，
+     * 不会出现「下半截空槽」的残缺感。</p>
+     */
+    private void drawSideTabBg(PoseStack poseStack) {
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.setShaderTexture(0, SIDE);
+        this.blit(poseStack, this.leftPos + 256, this.topPos + 37, 235, 107, 21, 25);
     }
 
     /**
@@ -868,6 +937,15 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
                 "gui.touhou_little_maid.task.next_page");
         this.renderWidgetTooltip(this.pageCloseButton, poseStack, mouseX, mouseY,
                 "gui.touhou_little_maid.task.close");
+
+        // 右侧「任务手册」按钮：两行提示（标题 + 说明），与上游侧边栏一致
+        if (this.taskBookButton != null && isMouseOver(this.taskBookButton, mouseX, mouseY)) {
+            List<Component> tooltip = this.taskBookButton.getTooltip();
+            if (tooltip != null) {
+                this.renderComponentTooltip(poseStack, tooltip, mouseX, mouseY);
+                return;
+            }
+        }
 
         // 页签：只给「未选中」的那些弹提示（选中的点了也没用）
         for (MaidTabButton tab : this.tabButtons) {

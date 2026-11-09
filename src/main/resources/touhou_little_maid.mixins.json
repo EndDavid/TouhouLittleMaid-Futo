@@ -4,6 +4,7 @@
   "package": "com.github.tartaricacid.touhoulittlemaid.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "CriteriaTriggersAccessor",
     "LivingEntityKillCreditMixin",
     "PlayerPowerMixin",
     "ServerPlayerPowerMixin",

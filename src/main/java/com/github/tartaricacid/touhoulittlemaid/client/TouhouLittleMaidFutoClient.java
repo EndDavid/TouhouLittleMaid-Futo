@@ -65,6 +65,8 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
 
         // 灵力 HUD：手持御币时显示 ×N.NN（上游 ShowPowerEvent）
         com.github.tartaricacid.touhoulittlemaid.client.event.ShowPowerEvent.init();
+        // 未安装帕秋莉手册时，登录后在聊天栏给出「点这里下载」提示（上游 PlayerLoggedInNotice）
+        com.github.tartaricacid.touhoulittlemaid.client.event.PlayerLoggedInNotice.init();
         // 「手持某物指向女仆」的操作提示（上游 client/overlay/MaidTipsOverlay）
         com.github.tartaricacid.touhoulittlemaid.client.overlay.MaidTipsOverlay.init();
         // 指南针：右击女仆后在世界里画她的工作区域（上游 client/event/MaidAreaRenderEvent）
