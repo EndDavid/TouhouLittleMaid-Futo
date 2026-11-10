@@ -73,6 +73,17 @@ dependencies {
 
 	// 说明：基岩版模型解析库（simplebedrockmodel）将在渲染里程碑中作为独立 Fabric 库接入，
 	// 目前尚未使用，因此暂不加入依赖，避免启动期出现缺失 jar 的警告。
+	// Fiber：Patchouli 用的配置库。Patchouli 的 Fabric 版把它作为 JiJ 内嵌在
+	// META-INF/jars/fiber-0.23.0-2.jar 里，而 Loom 不展开 files() 本地依赖的
+	// 嵌套 jar（和上面的 night-config 完全同一个坑），所以开发环境启动时会崩在
+	// 入口点阶段：
+	//   NoClassDefFoundError: io/github/fablabsmc/fablabs/api/fiber/v1/schema/type/derived/ConfigType
+	//       at vazkii.patchouli.fabric.common.FabricModInitializer.onInitialize -> FiberPatchouliConfig.setup()
+	// 该崩溃发生在窗口创建之前，Minecraft 只会弹出一个要手动关掉的崩溃对话框，
+	// 表现得很像「卡死」。解决办法同上：从 Patchouli 的 META-INF/jars 里把它解出来，
+	// 单独作为模组依赖加载（jar 自带 fabric.mod.json，mod id 为 fiber）。
+	// 我们不对 Fiber 写代码，因此只需运行期存在，用 modLocalRuntime 即可。
+	modLocalRuntime files("libs/fiber-0.23.0-2.jar")
 }
 
 processResources {
