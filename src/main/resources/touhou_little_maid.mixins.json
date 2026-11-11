@@ -5,7 +5,6 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "CriteriaTriggersAccessor",
-    "LivingEntityBreakItemAccessor",
     "LivingEntityKillCreditMixin",
     "PlayerPowerMixin",
     "ServerPlayerPowerMixin",
@@ -13,6 +12,7 @@
     "EntityPositionRiderMixin"
   ],
   "client": [
+    "client.LivingEntityBreakItemAccessor",
     "client.HumanoidModelMixin",
     "client.ItemInHandRendererMixin",
     "client.ItemInHandLayerMixin",

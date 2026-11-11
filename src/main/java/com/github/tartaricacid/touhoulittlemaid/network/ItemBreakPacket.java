@@ -58,10 +58,11 @@ public final class ItemBreakPacket {
         if (!maid.isAlive()) {
             return;
         }
-        // LivingEntity#breakItem is private in 1.18.2 (Forge opens it through an AT),
-        // so the call goes through the @Invoker accessor.
-        com.github.tartaricacid.touhoulittlemaid.mixin.LivingEntityBreakItemAccessor
-                .invokeBreakItem(maid, stack);
+        // LivingEntity#breakItem is private in 1.18.2 (Forge opens it through an AT)
+        // and is @Environment(CLIENT), so the call goes through a client-section
+        // @Invoker accessor. The invoker is an instance method - a static one would
+        // make Mixin look for a *static* breakItem and refuse to apply.
+        ((com.github.tartaricacid.touhoulittlemaid.mixin.client.LivingEntityBreakItemAccessor) maid)
+                .futo$breakItem(stack);
     }
 }
-
