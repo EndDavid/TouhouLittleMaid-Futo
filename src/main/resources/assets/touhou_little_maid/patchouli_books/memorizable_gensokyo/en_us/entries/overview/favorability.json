@@ -1,7 +1,7 @@
 {
   "sortnum": 4,
   "name": "patchouli.touhou_little_maid.book.entries.overview.favorability.name",
-  "icon": "touhou_little_maid:favorability_tool_add",
+  "icon": "minecraft:cake",
   "category": "touhou_little_maid:overview",
   "pages": [
     {
