@@ -30,6 +30,9 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // 方块 / 方块实体必须在物品之前：ItemMaidBeacon 的构造器要读 InitBlocks.MAID_BEACON
         com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.init();
         InitItems.init();
+        // 饰品登记表：必须晚于物品注册（它按物品实例建立「物品 → 行为」映射），
+        // 但必须早于任何女仆被创建 —— BaubleItemHandler 在读档 / 换物时会查它。
+        com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager.init();
         InitMenu.init();
 
 // 注册配置（Forge Config API Port 提供与 Forge 完全相同的 API）

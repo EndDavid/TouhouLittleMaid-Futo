@@ -10,7 +10,18 @@ $registered = @(
   'touhou_little_maid:maid_backpack_small','touhou_little_maid:maid_backpack_middle',
   'touhou_little_maid:maid_backpack_big','touhou_little_maid:crafting_table_backpack',
   'touhou_little_maid:ender_chest_backpack','touhou_little_maid:furnace_backpack',
-  'touhou_little_maid:tank_backpack'
+  'touhou_little_maid:tank_backpack',
+  # --- maid baubles (registered by InitItems) ---
+  'touhou_little_maid:ultramarine_orb_elixir',
+  'touhou_little_maid:explosion_protect_bauble',
+  'touhou_little_maid:fire_protect_bauble',
+  'touhou_little_maid:projectile_protect_bauble',
+  'touhou_little_maid:magic_protect_bauble',
+  'touhou_little_maid:fall_protect_bauble',
+  'touhou_little_maid:drown_protect_bauble',
+  'touhou_little_maid:nimble_fabric',
+  'touhou_little_maid:item_magnet_bauble',
+  'touhou_little_maid:mute_bauble'
 )
 $entities = @('touhou_little_maid:maid','touhou_little_maid:fairy','touhou_little_maid:power_point')
 
@@ -79,4 +90,3 @@ foreach ($f in Get-ChildItem -Filter *.json (Join-Path $book 'templates')) {
 
 Write-Output ''
 Write-Output ("entries={0} categories={1} problems={2}" -f (Get-ChildItem -Recurse -Filter *.json (Join-Path $book 'entries')).Count, $cats.Count, $problems)
-

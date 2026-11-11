@@ -117,6 +117,57 @@ public final class InitItems {
             TouhouLittleMaid.rl("power_point"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemPowerPoint());
 
+    // ------------------------------------------------------------------ 女仆饰品
+
+    /*
+     * 饰品（Bauble）的物品侧注册。行为侧在 item/bauble/BaubleManager 里绑定。
+     *
+     * 耐久数值逐条取自上游 InitItems：极意 6、爆炸 32、火焰 128、投射物 64、
+     * 魔法 128、摔落 32、溺水 64、机敏织物 64；物品磁铁与静音无耐久（普通饰品）。
+     *
+     * 注意 BOTH 类物品都 stacksTo(1) —— 饰品是「装备」，不做堆叠。
+     */
+
+    public static final Item ULTRAMARINE_ORB_ELIXIR = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("ultramarine_orb_elixir"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(6));
+
+    public static final Item EXPLOSION_PROTECT_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("explosion_protect_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(32));
+
+    public static final Item FIRE_PROTECT_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("fire_protect_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(128));
+
+    public static final Item PROJECTILE_PROTECT_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("projectile_protect_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(64));
+
+    public static final Item MAGIC_PROTECT_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("magic_protect_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(128));
+
+    public static final Item FALL_PROTECT_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("fall_protect_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(32));
+
+    public static final Item DROWN_PROTECT_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("drown_protect_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(64));
+
+    public static final Item NIMBLE_FABRIC = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("nimble_fabric"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemDamageableBauble(64));
+
+    public static final Item ITEM_MAGNET_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("item_magnet_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemNormalBauble());
+
+    public static final Item MUTE_BAUBLE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("mute_bauble"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemNormalBauble());
+
     // ------------------------------------------------------------------ 背包
 
     public static final Item MAID_BACKPACK_SMALL = registerBackpack("maid_backpack_small");

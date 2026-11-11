@@ -1,5 +1,8 @@
 package com.github.tartaricacid.touhoulittlemaid.util;
 
+import com.github.tartaricacid.touhoulittlemaid.api.bauble.IMaidBauble;
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.inventory.handler.BaubleItemHandler;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
@@ -92,5 +95,26 @@ public final class ItemsUtil {
      */
     public static void dropEntityItems(Entity entity, IItemHandler itemHandler) {
         dropEntityItems(entity, itemHandler, 0, itemHandler.getSlots());
+    }
+
+    /**
+     * 在女仆的饰品栏里找到承载指定饰品的槽位，移植自上游 {@code ItemsUtil#getBaubleSlotInMaid}。
+     *
+     * <p><b>为什么按对象身份（{@code ==}）比较而不是按物品比较：</b>
+     * 每种饰品的 {@code IMaidBauble} 实现都是 {@code BaubleManager} 里的<b>单例</b>，
+     * 而 {@code BaubleItemHandler} 会把「物品 → 该单例」缓存在槽位上。
+     * 所以「槽位缓存 == 我」等价于「这一格装的就是我这件饰品」。
+     * 而且一次引用比较就够，不必再反查注册表。</p>
+     *
+     * @return 找不到返回 {@code -1}
+     */
+    public static int getBaubleSlotInMaid(EntityMaid maid, IMaidBauble bauble) {
+        BaubleItemHandler handler = maid.getMaidBauble();
+        for (int i = 0; i < handler.getSlots(); i++) {
+            if (handler.getBaubleInSlot(i) == bauble) {
+                return i;
+            }
+        }
+        return -1;
     }
 }

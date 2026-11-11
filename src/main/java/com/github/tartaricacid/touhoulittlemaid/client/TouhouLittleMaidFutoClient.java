@@ -136,6 +136,38 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                     });
                 });
 
+        // 女仆粒子包（S2C）：饰品触发时让附近客户端播粒子。
+        // 粒子方法本身在 EntityMaid 上，是客户端专用的（上游同款），所以必须走包。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.MaidParticlePacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    int entityId = buf.readInt();
+                    int type = buf.readByte();
+                    client.execute(() -> {
+                        if (client.level != null
+                                && client.level.getEntity(entityId)
+                                instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid
+                                && maid.isAlive()) {
+                            com.github.tartaricacid.touhoulittlemaid.network.MaidParticlePacket.handle(maid, type);
+                        }
+                    });
+                });
+
+        // 装备碎裂包（S2C）：LivingEntity#breakItem 是客户端方法，服务端只能通知。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.ItemBreakPacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    int entityId = buf.readInt();
+                    net.minecraft.world.item.ItemStack stack = buf.readItem();
+                    client.execute(() -> {
+                        if (client.level != null
+                                && client.level.getEntity(entityId)
+                                instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) {
+                            com.github.tartaricacid.touhoulittlemaid.network.ItemBreakPacket.handle(maid, stack);
+                        }
+                    });
+                });
+
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(
                 new SimpleSynchronousResourceReloadListener() {
                     @Override

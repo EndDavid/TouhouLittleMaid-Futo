@@ -1,7 +1,7 @@
 # 暂存的手册页面（Patchouli book pages held back）
 
 这里放的是**刚从 `src/main/resources` 里挪出来**的《记忆中的幻想乡》词条，
-原样保留、未做任何修改。它们和上游 jar 里的同名文件仍然逐字节一致。
+原样保留、未做任何修改 —— 它们和上游 jar 里的同名文件仍然逐字节一致。
 
 ## 为什么要挪出来
 
@@ -15,7 +15,7 @@
    就抛 `JsonParseException: Unknown item ID: xxx`；
 5. `BookEntry#build` 把它包成 `RuntimeException`，`Book#reloadContents` 捕获后
    直接 `BookContents.empty(book, e)`；
-6. 结果就是**整本书变成空的**——首页只剩一个「索引」按钮，并显示
+6. 结果就是**整本书变成空的** —— 首页只剩一个「索引」按钮，并显示
    `Loading error! (Hover for info)`。
 
 日志里对应的行是：
@@ -28,49 +28,48 @@
 ```
 
 > 注意：**词条图标**（`icon` 字段）不认识物品时只 warn、不抛异常
-> （`BookIcon#from` 会退回 `StackIcon(ItemStack.EMPTY)`，画出来是空的），
-> 所以图标缺失不会导致整本书崩掉；真正致命的是 `spotlight` 页的 `item`。
+> （`BookIcon#from` 会退回 `StackIcon(ItemStack.EMPTY)`，画出来是空槽），
+> 所以图标缺失不会导致整本书崩溃；真正致命的是 `spotlight` 页的 `item`。
 
-## 缺口是什么
+## 现在还剩什么缺口
 
-被挪出来的 23 页，缺的是 **29 个还没移植的物品/方块**：
+被挪出来的 20 页，缺的是**尚未移植的物品 / 方块**：
 
-| 词条 | 缺失的物品 ID |
-| --- | --- |
-| `maid/film` | `film` |
-| `maid/gap` | `wireless_io` |
-| `maid/item_magnet` | `item_magnet_bauble` |
-| `maid/kappa_compass` | `kappa_compass` |
-| `maid/maid_bauble` | `ultramarine_orb_elixir`、`*_protect_bauble`、`nimble_fabric` |
-| `maid/mute_bauble` | `mute_bauble` |
-| `maid/servant_bell` | `servant_bell` |
-| `maid/substitute_jizo` | `substitute_jizo` |
-| `other/broom` | `broom` |
-| `other/chair` | `chair`、`cat_cart`、`beach_chair` |
-| `other/chair_show` | `chair_show` |
-| `other/chisel_and_statues` | `chisel`、`statue` |
-| `other/favorability_tool` | `favorability_tool_add/full/reduce` |
-| `other/fox_scroll` | `red_fox_scroll`、`white_fox_scroll` |
-| `other/garage_kit` | `garage_kit` |
-| `other/gomoku` | `gomoku` |
-| `other/granite_inari_fox` | `scarecrow` |
-| `other/maid_bed` | `maid_bed` |
-| `other/maid_joy` | `keyboard`、`bookshelf`、`computer`、`gomoku` |
-| `other/model_switcher` | `model_switcher` |
-| `other/picnic_basket` | `picnic_basket` |
-| `other/shrine` | `shrine` |
-| `other/trumpet` | `trumpet` |
+| 词条 | 缺失的物品 ID | 所属子系统 |
+| --- | --- | --- |
+| `maid/film` | `film` | 神社复兴 |
+| `maid/gap` | `wireless_io` | 女仆饰品（无线 IO） |
+| `maid/kappa_compass` | `kappa_compass` | 搜索类工具 |
+| `maid/servant_bell` | `servant_bell` | 搜索类工具 |
+| `maid/substitute_jizo` | `substitute_jizo` | 神社复兴 |
+| `other/broom` | `broom` | 扫帚 |
+| `other/chair` | `chair`、`cat_cart`、`beach_chair` | 坐垫 / 椅子 |
+| `other/chair_show` | `chair_show` | 坐垫 / 椅子 |
+| `other/chisel_and_statues` | `chisel`、`statue` | 手办与雕像 |
+| `other/favorability_tool` | `favorability_tool_add/full/reduce` | 好感度工具 |
+| `other/fox_scroll` | `red_fox_scroll`、`white_fox_scroll` | 搜索类工具 |
+| `other/garage_kit` | `garage_kit` | 手办与雕像 |
+| `other/gomoku` | `gomoku` | 棋类与娱乐方块 |
+| `other/granite_inari_fox` | `scarecrow` | 神社复兴 |
+| `other/maid_bed` | `maid_bed` | 神社复兴 |
+| `other/maid_joy` | `keyboard`、`bookshelf`、`computer`、`gomoku` | 棋类与娱乐方块 |
+| `other/model_switcher` | `model_switcher` | 模型切换器 |
+| `other/picnic_basket` | `picnic_basket` | 野餐与娱乐 |
+| `other/shrine` | `shrine` | 神社复兴（含祭坛） |
+| `other/trumpet` | `trumpet` | 搜索类工具 |
 
-对应的 7 个子系统：**坐垫/椅子**（含 `chair_show`）、**手办与雕像**（`chisel` /
-`statue` / `garage_kit`）、**棋类与娱乐方块**（`gomoku` / `cchess` / `wchess` /
-`keyboard` / `bookshelf` / `computer` / `picnic_mat`）、**扫帚**、
-**神社复兴**（`shrine` / `film` / `maid_bed` / `scarecrow` / `altar`）、
-**女仆饰品**（各类 bauble / `wireless_io` / `ultramarine_orb_elixir`）、
-**搜索类工具**（`kappa_compass` / `servant_bell` / `trumpet` / `fox_scroll`）。
+对应 6 个子系统：**坐垫 / 椅子**、**手办与雕像**、**棋类与娱乐方块**、
+**扫帚**、**神社复兴**（含祭坛）、**搜索类工具**。
 
-另外 `other/chair` 与 `maid/maid_bauble` 这两页虽然不会致命（它们的 `spotlight`
-不存在，只有图标缺），但整页讲的都是尚未移植的物品，留着等于手册在描述不存在的
-内容，所以一起挪出来了。
+## 已经还回去的（女仆饰品）
+
+`maid/maid_bauble.json`、`maid/mute_bauble.json`、`maid/item_magnet.json`
+三页已经还原进资源 —— 饰品子系统移植完成后，它们引用的
+`ultramarine_orb_elixir` / `*_protect_bauble` / `nimble_fabric` /
+`item_magnet_bauble` / `mute_bauble` 全部完成注册。
+
+`maid/gap.json` 仍留在本目录：它讲的是 `wireless_io`（无线 IO 饰品），
+这件物品要等 IO 配置界面一起移植，所以先不还原。
 
 ## 怎么还原
 
@@ -83,14 +82,21 @@ port/book_pages_held_back/other/gomoku.json
 
 不需要改任何其它东西：分类页是自动收录词条的，词条回来自动出现。
 
-**还原前务必确认该页引用的物品/方块都已注册**，否则整本书会再次变成
-`Loading error!`（这正是帕秋莉的失败模式）。
+**还原前务必确认该页引用的物品 / 方块都已注册**，否则整本书会再次变成
+`Loading error!`（这正是帕秋莉的失败模式）。`validate-book.ps1` 就是为此而写的：
 
-## 目前手册里保留了什么（29 页）
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File port/book_pages_held_back/validate-book.ps1
+```
 
-- `maid/`：backpack、chat_bubbles、last_slot、maid_base、maid_config、maid_home、
-  maid_meal、maid_skin、maid_sound、maid_task、naming_eggs、other_backpack、
-  snowball_fight、spawn_maid
+它按帕秋莉的规则静态检查 `spotlight` 物品 / 词条与分类图标 / 分类引用 / entity 页。
+**每还原一页就要跑一次，并同步在 `$registered` 里补上新增的物品 id。**
+
+## 目前手册里保留了什么（32 词条 / 3 分类）
+
+- `maid/`：backpack、chat_bubbles、item_magnet、last_slot、maid_bauble、maid_base、
+  maid_config、maid_home、maid_meal、maid_skin、maid_sound、maid_task、mute_bauble、
+  naming_eggs、other_backpack、snowball_fight、spawn_maid
 - `other/`：camera_and_photo、command、extinguisher、maid_beacon、power_point
 - `overview/`：download_custom_pack、favorability、gohei_and_danmaku、
   make_custom_chatbubble_text、make_custom_model、multiblocks_altar、power_point、

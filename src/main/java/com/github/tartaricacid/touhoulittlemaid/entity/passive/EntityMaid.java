@@ -192,6 +192,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      */
     private static final int MAID_INVENTORY_SIZE = 36;
     private static final String MAID_INVENTORY_TAG = "MaidInventory";
+    /**
+     * Bauble inventory save key (upstream EntityMaid.MAID_BAUBLE_INVENTORY_TAG).
+     */
+    public static final String MAID_BAUBLE_INVENTORY_TAG = "MaidBaubleInventory";
 
     private final ItemStack[] handItemsForAnimation = new ItemStack[]{ItemStack.EMPTY, ItemStack.EMPTY};
     /**
@@ -298,6 +302,14 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     private final ItemStackHandler maidInv = new ItemStackHandler(MAID_INVENTORY_SIZE);
     private final EntityArmorInvWrapper armorInvWrapper = new EntityArmorInvWrapper(this);
     private final EntityHandsInvWrapper handsInvWrapper = new EntityHandsInvWrapper(this);
+
+    /**
+     * Maid bauble inventory (upstream EntityMaid#maidBauble).
+     * Fixed at BAUBLE_INV_SIZE slots = the 3x3 grid in the GUI; upstream hardcodes 9 too.
+     */
+    public static final int BAUBLE_INV_SIZE = 9;
+    private final com.github.tartaricacid.touhoulittlemaid.inventory.handler.BaubleItemHandler maidBauble =
+            new com.github.tartaricacid.touhoulittlemaid.inventory.handler.BaubleItemHandler(BAUBLE_INV_SIZE);
 
     public EntityMaid(EntityType<? extends EntityMaid> type, Level level) {
         super(type, level);
@@ -1022,6 +1034,13 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         return this.maidInv;
     }
 
+    /**
+     * Maid bauble inventory (upstream EntityMaid#getMaidBauble).
+     */
+    public com.github.tartaricacid.touhoulittlemaid.inventory.handler.BaubleItemHandler getMaidBauble() {
+        return this.maidBauble;
+    }
+
     public IMaidBackpack getMaidBackpackType() {
         // Same as upstream: an unknown id (e.g. the type was removed from the registry)
         // degrades to the empty backpack instead of throwing.
@@ -1327,6 +1346,82 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      * <p>是「替换」而不是「合并」：服务端回传的就是该时刻的完整快照，
      * 合并只会留下已经到期、但这次没被回传的残留项。</p>
      */
+    /**
+     * Tells nearby clients that a piece of gear broke (upstream #sendItemBreakMessage).
+     * LivingEntity#breakItem is client-only, so the server can only notify.
+     */
+    public void sendItemBreakMessage(ItemStack stack) {
+        if (!this.level.isClientSide) {
+            com.github.tartaricacid.touhoulittlemaid.network.ItemBreakPacket.sendNearby(this, stack);
+        }
+    }
+
+    /**
+     * Bubble burst (upstream EntityMaid#spawnBubbleParticle). Client side only.
+     */
+    public void spawnBubbleParticle() {
+        if (this.level.isClientSide) {
+            for (int i = 0; i < 8; ++i) {
+                double offsetX = 2 * this.random.nextDouble() - 1;
+                double offsetY = this.random.nextDouble() / 2;
+                double offsetZ = 2 * this.random.nextDouble() - 1;
+                this.level.addParticle(ParticleTypes.BUBBLE,
+                        this.getX() + offsetX, this.getY() + offsetY, this.getZ() + offsetZ, 0, 0.1, 0);
+            }
+        }
+    }
+
+    /**
+     * Hearts (upstream EntityMaid#spawnHeartParticle).
+     * Note the split: spawnHeartParticles(int) is the server-side broadcast form used by
+     * interactions, this one is the client-side local form driven by the particle packet.
+     */
+    public void spawnHeartParticle() {
+        if (this.level.isClientSide) {
+            for (int i = 0; i < 8; ++i) {
+                double offsetX = this.random.nextGaussian() * 0.02;
+                double offsetY = this.random.nextGaussian() * 0.02;
+                double offsetZ = this.random.nextGaussian() * 0.02;
+                this.level.addParticle(ParticleTypes.HEART,
+                        this.getRandomX(1.0), this.getRandomY() + 0.5, this.getRandomZ(1.0),
+                        offsetX, offsetY, offsetZ);
+            }
+        }
+    }
+
+    /**
+     * Healing sparkles (upstream EntityMaid#spawnRestoreHealthParticle).
+     */
+    public void spawnRestoreHealthParticle(int particleCount) {
+        if (this.level.isClientSide) {
+            for (int i = 0; i < particleCount; ++i) {
+                double xRandom = this.random.nextGaussian() * 0.02;
+                double yRandom = this.random.nextGaussian() * 0.02;
+                double zRandom = this.random.nextGaussian() * 0.02;
+                this.level.addParticle(ParticleTypes.ENTITY_EFFECT,
+                        this.getX() + (this.random.nextFloat() * this.getBbWidth() * 2.0F) - this.getBbWidth() - xRandom * 10.0,
+                        this.getY() + (this.random.nextFloat() * this.getBbHeight()) - yRandom * 10.0,
+                        this.getZ() + (this.random.nextFloat() * this.getBbWidth() * 2.0F) - this.getBbWidth() - zRandom * 10.0,
+                        0.9, 0.1, 0.1);
+            }
+        }
+    }
+
+    /**
+     * Ranking-up burst (upstream EntityMaid#spawnRankUpParticle).
+     * Deviation: upstream also shows a client title through Minecraft#gui; this class is
+     * shared code, so referencing Minecraft here would drag client classes into the server
+     * jar. The totem burst and the bell sound are kept.
+     */
+    public void spawnRankUpParticle() {
+        if (this.level.isClientSide) {
+            this.level.addParticle(ParticleTypes.TOTEM_OF_UNDYING,
+                    this.getRandomX(1.0), this.getRandomY() + 0.5, this.getRandomZ(1.0), 0, 0.1, 0);
+            this.level.playLocalSound(this.getX(), this.getY(), this.getZ(),
+                    SoundEvents.BELL_BLOCK, this.getSoundSource(), 1.0F, 1.0F, false);
+        }
+    }
+
     public void setEffects(List<MaidEffectData> effects) {
         this.effects.clear();
         this.effects.addAll(effects);
@@ -1545,6 +1640,13 @@ public class EntityMaid extends TamableAnimal implements IMaid,
 
     @Override
     public void die(DamageSource source) {
+        // Upstream wraps super.die in a cancelable MaidDeathEvent: the undying totem and
+        // the extra-life elixir resurrect the maid by cancelling it, both at HIGH priority
+        // so they run before anything else observes the death.
+        if (net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new com.github.tartaricacid.touhoulittlemaid.api.event.MaidDeathEvent(this, source)).isCanceled()) {
+            return;
+        }
         super.die(source);
         if (!this.level.isClientSide) {
             this.level.broadcastEntityEvent(this, (byte) 60);
@@ -1683,6 +1785,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     protected SoundEvent getAmbientSound() {
         // 与上游一致：环境音由当前 Task 决定（不同工作模式不同语音），
         // 并按时间段 / 天气 / 生物群系挑环境音。
+        if (net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new com.github.tartaricacid.touhoulittlemaid.api.event.MaidPlaySoundEvent(this)).isCanceled()) {
+            return null;
+        }
         return this.getTask().getAmbientSound(this);
     }
     /**
@@ -1699,6 +1805,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         if (!this.shouldPlayVoice()) {
             return null;
         }
+        if (net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new com.github.tartaricacid.touhoulittlemaid.api.event.MaidPlaySoundEvent(this)).isCanceled()) {
+            return null;
+        }
         return source.isFire() ? InitSounds.MAID_HURT_FIRE : InitSounds.MAID_HURT;
     }
 
@@ -1708,6 +1818,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     @Nullable
     @Override
     protected SoundEvent getDeathSound() {
+        if (net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new com.github.tartaricacid.touhoulittlemaid.api.event.MaidPlaySoundEvent(this)).isCanceled()) {
+            return null;
+        }
         return this.shouldPlayVoice() ? InitSounds.MAID_DEATH : null;
     }
 
@@ -1744,6 +1858,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         tag.putString("MaidBackpackType", this.getMaidBackpackType().getId().toString());
         tag.put(MAID_INVENTORY_TAG, this.maidInv.serializeNBT());
         tag.put(MAID_HIDE_INVENTORY_TAG, this.hideInv.serializeNBT());
+        tag.put(MAID_BAUBLE_INVENTORY_TAG, this.maidBauble.serializeNBT());
         this.favorabilityManager.save(tag);
 
         MaidSubConfig.save(tag, this);
@@ -1820,6 +1935,9 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         if (tag.contains(MAID_HIDE_INVENTORY_TAG)) {
             this.hideInv.deserializeNBT(tag.getCompound(MAID_HIDE_INVENTORY_TAG));
         }
+        if (tag.contains(MAID_BAUBLE_INVENTORY_TAG)) {
+            this.maidBauble.deserializeNBT(tag.getCompound(MAID_BAUBLE_INVENTORY_TAG));
+        }
         this.favorabilityManager.load(tag);
         // 好感度决定最大生命与攻击力，读档后必须按当前好感度重建一次属性，
         // 否则会出现「好感度 300 但生命還是 20」
@@ -1850,6 +1968,12 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         if (this.backpackDelay > 0) {
             this.backpackDelay--;
         }
+        // Drive every bauble per-tick hook (upstream MaidTickEvent -> maidBauble.fireEvent).
+        // Returning false keeps iterating so every bauble gets its tick.
+        this.maidBauble.fireEvent((bauble, stack) -> {
+            bauble.onTick(this, stack);
+            return false;
+        });
         // 好感度冷却表：吃饭 / 睡觉 / 玩棋等每种行为都有各自的冷却（见 Type）
         this.favorabilityManager.tick();
 
@@ -1891,6 +2015,43 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     private int passiveUseShieldTick;
 
     /**
+     * Damage settlement, ported from upstream EntityMaid#actuallyHurt.
+     * Vanilla arithmetic plus one hook: right before health is subtracted it posts
+     * MaidDamageEvent. Being after armour / resistance / absorption is deliberate -
+     * getAmount() is then the damage that would really be taken, which is what the
+     * protection baubles need in order to decide whether to spend durability.
+     */
+    @Override
+    protected void actuallyHurt(net.minecraft.world.damagesource.DamageSource damageSrc, float damageAmount) {
+        if (this.isInvulnerableTo(damageSrc)) {
+            return;
+        }
+        damageAmount = this.getDamageAfterArmorAbsorb(damageSrc, damageAmount);
+        damageAmount = this.getDamageAfterMagicAbsorb(damageSrc, damageAmount);
+        float beforeAbsorption = damageAmount;
+        damageAmount = Math.max(damageAmount - this.getAbsorptionAmount(), 0.0F);
+        this.setAbsorptionAmount(this.getAbsorptionAmount() - (beforeAbsorption - damageAmount));
+        float absorbed = beforeAbsorption - damageAmount;
+        if (absorbed > 0.0F && absorbed < Float.MAX_VALUE / 10.0F
+                && damageSrc.getEntity() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            serverPlayer.awardStat(net.minecraft.stats.Stats.DAMAGE_DEALT_ABSORBED, Math.round(absorbed * 10.0F));
+        }
+
+        com.github.tartaricacid.touhoulittlemaid.api.event.MaidDamageEvent event =
+                new com.github.tartaricacid.touhoulittlemaid.api.event.MaidDamageEvent(this, damageSrc, damageAmount);
+        damageAmount = net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event).isCanceled() ? 0.0F : event.getAmount();
+
+        if (damageAmount == 0.0F) {
+            return;
+        }
+        float health = this.getHealth();
+        this.setHealth(health - damageAmount);
+        this.getCombatTracker().recordDamage(damageSrc, health, damageAmount);
+        this.setAbsorptionAmount(this.getAbsorptionAmount() - damageAmount);
+        this.gameEvent(net.minecraft.world.level.gameevent.GameEvent.ENTITY_DAMAGED, damageSrc.getEntity());
+    }
+
+    /**
      * 受伤处理，移植自上游 {@code EntityMaid#hurt}。
      *
      * <p>两处与 vanilla 不同，都是上游行为：</p>
@@ -1910,6 +2071,12 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      */
     @Override
     public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
+        // Upstream posts MaidAttackEvent first: cancelling means "this hit never landed",
+        // which is how the nimble fabric bauble dodges projectiles.
+        if (net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new com.github.tartaricacid.touhoulittlemaid.api.event.MaidAttackEvent(this, source, amount)).isCanceled()) {
+            return false;
+        }
         if (source.getEntity() instanceof net.minecraft.world.entity.player.Player player
                 && this.isAlliedTo(player)) {
             amount = net.minecraft.util.Mth.clamp(amount / 5.0F, 0.0F, 2.0F);

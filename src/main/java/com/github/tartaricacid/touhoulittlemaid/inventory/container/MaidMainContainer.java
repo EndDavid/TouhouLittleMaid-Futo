@@ -100,6 +100,7 @@ public class MaidMainContainer extends AbstractMaidContainer {
         if (foundMaid != null) {
             this.addMaidArmorInv(foundMaid);
             this.addMaidHandInv(foundMaid);
+            this.addMaidBauble(foundMaid);
             this.addBackpackInv(foundMaid, capacity);
         }
     }
@@ -173,6 +174,22 @@ public class MaidMainContainer extends AbstractMaidContainer {
                 return Pair.of(InventoryMenu.BLOCK_ATLAS, InventoryMenu.EMPTY_ARMOR_SLOT_SHIELD);
             }
         });
+    }
+
+    /**
+     * 女仆饰品栏 3x3（上游 {@code MaidMainContainer#addMaidBauble}）。
+     *
+     * <p>坐标逐格取自上游：{@code (86 + 18*j, 99 + 18*i)}，即从 (86,99) 起 3 行 3 列。
+     * 这 9 格画在 {@code maid_gui_main.png} 的左下区域，与护甲 / 双手并排。</p>
+     */
+    private void addMaidBauble(EntityMaid maid) {
+        com.github.tartaricacid.touhoulittlemaid.inventory.handler.BaubleItemHandler bauble =
+                maid.getMaidBauble();
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                this.addSlot(new SlotItemHandler(bauble, i * 3 + j, 86 + 18 * j, 99 + 18 * i));
+            }
+        }
     }
 
     private void addBackpackInv(EntityMaid maid, int capacity) {
