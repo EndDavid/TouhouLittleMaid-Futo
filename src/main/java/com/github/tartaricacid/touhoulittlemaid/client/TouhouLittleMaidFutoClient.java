@@ -69,6 +69,8 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.client.event.PlayerLoggedInNotice.init();
         // 「手持某物指向女仆」的操作提示（上游 client/overlay/MaidTipsOverlay）
         com.github.tartaricacid.touhoulittlemaid.client.overlay.MaidTipsOverlay.init();
+        // 物品说明：饰品 / 背包追加「需要放置在…」的提示（上游 AddInformationEvent）
+        com.github.tartaricacid.touhoulittlemaid.client.event.AddInformationEvent.init();
         // 指南针：右击女仆后在世界里画她的工作区域（上游 client/event/MaidAreaRenderEvent）
         com.github.tartaricacid.touhoulittlemaid.client.render.MaidAreaRenderer.init();
         // 指南针 / 命名牌的客户端行为（上游 UseNameTagEvent 的客户端那一半 + 区域显示入口）
@@ -182,3 +184,4 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 });
     }
 }
+

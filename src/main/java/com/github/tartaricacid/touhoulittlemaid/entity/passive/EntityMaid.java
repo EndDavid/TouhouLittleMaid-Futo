@@ -317,12 +317,35 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.setPersistenceRequired();
     }
 
+    /**
+     * Attributes, copied field for field from upstream EntityMaid#createAttributes.
+     *
+     * <p>Upstream is:</p>
+     * <pre>
+     * LivingEntity.createLivingAttributes()      // five attributes, all default values
+     *     .add(Attributes.FOLLOW_RANGE, 64)
+     *     .add(Attributes.ATTACK_KNOCKBACK)
+     *     .add(Attributes.ATTACK_DAMAGE)
+     *     .add(Attributes.LUCK)</pre>
+     *
+     * <p>The point is what it does NOT override: MOVEMENT_SPEED stays at the vanilla
+     * generic.movement_speed default of 0.7. This port used to write
+     * .add(Attributes.MOVEMENT_SPEED, 0.35D), which halved the base speed of every
+     * single movement instruction - every AI task computes
+     * speed * MOVEMENT_SPEED, so identical multipliers on a halved base meant the maid
+     * moved at half upstream speed everywhere. It is most obvious when she runs a long
+     * stretch toward an owner holding cake.</p>
+     *
+     * <p>MAX_HEALTH is not written here either: the vanilla default is already 20, and
+     * FavorabilityManager#refreshAttributes resets the base value from the favorability
+     * level afterwards, so pinning it here would only hide that layer.</p>
+     */
     public static net.minecraft.world.entity.ai.attributes.AttributeSupplier.Builder createAttributes() {
-        return TamableAnimal.createMobAttributes()
-                .add(Attributes.MAX_HEALTH, 20.0D)
-                .add(Attributes.MOVEMENT_SPEED, 0.35D)
+        return LivingEntity.createLivingAttributes()
                 .add(Attributes.FOLLOW_RANGE, 64.0D)
-                .add(Attributes.ATTACK_DAMAGE, 2.0D);
+                .add(Attributes.ATTACK_KNOCKBACK)
+                .add(Attributes.ATTACK_DAMAGE)
+                .add(Attributes.LUCK);
     }
 
     /**
