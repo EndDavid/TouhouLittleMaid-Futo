@@ -47,6 +47,11 @@ loom_version=1.15.5
 **`gradlew build` 通过 ≠ 能跑。** Mixin 只在运行期应用，注入失败时构建仍是绿的
 （曾因此漏掉一个 `@Invoker` 写错）。任何涉及 mixin / 注册 / 初始化的改动都必须真的
 `runClient` 一次并读 `run/logs/latest.log`。
+**`gradlew runClient` 能跑 ≠ 打包后能跑。** 开发环境跑在 **named（Mojang）** 映射下，
+正式环境被 Fabric Loader 重映射到 **intermediary**，写死在字符串里的类名 / 方法名 / 字段名
+**不会被重映射**。所以每次动过反射、或新增了依赖 `Class#getDeclaredMethod(name, …)` 的代码，
+必须把 `build/libs/` 的 jar 装进启动器实测一次。见下文兼容层的「反射只能按参数类型找」。
+
 
 ---
 
@@ -95,6 +100,26 @@ loom_version=1.15.5
   `accessWidener …`，一个文件无法同时满足。改用 `util/MaidReflection` 反射构造 vanilla
   私有构造器（`MemoryModuleType` / `SensorType` / `Activity` / `Schedule` / `PoiType`）。
   `StructureTemplate#palettes` 用 `@Accessor` 打开。
+- **反射只能按参数类型找，绝不能按方法名找。**
+  开发环境（`runClient`）跑在 **named / Mojang** 映射下，`SpawnPlacements#register`
+  就叫 `register`；正式环境被 Fabric Loader 重映射到 **intermediary**，同一个方法变成
+  `method_5684` 之类的编号。**Loom 只重映射常量池里的类名 / 字段名 / 方法引用，
+  不会重映射写死在字符串里的名字** —— 于是 `getDeclaredMethod("register", …)`
+  开发环境成功、正式环境抛 `NoSuchMethodException`：
+
+  ```
+  java.lang.IllegalStateException: Failed to register spawn placement for
+      touhou_little_maid:fairy (unsupported Minecraft version?)
+    Caused by: java.lang.NoSuchMethodException: net.minecraft.class_1317.register(…)
+  ```
+
+  表现就是「终端 `runClient` 正常、装进启动器立刻崩在入口点」。正确写法是遍历
+  `getDeclaredMethods()`、**只比对参数类型**（`Class` 字面量会随常量池一起被重映射）。
+  构造函数没有这个问题 —— 构造器在字节码里没有名字。
+
+  > Mixin 侧不受影响：Loom 打包时会把 `@Inject(method=…)` / `@At(target=…)` 的字符串
+  > 直接重映射成 intermediary（核对过 jar 内的 mixin 类，`NaturalSpawnerMixin` 里已是
+  > `method_34994`），所以**不需要 refmap**，`mixins.json` 里也没有 `refmap` 字段。
 - **编码守卫**：`port/check-encoding.ps1` 扫描全项目 U+FFFD。
   **大文件禁用 `insert_edit_into_file`** —— 它会静默吞行、合并行、把中文变成 U+FFFD。
   正确做法：纯 ASCII 的 `.ps1`（Windows PowerShell 5.1 按 ANSI 解析无 BOM 脚本，
