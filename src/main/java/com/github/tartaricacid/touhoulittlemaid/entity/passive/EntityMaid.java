@@ -3092,6 +3092,38 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         sleepingPos.ifPresent(pos ->
                 com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed.setBedOccupied(this.level, pos, false));
     }
+    /**
+     * 睡觉时头朝哪边 —— 返回女仆床的 {@code FACING}。
+     *
+     * <h2>这是本移植版唯一一处「故意与上游不同」的渲染钩子</h2>
+     * <p>上游没有覆写这个方法，而 Forge 的默认实现只认 {@code BedBlock}，
+     * 所以上游女仆床的朝向查询恒为 {@code null}。后果有两个：</p>
+     * <ol>
+     *     <li>{@code LivingEntityRenderer#setupRotations} 不会做那一步
+     *         {@code -bedFacing * (getEyeHeight(STANDING) - 0.1)} 的水平位移，
+     *         于是女仆躺下后会越过床头约一格；</li>
+     *     <li>躺姿的朝向退化成 {@code 180 - bodyYaw}，也就是「她走到床边时朝哪，
+     *         就斜着往哪躺」，与床的方向无关。</li>
+     * </ol>
+     *
+     * <p>上游因为第 2 条看起来还过得去（她会大致朝着床走），但第 1 条一直存在。
+     * 这里返回真实朝向，让上面两件事都按「正常睡在床上的生物」来算，
+     * 同时 {@code GeoReplacedEntityRenderer#render} 里那份重复的位移已经删除，
+     * 保证位移只发生一次。</p>
+     */
+    @Override
+    public Direction getBedOrientation() {
+        Optional<BlockPos> sleepingPos = this.getSleepingPos();
+        if (sleepingPos.isPresent()) {
+            Direction facing = com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed
+                    .getMaidBedFacing(this.level, sleepingPos.get());
+            if (facing != null) {
+                return facing;
+            }
+        }
+        return super.getBedOrientation();
+    }
+
 
     /**
      * 是否已经生成过墓碑。
