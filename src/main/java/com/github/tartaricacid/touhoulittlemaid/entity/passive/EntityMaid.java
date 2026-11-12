@@ -2022,19 +2022,24 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
-     * 把女仆放到两格床的正中、床面上。
+     * 鎶婂コ浠嗘斁鍒颁袱鏍煎簥鐨勬涓€佸簥闈笂銆?
      *
-     * <h2>水平：床头格中心再退半格</h2>
-     * <p>{@code MaidBedTask} 只用床头（{@code PART == HEAD}）那一格的 POI 入睡，
-     * 所以睡眠坐标永远是床头格。而两格床的中点在它沿 {@code FACING} 反方向半格处。
-     * 把坐标放在中点，再让渲染侧回退半个身长
-     * （{@link com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.GeoReplacedEntityRenderer}），
-     * 1.5 格高的身体就正好以床心为中心铺满两格。</p>
+     * <h2>姘村钩锛氬簥澶存牸涓績鍐嶉€€鍗婃牸</h2>
+     * <p>{@code MaidBedTask} 鍙敤搴婂ご锛坽@code PART == HEAD}锛夐偅涓€鏍肩殑 POI 鍏ョ潯锛?
+     * 鎵€浠ョ潯鐪犲潗鏍囨案杩滄槸搴婂ご鏍笺€傝€屼袱鏍煎簥鐨勪腑鐐瑰湪瀹冩部 {@code FACING} 鍙嶆柟鍚戝崐鏍煎銆?
+     * 鎶婂潗鏍囨斁鍦ㄤ腑鐐癸紝鍐嶈娓叉煋渚у洖閫€鍗婁釜韬暱
+     * 锛堣 {@code GeoReplacedEntityRenderer#render}锛夛紝
+     * 1.5 鏍奸珮鐨勮韩浣撳氨姝ｅソ浠ュ簥蹇冧负涓績閾烘弧涓ゆ牸銆?/p>
      *
-     * <h2>竖直：0.5625 而不是 0.8</h2>
-     * <p>{@code 0.5625} = 9/16，正是 {@code BlockMaidBed} 碰撞箱的高度，也就是床面本身。
-     * 1.18.2 上游写的是 {@code 0.8}，会让女仆悬空 0.24 格；1.20.1 已改成
-     * {@code 0.5625}，这里跟 1.20.1 一致。</p>
+     * <h2>绔栫洿锛?.6875锛岀洿鎺ョ収鎶勫師鐗?{@code setPosToBed}</h2>
+     * <p>鍊煎彇鑷?vanilla {@code LivingEntity#setPosToBed}锛坖avap 纭锛夛細</p>
+     * <pre>
+     * setPos(pos.getX() + 0.5, pos.getY() + 0.6875, pos.getZ() + 0.5)
+     * </pre>
+     * <p>{@code 0.6875} = 11/16锛屾瘮搴婇潰锛坽@code BlockMaidBed} 纰版挒绠?9/16 = 0.5625锛?
+     * 楂?2/16銆傝繖涓綑閲忔槸鍘熺増缁欍€岃汉鐫€鐨勮韩浣撱€嶇暀鐨勶細妯″瀷鏄粫鑴氶儴鍘熺偣鏃嬭浆鐨勶紝
+     * 韬哄钩鍚庤韩浣撶殑妯埅闈㈡暣浣撲綅浜庡疄浣?Y 杩欎竴灞傦紝鎵€浠ュ疄浣?Y 蹇呴』姣斿簥闈㈤珮鍑哄崐涓韩浣撳帤搴︼紝
+     * 鍚﹀垯灏变細闄疯繘搴婇噷 鈥斺€?杩欐鏄箣鍓嶇敤 0.5625锛? 搴婇潰楂樺害锛夋椂鐨勭幇璞°€?/p>
      */
     private void pinToBed(BlockPos headPos) {
         double cx = headPos.getX() + 0.5D;
@@ -2045,7 +2050,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             cx -= facing.getStepX() * 0.5D;
             cz -= facing.getStepZ() * 0.5D;
         }
-        this.setPos(cx, headPos.getY() + 0.5625D, cz);
+        this.setPos(cx, headPos.getY() + 0.6875D, cz);
     }
 
     @Override
