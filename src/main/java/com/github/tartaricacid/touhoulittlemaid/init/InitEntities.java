@@ -164,6 +164,30 @@ public final class InitEntities {
                     .clientTrackingRange(10)
                     .build(TouhouLittleMaid.MOD_ID + ":fairy"));
 
+    // ------------------------------------------------------------------ 墓碑与箱子
+
+    /**
+     * 女仆墓碑（上游 {@code EntityTombstone.TYPE}）。
+     *
+     * <p>尺寸 {@code 0.8 × 1.2}、追踪距离 10，与上游一致。它不写 {@code noSave()}：
+     * 墓碑必须能活过重启，否则女仆的东西会永久丢失。</p>
+     */
+    public static final EntityType<com.github.tartaricacid.touhoulittlemaid.entity.item.EntityTombstone>
+            TOMBSTONE = Registry.register(Registry.ENTITY_TYPE,
+            TouhouLittleMaid.rl("tombstone"),
+            com.github.tartaricacid.touhoulittlemaid.entity.item.EntityTombstone.createType());
+
+    /**
+     * 祭坛召唤用的「箱子」（上游 {@code EntityBox.TYPE}）。
+     *
+     * <p>尺寸 {@code 2 × 2}，因为它里面塞着一只直立的女仆。追踪距离 10 是上游的值 ——
+     * 盒子开完就消失，不需要更远的同步。</p>
+     */
+    public static final EntityType<com.github.tartaricacid.touhoulittlemaid.entity.item.EntityBox>
+            BOX = Registry.register(Registry.ENTITY_TYPE,
+            TouhouLittleMaid.rl("box"),
+            com.github.tartaricacid.touhoulittlemaid.entity.item.EntityBox.createType());
+
     // ------------------------------------------------------------------ 自定义记忆
 
     public static final MemoryModuleType<List<Entity>> VISIBLE_PICKUP_ENTITIES = Registry.register(

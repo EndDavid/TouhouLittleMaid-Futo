@@ -71,6 +71,14 @@ public final class InitSounds {
      */
     public static final SoundEvent ALTAR_CRAFT = register("block.altar_craft");
 
+    /**
+     * 开箱音效（上游 {@code InitSounds.BOX_OPEN}）。
+     *
+     * <p>{@code sounds.json} 里的键是 {@code entity.box}，音源 {@code entity/box.ogg}。
+     * 祭坛召唤出来的「箱子」{@code EntityBox} 每点一下开一层，共三层。</p>
+     */
+    public static final SoundEvent BOX_OPEN = register("entity.box");
+
     // ------------------------------------------------------------------ 女仆妖精
     /**
      * 妖精音效。{@code sounds.json} 里直接指向原版兔子音效

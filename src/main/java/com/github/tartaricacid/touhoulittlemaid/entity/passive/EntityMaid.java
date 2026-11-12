@@ -1492,7 +1492,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     /**
      * NTR 物品判定（上游 {@code getNtrItem()}，默认结构空位）。
      */
-    public Predicate<ItemStack> getNtrItem() {
+    public static Predicate<ItemStack> getNtrItem() {
         return matchItemIds(java.util.List.of(
                 com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.ntrItem()));
     }
@@ -1671,8 +1671,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             return;
         }
         super.die(source);
-        // Film for the shrine revival (upstream puts it into an EntityTombstone).
-        this.dropFilmOnDeath();
         if (!this.level.isClientSide) {
             this.level.broadcastEntityEvent(this, (byte) 60);
         }
@@ -1981,12 +1979,38 @@ public class EntityMaid extends TamableAnimal implements IMaid,
 
     // ---------------------------------------------------------------- 每刻
 
+    /**
+     * 睡觉时把女仆「钉」在床上（上游 {@code EntityMaid#onMaidSleep}，由 {@code baseTick} 每 tick 调用）。
+     *
+     * <p>原版 {@code startSleeping} 只把坐标设成方块中心 +0.6875，之后每一 tick 仍然走正常的
+     * {@code aiStep} / 重力 / 推挤，女仆会从床上滑下去；一旦离开床面，原版那套
+     * {@code checkBedExists} 之外的清理逻辑就会把她叫醒。上游的做法是每 tick 重申一次坐标、
+     * 清零速度并静音（睡着的时候不该再触发语音）。</p>
+     *
+     * <p>这里逐字照抄。注意它<b>两端都要跑</b>：客户端也必须停在同一坐标上，否则会看到
+     * 女仆在床上抖动，{@code Pose.SLEEPING} 触发的 {@code sleep} 动画也会断续。</p>
+     */
+    private void onMaidSleep() {
+        if (this.isSleeping()) {
+            this.getSleepingPos().ifPresent(pos -> this.setPos(pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5));
+            this.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            if (!this.isSilent()) {
+                this.setSilent(true);
+            }
+        } else {
+            if (this.isSilent()) {
+                this.setSilent(false);
+            }
+        }
+    }
+
     @Override
     public void tick() {
         super.tick();
         // 被抱着时的位置两端都要算：乘客坐标不由服务端同步，客户端必须自己算一遍。
         // 放在 isClientSide 提前返回之前，否则客户端会把女仆留在抱起时的原地。
         this.updateCarriedPosition();
+        this.onMaidSleep();
         if (this.level.isClientSide) {
             return;
         }
@@ -3069,19 +3093,92 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
-     * 死亡时掉出胶片 —— 上游 {@code dropEquipment} 里塞进墓碑的那一张。
+     * 是否已经生成过墓碑。
      *
-     * <p><b>与上游的差异：</b>上游把胶片连同伴随全部家当一起塞进
-     * {@code EntityTombstone}，那个实体属于「死亡与收纳」子系统，本移植版还没移植。
-     * 神社复活只需要「手里有一张胶片」，所以这里先把胶片直接掉在死亡位置，
-     * 让「死亡 → 神社复活」这条链完整可用；墓碑移植后再改成收进墓碑即可。</p>
+     * <p>必须记着：女仆有两条走向死亡的路径 —— 正常的 {@code die()}（期间原版会调
+     * {@link #dropEquipment()}），以及 {@code /kill} 直接 {@code remove(RemovalReason.KILLED)}
+     * 根本不会走 {@code die()}（见 {@link #remove}）。两边都要能触发，但不许触发两次。</p>
      */
-    private void dropFilmOnDeath() {
-        if (this.level.isClientSide || this.getOwnerUUID() == null) {
-            return;
+    private boolean alreadyDropped;
+
+    /**
+     * 死亡时把遗物收进墓碑，逐字移植自上游 {@code EntityMaid#dropEquipment}。
+     *
+     * <p>原版 {@code LivingEntity#die()} 会在 {@code dropAllDeathLoot} 里调这个方法，
+     * 所以覆写它就是唯一的正确接入口（比在 {@code die()} 里手动搬运更可靠 ——
+     * {@code /kill}、掉出世界等路径也都能覆盖到）。</p>
+     *
+     * <h2>收进去的东西</h2>
+     * <ul>
+     *     <li>护甲 / 主副手 / 物品栏 / 饰品栏 / 隐藏栏：合成一个 {@code CombinedInvWrapper} 逐个抽干；</li>
+     *     <li>背包本身（{@code getTakeOffItemStack}）以及背包可能持有的额外数据；</li>
+     *     <li>胶片刻录（{@link com.github.tartaricacid.touhoulittlemaid.item.ItemFilm#maidToFilm}）——
+     *         这是神社复活唯一的凭据，必须进墓碑，否则掉出去被岩浆烧掉就永久丢失。</li>
+     * </ul>
+     *
+     * <p><b>与上游的差异：</b>上游还会判 {@code PetBedDrop.hasPetBedPos(this)}（第三方
+     * 「宠物床」模组的兼容，装了那个模组时死亡不进墓碑而是回到床上）。本移植版没有该模组，
+     * 直接省略。</p>
+     */
+    @Override
+    protected void dropEquipment() {
+        if (this.getOwnerUUID() != null && !this.level.isClientSide && !this.alreadyDropped) {
+            // 掉出世界的判断：把墓碑按「可站立的 y」夹到世界高度里，
+            // 否则在虚空 / 基岩里死亡会生成一个永远摸不到的墓碑
+            net.minecraft.world.phys.Vec3 position =
+                    net.minecraft.world.phys.Vec3.atBottomCenterOf(this.blockPosition());
+            if (this.getY() < this.level.getMinBuildHeight() + 5) {
+                position = new net.minecraft.world.phys.Vec3(position.x, this.level.getMinBuildHeight() + 5, position.z);
+            }
+            if (this.getY() > this.level.getMaxBuildHeight()) {
+                position = new net.minecraft.world.phys.Vec3(position.x, this.level.getMaxBuildHeight(), position.z);
+            }
+            com.github.tartaricacid.touhoulittlemaid.entity.item.EntityTombstone tombstone =
+                    new com.github.tartaricacid.touhoulittlemaid.entity.item.EntityTombstone(
+                            this.level, this.getOwnerUUID(), position);
+            tombstone.setMaidName(this.getDisplayName());
+
+            CombinedInvWrapper invWrapper = new CombinedInvWrapper(
+                    this.armorInvWrapper, this.handsInvWrapper, this.maidInv, this.maidBauble, this.hideInv);
+            for (int i = 0; i < invWrapper.getSlots(); i++) {
+                int size = invWrapper.getSlotLimit(i);
+                tombstone.insertItem(invWrapper.extractItem(i, size, false));
+            }
+            // 背包额外数据
+            IMaidBackpack maidBackpack = this.getMaidBackpackType();
+            tombstone.insertItem(maidBackpack.getTakeOffItemStack(ItemStack.EMPTY, null, this));
+            maidBackpack.onSpawnTombstone(this, tombstone);
+            // 胶片
+            tombstone.insertItem(com.github.tartaricacid.touhoulittlemaid.item.ItemFilm.maidToFilm(this));
+            // 全局记录（狐狸卷轴按玩家查墓碑用）
+            com.github.tartaricacid.touhoulittlemaid.world.data.MaidWorldData maidWorldData =
+                    com.github.tartaricacid.touhoulittlemaid.world.data.MaidWorldData.get(this.level);
+            if (maidWorldData != null) {
+                maidWorldData.addTombstones(this, tombstone);
+            }
+
+            // 记录墓碑已经生成，避免重复生成
+            this.alreadyDropped = true;
+            this.level.addFreshEntity(tombstone);
         }
-        this.spawnAtLocation(com.github.tartaricacid.touhoulittlemaid.item.ItemFilm.maidToFilm(this));
     }
+
+    /**
+     * 被 {@code /kill} 或其它「直接移除」路径干掉时补一次墓碑。
+     *
+     * <p>上游为此单独写了一个 {@code remove} 覆写，注释里写着「尝试修复可能存在的目标生成
+     * 丢失问题」：{@code RemovalReason.KILLED} 不会经过 {@code die()}，所以不会调
+     * {@link #dropEquipment()}。</p>
+     */
+    @Override
+    public void remove(net.minecraft.world.entity.Entity.RemovalReason reason) {
+        if (reason == net.minecraft.world.entity.Entity.RemovalReason.KILLED
+                && !this.alreadyDropped && !this.level.isClientSide) {
+            this.dropEquipment();
+        }
+        super.remove(reason);
+    }
+
 
     /**
      * 替身地藏：给自己的女仆永久无敌（上游 {@code ItemSubstituteJizo} 里的

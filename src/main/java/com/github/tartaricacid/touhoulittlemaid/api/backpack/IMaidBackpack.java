@@ -55,6 +55,21 @@ public abstract class IMaidBackpack {
     public abstract int getAvailableMaxContainerIndex();
 
     /**
+     * 女仆死亡生成墓碑时回调（上游 {@code IMaidBackpack#onSpawnTombstone}）。
+     *
+     * <p>上游用它把「背包自己的额外数据」也塞进墓碑 —— 目前只有熔炉背包（燃料 + 烧炼进度）
+     * 和储罐背包（液体）有这种数据，其余背包的实现是空方法。</p>
+     *
+     * <p><b>与上游的差异：</b>这两套 {@code IBackpackData} 在本移植版还没移植
+     * （见 {@code FurnaceBackpack} / {@code TankBackpack} 的类注释），所以这里给出
+     * 空实现而不是抽象方法 —— 语义与上游「没有额外数据的背包」完全一致，
+     * 等数据层到位后在这两个子类里覆写即可。</p>
+     */
+    public void onSpawnTombstone(EntityMaid maid,
+                                 com.github.tartaricacid.touhoulittlemaid.entity.item.EntityTombstone tombstone) {
+    }
+
+    /**
      * 掉落「空背包也装得下」的那些基础格以外的所有物品。
      *
      * <p>脱下背包时使用：基础 6 格（{@link BackpackLevel#EMPTY_CAPACITY}）永远属于女仆本人，

@@ -78,6 +78,18 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SHRINE_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityShrineRenderer::new);
 
+        // 墓碑与祭坛召唤箱：模型层同样必须先烘焙（渲染器构造函数里 bakeLayer）。
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.TombstoneModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.TombstoneModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.EntityBoxModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.EntityBoxModel::createBodyLayer);
+        EntityRendererRegistry.register(InitEntities.TOMBSTONE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityTombstoneRenderer::new);
+        EntityRendererRegistry.register(InitEntities.BOX,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityBoxRender::new);
+
         // 灵力 HUD：手持御币时显示 ×N.NN（上游 ShowPowerEvent）
         com.github.tartaricacid.touhoulittlemaid.client.event.ShowPowerEvent.init();
         // 未安装帕秋莉手册时，登录后在聊天栏给出「点这里下载」提示（上游 PlayerLoggedInNotice）
