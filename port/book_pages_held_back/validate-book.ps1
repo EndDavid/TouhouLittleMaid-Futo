@@ -21,7 +21,12 @@ $registered = @(
   'touhou_little_maid:drown_protect_bauble',
   'touhou_little_maid:nimble_fabric',
   'touhou_little_maid:item_magnet_bauble',
-  'touhou_little_maid:mute_bauble'
+  'touhou_little_maid:mute_bauble',
+  # --- shrine revival milestone: film / shrine / bed / jizo ---
+  'touhou_little_maid:film',
+  'touhou_little_maid:shrine',
+  'touhou_little_maid:maid_bed',
+  'touhou_little_maid:substitute_jizo'
 )
 $entities = @('touhou_little_maid:maid','touhou_little_maid:fairy','touhou_little_maid:power_point')
 

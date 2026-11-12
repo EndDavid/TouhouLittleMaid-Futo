@@ -105,6 +105,58 @@ public final class InitItems {
             TouhouLittleMaid.rl("maid_beacon"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemMaidBeacon());
 
+    // ------------------------------------------------------------------ 胶片 / 神社
+
+    /**
+     * 胶片（上游 {@code InitItems.FILM}）。
+     *
+     * <p>女仆死亡时掉落，NBT 里存着那只女仆的完整快照；放进神社（或祭坛的
+     * {@code reborn_maid} 配方）即可复活。见 {@code item/ItemFilm}。</p>
+     */
+    public static final Item FILM = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("film"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemFilm());
+
+    /**
+     * 神社（上游 {@code InitItems.SHRINE}）：方块物品形态。
+     *
+     * <p>类构造器里会读 {@code InitBlocks.SHRINE}，因此主入口必须先调用
+     * {@code InitBlocks.init()} 再调用 {@code InitItems.init()}（与神社庭灯同款约束）。</p>
+     */
+    public static final Item SHRINE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("shrine"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SHRINE,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    // ------------------------------------------------------------------ 女仆床 / 稻草人 / 替身地藏
+
+    /**
+     * 女仆床（上游 {@code InitItems.MAID_BED}）。
+     *
+     * <p>用 {@code ItemMaidBed} 而不是普通 {@code BlockItem}：放置时的方块更新标志位
+     * 不一样，否则双格方块会在放置瞬间自己塌掉。</p>
+     */
+    public static final Item MAID_BED = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("maid_bed"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemMaidBed());
+
+    /**
+     * 稻草人（上游 {@code InitItems.SCARECROW}）。
+     */
+    public static final Item SCARECROW = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("scarecrow"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SCARECROW,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    /**
+     * 替身地藏（上游 {@code InitItems.SUBSTITUTE_JIZO}）：给女仆永久无敌。
+     */
+    public static final Item SUBSTITUTE_JIZO = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("substitute_jizo"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemSubstituteJizo());
+
     // ------------------------------------------------------------------ P 点
 
     /**

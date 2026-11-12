@@ -63,6 +63,21 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         EntityRendererRegistry.register(InitEntities.FAIRY,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityFairyRenderer::new);
 
+        // 祭坛与神社：两者都是 ENTITYBLOCK_ANIMATED，方块本身不画，全靠方块实体渲染器。
+        // 模型层必须先烘焙，渲染器的构造函数里会 bakeLayer。
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.AltarModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.AltarModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.ShrineModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.ShrineModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.ALTAR_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityAltarRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SHRINE_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityShrineRenderer::new);
+
         // 灵力 HUD：手持御币时显示 ×N.NN（上游 ShowPowerEvent）
         com.github.tartaricacid.touhoulittlemaid.client.event.ShowPowerEvent.init();
         // 未安装帕秋莉手册时，登录后在聊天栏给出「点这里下载」提示（上游 PlayerLoggedInNotice）

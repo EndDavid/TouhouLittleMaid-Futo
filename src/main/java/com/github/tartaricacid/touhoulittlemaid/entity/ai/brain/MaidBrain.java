@@ -3,6 +3,7 @@ package com.github.tartaricacid.touhoulittlemaid.entity.ai.brain;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidAttackStrafingTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidAwaitTask;
+import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidBedTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidBegTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidClearHurtTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidHealSelfTask;
@@ -165,10 +166,11 @@ public final class MaidBrain {
     }
 
     private static void registerRestGoals(Brain<EntityMaid> brain) {
+        Pair<Integer, Behavior<? super EntityMaid>> bed = Pair.of(5, new MaidBedTask(0.6f, 2));
         Pair<Integer, Behavior<? super EntityMaid>> supplemented = Pair.of(20, getLookAndRandomWalk(maid -> true));
         Pair<Integer, Behavior<? super EntityMaid>> updateActivity = Pair.of(99, new MaidUpdateActivityFromSchedule());
 
-        brain.addActivity(Activity.REST, ImmutableList.of(supplemented, updateActivity));
+        brain.addActivity(Activity.REST, ImmutableList.of(bed, supplemented, updateActivity));
     }
 
     private static void registerPanicGoals(Brain<EntityMaid> brain) {

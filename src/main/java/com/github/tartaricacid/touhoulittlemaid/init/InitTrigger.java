@@ -1,5 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.init;
 
+import com.github.tartaricacid.touhoulittlemaid.advancements.altar.AltarCraftTrigger;
 import com.github.tartaricacid.touhoulittlemaid.advancements.maid.MaidEventTrigger;
 import com.github.tartaricacid.touhoulittlemaid.advancements.rewards.GivePatchouliBookConfigTrigger;
 import com.github.tartaricacid.touhoulittlemaid.mixin.CriteriaTriggersAccessor;
@@ -7,9 +8,8 @@ import com.github.tartaricacid.touhoulittlemaid.mixin.CriteriaTriggersAccessor;
 /**
  * 判据触发器注册表，移植自上游 {@code init/InitTrigger}（只保留已移植的部分）。
  *
- * <p>本移植版目前有两条：「首次登录送帕秋莉手册」与「女仆事件」。
- * 上游的 {@code GiveSmartSlabConfigTrigger} / {@code AltarCraftTrigger}
- * 依赖尚未移植的祭坛 / 智能台阶，等对应模块搬过来再补。</p>
+ * <p>本移植版目前有三条：「首次登录送帕秋莉手册」、「女仆事件」与「祭坛合成」。
+ * 上游的 {@code GiveSmartSlabConfigTrigger} 依赖尚未移植的智能台阶，等它搬过来再补。</p>
  *
  * <p>必须在服务端开始加载数据包（解析进度 JSON）之前完成注册，
  * 所以在主入口里紧跟配置注册之后调用。</p>
@@ -24,6 +24,13 @@ public final class InitTrigger {
      */
     public static MaidEventTrigger MAID_EVENT;
 
+    /**
+     * 祭坛合成判据（上游 {@code InitTrigger.ALTAR_CRAFT}）。
+     *
+     * <p>进度 JSON 里带 {@code recipe_id} 条件，用来区分「第一次合出女仆」之类的细分成就。</p>
+     */
+    public static AltarCraftTrigger ALTAR_CRAFT;
+
     private InitTrigger() {
     }
 
@@ -31,5 +38,6 @@ public final class InitTrigger {
         // 原版 CriteriaTriggers#register 是 private，走 @Invoker 访问器（见 CriteriaTriggersAccessor）
         GIVE_PATCHOULI_BOOK_CONFIG = CriteriaTriggersAccessor.invokeRegister(new GivePatchouliBookConfigTrigger());
         MAID_EVENT = CriteriaTriggersAccessor.invokeRegister(new MaidEventTrigger());
+        ALTAR_CRAFT = CriteriaTriggersAccessor.invokeRegister(new AltarCraftTrigger());
     }
 }

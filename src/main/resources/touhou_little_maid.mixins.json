@@ -5,6 +5,8 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "CriteriaTriggersAccessor",
+    "PoiTypeAccessor",
+    "StructureTemplateAccessor",
     "LivingEntityKillCreditMixin",
     "PlayerPowerMixin",
     "ServerPlayerPowerMixin",

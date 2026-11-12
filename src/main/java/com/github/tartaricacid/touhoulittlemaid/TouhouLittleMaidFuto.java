@@ -29,6 +29,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         InitEntities.init();
         // 方块 / 方块实体必须在物品之前：ItemMaidBeacon 的构造器要读 InitBlocks.MAID_BEACON
         com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.init();
+        // 兴趣点必须晚于方块注册（状态集合是从已注册方块枚举出来的）
+        com.github.tartaricacid.touhoulittlemaid.init.InitPoi.init();
         InitItems.init();
         // 饰品登记表：必须晚于物品注册（它按物品实例建立「物品 → 行为」映射），
         // 但必须早于任何女仆被创建 —— BaubleItemHandler 在读档 / 换物时会查它。
@@ -80,6 +82,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.event.MaidCarryTicker.initServer();
         // 玩家登录时主动敲一次「首次登录送手册」判据（对应上游 EnterServerEvent）
         com.github.tartaricacid.touhoulittlemaid.event.EnterServerEvent.init();
+        // 神社 / P 点塞进原版箱子战利品（上游的两条全局战利品修饰器）
+        com.github.tartaricacid.touhoulittlemaid.event.ChestLootEvent.init();
 
         // 合成表：帕秋莉手册的《记忆中的幻想乡》（touhou_little_maid:memorizable_gensokyo）
         com.github.tartaricacid.touhoulittlemaid.init.InitRecipes.init();

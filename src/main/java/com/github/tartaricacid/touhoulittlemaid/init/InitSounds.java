@@ -62,6 +62,15 @@ public final class InitSounds {
      */
     public static final SoundEvent CAMERA_USE = register("item.camera_use");
 
+    /**
+     * 祭坛合成完成的音效（上游 {@code InitSounds.ALTAR_CRAFT}）。
+     *
+     * <p>{@code sounds.json} 里的键是 {@code block.altar_craft}，两条音源
+     * （{@code block/altar_craft_1.ogg} / {@code block/altar_craft_2.ogg}）随机选一条，
+     * 分类 {@code voice}。胶片复活女仆时也复用这一条（上游同款）。</p>
+     */
+    public static final SoundEvent ALTAR_CRAFT = register("block.altar_craft");
+
     // ------------------------------------------------------------------ 女仆妖精
     /**
      * 妖精音效。{@code sounds.json} 里直接指向原版兔子音效
@@ -83,4 +92,3 @@ public final class InitSounds {
         return Registry.register(Registry.SOUND_EVENT, id, new SoundEvent(id));
     }
 }
-

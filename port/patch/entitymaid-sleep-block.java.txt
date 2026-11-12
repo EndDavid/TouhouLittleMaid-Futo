@@ -1,0 +1,92 @@
+
+    // ---------------------------------------------------------------- 睡觉与床 / 胶片 / 替身地藏
+
+    /**
+     * 躺到女仆床上。逐字移植自上游 {@code EntityMaid#startSleeping}。
+     *
+     * <p><b>1.18.2 需要额外做一步：</b>Forge 的补丁把 {@code Block#isBed} 塞进了
+     * {@code LivingEntity#startSleeping}，原版只认 {@code instanceof BedBlock}。
+     * 女仆床不是 {@code BedBlock} 的子类，所以「占床」得自己做 ——
+     * 否则床永远不显示被占用，别的女仆会一直往上爬。</p>
+     */
+    @Override
+    public void startSleeping(BlockPos pos) {
+        super.startSleeping(pos);
+        com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed.setBedOccupied(this.level, pos, true);
+        // 睡一觉直接回满血，好感度按 Type.SLEEP 加一次（冷却 24000 tick）
+        this.setHealth(this.getMaxHealth());
+        this.favorabilityManager.apply(com.github.tartaricacid.touhoulittlemaid.entity.favorability.Type.SLEEP);
+        if (this.getOwner() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            com.github.tartaricacid.touhoulittlemaid.init.InitTrigger.MAID_EVENT.trigger(serverPlayer,
+                    com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType.MAID_SLEEP);
+        }
+    }
+
+    /**
+     * 起床：把床的 {@code OCCUPIED} 清掉。
+     *
+     * <p>同样是 1.18.2 要自己做的那一步，见 {@link #startSleeping}。必须先把
+     * {@code getSleepingPos()} 存下来 —— {@code super.stopSleeping()} 会把它清空。</p>
+     */
+    @Override
+    public void stopSleeping() {
+        Optional<BlockPos> sleepingPos = this.getSleepingPos();
+        super.stopSleeping();
+        sleepingPos.ifPresent(pos ->
+                com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed.setBedOccupied(this.level, pos, false));
+    }
+
+    /**
+     * 睡觉时头朝哪边 —— 对应 Forge 补丁里 {@code isBed} 为真的那个分支。
+     * 原版只对 {@code BedBlock} 返回朝向，取不到就返回 {@code null}。
+     */
+    @Override
+    public Direction getBedOrientation() {
+        Optional<BlockPos> sleepingPos = this.getSleepingPos();
+        if (sleepingPos.isPresent()) {
+            Direction facing = com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed
+                    .getMaidBedFacing(this.level, sleepingPos.get());
+            if (facing != null) {
+                return facing;
+            }
+        }
+        return super.getBedOrientation();
+    }
+
+    /**
+     * 死亡时掉出胶片 —— 上游 {@code dropEquipment} 里塞进墓碑的那一张。
+     *
+     * <p><b>与上游的差异：</b>上游把胶片连同伴随全部家当一起塞进
+     * {@code EntityTombstone}，那个实体属于「死亡与收纳」子系统，本移植版还没移植。
+     * 神社复活只需要「手里有一张胶片」，所以这里先把胶片直接掉在死亡位置，
+     * 让「死亡 → 神社复活」这条链完整可用；墓碑移植后再改成收进墓碑即可。</p>
+     */
+    private void dropFilmOnDeath() {
+        if (this.level.isClientSide || this.getOwnerUUID() == null) {
+            return;
+        }
+        this.spawnAtLocation(com.github.tartaricacid.touhoulittlemaid.item.ItemFilm.maidToFilm(this));
+    }
+
+    /**
+     * 替身地藏：给自己的女仆永久无敌（上游 {@code ItemSubstituteJizo} 里的
+     * {@code InteractMaidEvent} 处理器）。
+     *
+     * <p>判断条件与上游逐字一致：手里是地藏，且她还没无敌。物品<b>无条件</b>消耗
+     * （上游也没有判创造模式）。</p>
+     *
+     * @return {@code null} 表示手里不是地藏，或者她已经无敌了
+     */
+    @Nullable
+    private InteractionResult applySubstituteJizo(Player player, ItemStack stack) {
+        if (stack.getItem() != com.github.tartaricacid.touhoulittlemaid.init.InitItems.SUBSTITUTE_JIZO) {
+            return null;
+        }
+        if (this.isInvulnerable()) {
+            return null;
+        }
+        this.setInvulnerable(true);
+        stack.shrink(1);
+        return InteractionResult.sidedSuccess(this.level.isClientSide);
+    }
+

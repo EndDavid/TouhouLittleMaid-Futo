@@ -69,6 +69,25 @@ public final class ItemHandlerHelper {
     }
 
     /**
+     * 按指定数量复制一份物品，等价 Forge {@code ItemHandlerHelper#copyStackWithSize}。
+     *
+     * <p>空栈直接返回空；数量与原件相同时返回原件本身（Forge 也是这么做的，
+     * 某些调用点依赖这个「不复制」的行为来就地修改）。</p>
+     */
+    @NotNull
+    public static ItemStack copyStackWithSize(@NotNull ItemStack stack, int size) {
+        if (stack.isEmpty() || size <= 0) {
+            return ItemStack.EMPTY;
+        }
+        if (stack.getCount() == size) {
+            return stack;
+        }
+        ItemStack copy = stack.copy();
+        copy.setCount(size);
+        return copy;
+    }
+
+    /**
      * 把物品交给玩家：先塞背包，塞不下就掉在脚边，等价 Forge {@code ItemHandlerHelper#giveItemToPlayer}。
      *
      * <p>签名保留 {@code Player}，是为了和上游调用点一一对应；

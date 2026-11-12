@@ -1,70 +1,143 @@
 package com.github.tartaricacid.touhoulittlemaid.compat.patchouli;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.crafting.AltarRecipe;
+import com.github.tartaricacid.touhoulittlemaid.init.InitRecipes;
+import com.google.common.collect.Lists;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import vazkii.patchouli.api.IComponentProcessor;
 import vazkii.patchouli.api.IVariable;
 import vazkii.patchouli.api.IVariableProvider;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.Locale;
+
 /**
  * 手册里「祭坛合成」模板（{@code templates/altar_recipe.json}）的变量处理器。
  *
- * <p><b>本移植版是占位实现，不是上游逻辑的删减版：</b>上游这个处理器要读
- * {@code InitRecipes.ALTAR_CRAFTING} 与 {@code AltarRecipe}，而祭坛合成系统
- * 在本移植版里尚未移植（没有 {@code RecipeType} / {@code RecipeSerializer}，
- * 也没有任何 {@code data/.../recipes/altar/*.json}）。因此这里只保留
- * <b>同一套变量名</b>，并统一返回空值：</p>
- *
- * <ul>
- *     <li>手册不会因为 {@code ClassNotFoundException} 整页加载失败；</li>
- *     <li>页面仍然会画出六个输入槽、能量图标与输出槽的框架，只是里面为空；</li>
- *     <li>等祭坛系统移植完成后，把 {@link #setup} / {@link #process} 换成上游实现即可，
- *         模板 JSON 与页面按键都不需要改。</li>
- * </ul>
+ * <p>页面 JSON 只写一个 {@code recipe_id}，其余全部由这里算出来；
+ * 逐字移植自上游 {@code compat/patchouli/AltarRecipeComponent}。</p>
  *
  * <p>上游变量名：{@code recipe_id}（输入）、{@code input1~6}、
  * {@code power_cost}、{@code output_item}、{@code output_entity}、{@code output_desc}。</p>
+ *
+ * <h2>每个变量怎么算</h2>
+ * <table border="1">
+ *     <caption>变量表</caption>
+ *     <tr><th>变量</th><th>含义</th></tr>
+ *     <tr><td>{@code input1..input6}</td><td>第 N 个材料 —— 该 {@link Ingredient}
+ *         接受的全部物品 id，逗号分隔（Patchouli 会画成可循环切换的物品槽）</td></tr>
+ *     <tr><td>{@code power_cost}</td><td>{@code x1.50} 形式的灵力消耗</td></tr>
+ *     <tr><td>{@code output_item}</td><td>物品产物（实体产物时为空，只留实体槽）</td></tr>
+ *     <tr><td>{@code output_entity}</td><td>实体产物的注册名；找不到时兜底
+ *         {@code minecraft:item}，页面至少还能画出物品槽</td></tr>
+ *     <tr><td>{@code output_desc}</td><td>产物的语言键
+ *         {@code jei.<ns>.altar_craft.<配方文件名>.result}</td></tr>
+ * </table>
+ *
+ * <h2>与上游的差异</h2>
+ * <p>上游有一句「产物是盒子时把实体改成女仆」的特判（{@code InitEntities.BOX}）。
+ * {@code spawn_box} 配方与 {@code EntityBox} 在本移植版里还没移植，没有任何配方会
+ * 产出盒子，这条分支现在不可达，所以先不写 —— 等盒子移植后补回即可。</p>
  */
 public class AltarRecipeComponent implements IComponentProcessor {
+    private static final String RECIPE_ID = "recipe_id";
     private static final String INPUT = "input";
     private static final String POWER_COST = "power_cost";
     private static final String OUTPUT_ITEM = "output_item";
     private static final String OUTPUT_ENTITY = "output_entity";
     private static final String OUTPUT_DESC = "output_desc";
 
-    private static boolean warned = false;
+    @Nullable
+    private AltarRecipe recipe;
 
     @Override
     public void setup(IVariableProvider variables) {
-        if (!warned) {
-            warned = true;
-            // 只提示一次：手册里引用本模板的页面有好几页，逐页刷屏没有意义
-            TouhouLittleMaid.LOGGER.warn("[Futo] Patchouli altar recipe pages are placeholders: " +
-                                        "the altar crafting system has not been ported yet.");
+        Level level = Minecraft.getInstance().level;
+        if (level == null) {
+            return;
         }
+        ResourceLocation recipeId = new ResourceLocation(variables.get(RECIPE_ID).asString());
+        List<AltarRecipe> allAltarRecipes = level.getRecipeManager().getAllRecipesFor(InitRecipes.ALTAR_CRAFTING);
+        for (AltarRecipe altarRecipe : allAltarRecipes) {
+            if (altarRecipe.getId().equals(recipeId)) {
+                this.recipe = altarRecipe;
+                return;
+            }
+        }
+        // 兜底：拿一条空配方，让下面的 process 都能安全跑完（页面画成空框）
+        this.recipe = new AltarRecipe(new ResourceLocation(TouhouLittleMaid.MOD_ID, "empty"),
+                EntityType.ITEM, null, 0, Ingredient.EMPTY);
+        TouhouLittleMaid.LOGGER.error("Altar recipe not found: {}", recipeId);
     }
 
     @Nullable
     @Override
     public IVariable process(String key) {
-        if (key.startsWith(INPUT)) {
-            // input1 ~ input6：全部返回空物品，槽位会保持空框
-            return IVariable.from(ItemStack.EMPTY);
+        if (this.recipe == null) {
+            return key.startsWith(INPUT) ? IVariable.from(ItemStack.EMPTY) : null;
         }
-        switch (key) {
-            case POWER_COST:
-                return IVariable.wrap("");
-            case OUTPUT_ITEM:
+        if (key.startsWith(INPUT)) {
+            int index = Integer.parseInt(key.substring(INPUT.length())) - 1;
+            if (index < 0 || index >= this.recipe.getIngredients().size()) {
                 return IVariable.from(ItemStack.EMPTY);
-            case OUTPUT_ENTITY:
-                // 与上游的兜底值一致：实体页在找不到实体时就画物品
+            }
+            Ingredient ingredient = this.recipe.getIngredients().get(index);
+            ItemStack[] stacks = ingredient.getItems();
+            if (stacks.length == 0) {
+                return IVariable.from(ItemStack.EMPTY);
+            }
+            // 一个 Ingredient 可以接受多种物品（tag），全部列出来交给 Patchouli 循环显示
+            List<String> stackNames = Lists.newArrayList();
+            for (ItemStack stack : stacks) {
+                ResourceLocation itemId = Registry.ITEM.getKey(stack.getItem());
+                if (itemId != null) {
+                    stackNames.add(itemId.toString());
+                }
+            }
+            return IVariable.wrap(StringUtils.join(stackNames, ","));
+        }
+
+        switch (key) {
+            case POWER_COST -> {
+                return IVariable.wrap(String.format("x%.2f", this.recipe.getPowerCost()));
+            }
+            case OUTPUT_ITEM -> {
+                return IVariable.from(this.recipe.getResultItem());
+            }
+            case OUTPUT_DESC -> {
+                String namespace = this.recipe.getId().getNamespace().toLowerCase(Locale.US);
+                String langKey;
+                if (this.recipe.isItemCraft()) {
+                    langKey = String.format("jei.%s.altar_craft.%s.result", namespace, "item_craft");
+                } else {
+                    // 实体产物按配方文件名区分（reborn_maid / spawn_box …）
+                    Path path = Paths.get(this.recipe.getId().getPath().toLowerCase(Locale.US));
+                    langKey = String.format("jei.%s.altar_craft.%s.result", namespace, path.getFileName());
+                }
+                return IVariable.wrap(I18n.get(langKey));
+            }
+            case OUTPUT_ENTITY -> {
+                ResourceLocation entityId = Registry.ENTITY_TYPE.getKey(this.recipe.getEntityType());
+                if (entityId != null) {
+                    return IVariable.wrap(entityId.toString());
+                }
                 return IVariable.wrap("minecraft:item");
-            case OUTPUT_DESC:
-                return IVariable.wrap("");
-            default:
+            }
+            default -> {
                 return null;
+            }
         }
     }
 }
-
