@@ -172,7 +172,25 @@ public abstract class GeoReplacedEntityRenderer<T extends LivingEntity, E extend
             }
             netHeadYaw = lerpHeadRot - lerpBodyRot;
         }
-
+        // Sleeping centring translate -- the only one in the whole pipeline.
+        //
+        // The lying-down pose comes from LivingEntityRenderer#setupRotations
+        // (Y(sleepDirectionToRotation) -> Z(getFlipDegrees()=90) -> Y(270)).
+        // The model extends from its foot origin along the body axis by the
+        // standing height, so backing it off by half the body length centres
+        // the body on the entity position, 0.75 blocks either way.
+        //
+        // IMPORTANT: use the STANDING dimensions, never getBbHeight().
+        // Pose.SLEEPING bounding box is 0.2 x 0.2, so getBbHeight() returns 0.2
+        // and half the body length collapses to 0.1 -- the translate becomes
+        // almost nothing and the whole body stays outside the head bed block.
+        if (entity.getPose() == Pose.SLEEPING) {
+            Direction direction = entity.getBedOrientation();
+            if (direction != null) {
+                float halfBody = entity.getDimensions(Pose.STANDING).height * 0.5F;
+                poseStack.translate(-direction.getStepX() * halfBody, 0.0D, -direction.getStepZ() * halfBody);
+            }
+        }
 
         float lerpedAge = entity.tickCount + partialTick;
         float limbSwingAmount = 0;
