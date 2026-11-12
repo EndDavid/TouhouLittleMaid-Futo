@@ -35,8 +35,23 @@ public final class AnimationRegister {
     public static void registerAnimationState() {
         register("death", ILoopType.EDefaultLoopTypes.PLAY_ONCE, Priority.HIGHEST,
                 (maid, event) -> maid.asEntity().isDeadOrDying());
+        // 旧版模型必须跳过 sleep —— 与上游一致。
+        //
+        // 理由：躺平这个姿态已经由 LivingEntityRenderer#setupRotations 完成
+        //     Y(sleepDirectionToRotation(bedFacing)) → Z(getFlipDegrees() = 90) → Y(270)
+        // 而 animation/maid.animation.json 里 sleep 的 Root 还有
+        //     [-13.26, -77.80, 23.76] 度
+        // 在「已经躺平」的模型空间里，那个 -77.8 度的 Y 轴旋转不再是把人转个方向，
+        // 而是绕身体长轴翻滚 —— 于是整个人侧过去了，而且绕 Root 原点转，
+        // 顺带把身体整体推离床心（这就是位置偏的来源）。
+        //
+        // 上游对旧版模型根本不走 JSON 动画，睡觉用的是 MaidBaseAnimation 里的硬编码逻辑
+        // （只把 head 抬头 15 度、隐藏帽子/尾巴/翅膀、切换睡觉贴图），
+        // 所以它看起来是平的。本移植版的等价物在 InnerAnimations 里，
+        // 已经逐字照抄了那几条，因此这里让旧版模型落回它即可。
         register("sleep", Priority.HIGHEST,
-                (maid, event) -> maid.asEntity().getPose() == Pose.SLEEPING);
+                (maid, event) -> !isLegacyModel(event)
+                        && maid.asEntity().getPose() == Pose.SLEEPING);
         register("swim", Priority.HIGHEST,
                 (maid, event) -> maid.asEntity().isVisuallySwimming());
 
