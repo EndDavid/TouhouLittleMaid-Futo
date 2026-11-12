@@ -1,5 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.client.resource.pojo;
 
+import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.annotations.SerializedName;
 import net.minecraft.resources.ResourceLocation;
@@ -167,7 +168,36 @@ public class MaidModelInfo {
         if (name == null) {
             name = String.format("{model.%s.%s.name}", modelId.getNamespace(), modelId.getPath());
         }
+        applyDefaultInnerAnimations();
         renderEntityScale = Mth.clamp(renderEntityScale, RENDER_ENTITY_SCALE_MIN, RENDER_ENTITY_SCALE_MAX);
         return this;
+    }
+
+    /**
+     * 没有声明 {@code animation} 的模型，补上「坐下时裙摆修正」。
+     *
+     * <p>上游 {@code MaidModelInfo#decorate} 在 {@code animation} 为空时补一份 15 条的
+     * 默认动画表，其中包含 {@code sit/skirt_rotation.js}。本移植版只补这一条，原因：</p>
+     *
+     * <ul>
+     *     <li>其余 14 条在本移植版里已有等价实现，再叠一遍会打架 ——
+     *         {@code sit/default} 会按 {@code sittingPosture} 直接写腿骨，而旧版模型的
+     *         坐姿是由 {@code maid_legacy.animation.json} 的 {@code sit} 关键帧给的；
+     *         {@code arm/default}、{@code arm/swing} 同理，已由 {@code armed_pose} /
+     *         {@code use_mainhand} / {@code use_offhand} 三支 JSON 姿态替代。
+     *         {@code head/blink}、{@code armor/default}、{@code wing/default} 则在
+     *         {@code MaidRenderer} / {@code GeckoMaidEntity} 里逐帧写过。</li>
+     *     <li>而裙摆这一条<b>没有任何替代实现</b>，缺了它就只能看到「坐下时裙子还是站着的形状」。</li>
+     * </ul>
+     *
+     * <p>它与模型自带的 {@code skirt} 骨骼无关，只看模型里有没有那根专用骨骼
+     * {@code sittingRotationSkirt}（坐下时绕 X 轴抬 -0.567 rad，约 32.5 度）。
+     * 没有这根骨骼的模型，补了也不会变 —— 见 {@code InnerAnimations#sitSkirtRotation}。</p>
+     */
+    private void applyDefaultInnerAnimations() {
+        if (!this.isGeckoModel && (this.animation == null || this.animation.isEmpty())) {
+            this.animation = Collections.singletonList(new ResourceLocation(TouhouLittleMaid.MOD_ID,
+                    "animation/maid/default/sit/skirt_rotation.js"));
+        }
     }
 }
