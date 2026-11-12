@@ -1642,6 +1642,24 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         return false;
     }
 
+    /**
+     * 眼睛高度（上游 {@code EntityMaid#getStandingEyeHeight}）。
+     *
+     * <p>原版默认是 {@code sizeIn.height * 0.85}，上游在「坐姿」时把它降到 {@code 0.65}，
+     * 这样坐下以后「看向玩家」的判定点仍然在头部而不是悬在头顶上方。</p>
+     *
+     * <p>这个值还决定了睡觉时的渲染位置：{@code LivingEntityRenderer} 对
+     * {@code Pose.SLEEPING} 做的那一步水平位移是
+     * {@code -bedFacing * (getEyeHeight(Pose.STANDING) - 0.1)}，
+     * 也就是「把位于眼睛高度的模型枢轴移回床面」。所以这里必须与上游逐字一致，
+     * 否则躺下的位置会整体沿床长方向偏掉。</p>
+     */
+    @Override
+    public float getStandingEyeHeight(net.minecraft.world.entity.Pose pose,
+                                      net.minecraft.world.entity.EntityDimensions size) {
+        return size.height * (isMaidInSittingPose() ? 0.65F : 0.85F);
+    }
+
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob other) {
@@ -3073,23 +3091,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         super.stopSleeping();
         sleepingPos.ifPresent(pos ->
                 com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed.setBedOccupied(this.level, pos, false));
-    }
-
-    /**
-     * 睡觉时头朝哪边 —— 对应 Forge 补丁里 {@code isBed} 为真的那个分支。
-     * 原版只对 {@code BedBlock} 返回朝向，取不到就返回 {@code null}。
-     */
-    @Override
-    public Direction getBedOrientation() {
-        Optional<BlockPos> sleepingPos = this.getSleepingPos();
-        if (sleepingPos.isPresent()) {
-            Direction facing = com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed
-                    .getMaidBedFacing(this.level, sleepingPos.get());
-            if (facing != null) {
-                return facing;
-            }
-        }
-        return super.getBedOrientation();
     }
 
     /**

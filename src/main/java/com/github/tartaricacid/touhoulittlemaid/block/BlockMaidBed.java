@@ -199,12 +199,15 @@ public class BlockMaidBed extends HorizontalDirectionalBlock {
     }
 
     /**
-     * 睡觉时朝向哪边 —— 同 Forge 补丁：{@code isBed} 为真时直接用方块的 {@code FACING}。
+     * 睡觉时头朝哪边 —— 读女仆床的 {@code FACING}。
+     *
+     * <p><b>注意：{@code EntityMaid#getBedOrientation()} 已经不再调用它。</b>
+     * 上游根本没有覆写 {@code getBedOrientation()}，而 Forge 那条默认实现只能认出
+     * {@code BedBlock}，所以上游女仆床的朝向查询恒为 {@code null}、也就不会做
+     * {@code LivingEntityRenderer} 里那一步「{@code -bedFacing * (eyeHeight - 0.1)}」的
+     * 水平位移。本移植版之前自己加了这层覆写，结果女仆整体沿床长方向偏了约 1.2 格 ——
+     * 现在已按上游改回。这个方法保留下来是给需要「女仆床朝向」的地方用的工具方法。</p>
      */
-    public static boolean isMaidBedAt(BlockGetter level, BlockPos pos) {
-        return pos != null && isMaidBed(level.getBlockState(pos));
-    }
-
     public static Direction getMaidBedFacing(BlockGetter level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         return isMaidBed(state) ? state.getValue(FACING) : null;
