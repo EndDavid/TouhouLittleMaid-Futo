@@ -74,7 +74,7 @@ public final class AnimationManager {
      *
      * <p>之所以要单独列一张表，而不是直接放行所有 {@code use_*}：
      * 吃 / 喝 / 望远镜 / 盾这几支动画带 {@code UpBody}、{@code Head}、{@code UpperBody}
-     * 关键帧，在平铺的旧版骨架上会把头拧过去，仍旧要走「持物」降级。</p>
+     * 关键帧，在平铺的旧版骨架上会把头拧过去，仍舊要走「持物」降级。</p>
      */
     private static final Set<String> LEGACY_USE_ANIMATIONS = Set.of(
             "use_mainhand:bow", "use_offhand:bow",
@@ -203,16 +203,24 @@ public final class AnimationManager {
     }
 
     /**
-     * 主控制器「被请求播放的动画」发生变化时打印一行。
+     * 主控制器「被请求播放的动画」发生变化时是否打印一行日志。
      *
-     * <p>这条日志是「模型不切换」类问题的判据：坐姿开关（{@code sitting}）与服务端行为
-     * 同源，因此只要这里出现了 {@code sit -> idle} 而画面仍坐在原地，问题就出在动画/模型层，
-     * 而不是状态层。</p>
+     * <p>这条日志曾是「模型不切换」类问题的判据：坐姿开关（{@code sitting}）与服务端行为
+     * 同源，只要日志里出现 {@code sit -> idle} 而画面仍坐在原地，问题就在动画/模型层而非状态层。</p>
+     *
+     * <p>但它每换一次状态就写一行，正常走动 + 停下就是两行，会持续污染 {@code latest.log}。
+     * 排查动画问题时把它改回 {@code true} 即可。</p>
      *
      * <p>「上一次的动画名」存在动画实例自己身上，而不是按实体做 key 的 Map：
      * {@code Entity#equals/hashCode} 是按实体 id 的，区块重载后新实体实例会命中旧记录。</p>
      */
+    private static final boolean DEBUG_ANIM_STATE = false;
+
     private static void logMainAnimation(AnimationEvent<?> event, String animationName) {
+        // 先做最便宜的判断，关闭时连 controller 都不用取
+        if (!DEBUG_ANIM_STATE) {
+            return;
+        }
         AnimationController<?> controller = event.getController();
         if (controller == null || !"main".equals(controller.getName())) {
             return;
