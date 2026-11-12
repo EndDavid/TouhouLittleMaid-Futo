@@ -1998,19 +1998,18 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     // ---------------------------------------------------------------- 每刻
 
     /**
-     * 睡觉时把女仆「钉」在床上（上游 {@code EntityMaid#onMaidSleep}，由 {@code baseTick} 每 tick 调用）。
+     * 睡觉时把女仆摆到床面上（上游 {@code EntityMaid#onMaidSleep}，由 {@code baseTick} 每 tick 调用）。
      *
-     * <p>原版 {@code startSleeping} 只把坐标设成方块中心 +0.6875，之后每一 tick 仍然走正常的
-     * {@code aiStep} / 重力 / 推挤，女仆会从床上滑下去；一旦离开床面，原版那套
-     * {@code checkBedExists} 之外的清理逻辑就会把她叫醒。上游的做法是每 tick 重申一次坐标、
-     * 清零速度并静音（睡着的时候不该再触发语音）。</p>
+     * <p>原版 {@code startSleeping} 只把坐标设成床头格中心 + 某个高度，之后每一 tick 仍然走正常的
+     * {@code aiStep} / 重力 / 推挤，女仆会从床上滑下去；一旦离开床面就会被叫醒。
+     * 上游的做法是每 tick 重申一次坐标、清零速度并静音（睡着的时候不该再触发语音）。</p>
      *
-     * <p>这里逐字照抄。注意它<b>两端都要跑</b>：客户端也必须停在同一坐标上，否则会看到
-     * 女仆在床上抖动，{@code Pose.SLEEPING} 触发的 {@code sleep} 动画也会断续。</p>
+     * <p>这里<b>两端都要跑</b>：客户端也必须停在同一坐标上，否则会看到女仆在床上抖动，
+     * {@code Pose.SLEEPING} 触发的 {@code sleep} 动画也会断续。</p>
      */
     private void onMaidSleep() {
         if (this.isSleeping()) {
-            this.getSleepingPos().ifPresent(pos -> this.setPos(pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5));
+            this.getSleepingPos().ifPresent(this::pinToBed);
             this.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
             if (!this.isSilent()) {
                 this.setSilent(true);
@@ -2020,6 +2019,34 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                 this.setSilent(false);
             }
         }
+    }
+
+    /**
+     * 把身体放到床面正中 —— 与 1.20.1 上游对齐。
+     *
+     * <h2>水平：为什么要挪到另一格</h2>
+     * <p>{@code MaidBedTask} 只在<b>床头</b>（{@code PART == HEAD}）那一格入睡，
+     * 而 {@code sleep} 动画里身体的延展方向是「从 {@code FACING} 指向的方向继续往床外」
+     * —— 也就是头和上半身会越过枕头、伸到床外一格多。1.18.2 上游就停在这里
+     * （所以它的女仆睡觉也是歪出去的），1.20.1 之后才改为把落点算到整张床上。</p>
+     *
+     * <p>女仆床是双格：睡眠坐标永远是床头那一格，另一格在 {@code FACING} 的反方向。
+     * 把落点移到那一格的格心，1.5 格高的模型就正好铺满两格床面
+     * （身体在床内约 -1 … +0.5 的区间）。</p>
+     *
+     * <h2>竖直：0.5625 而不是 0.8</h2>
+     * <p>{@code 0.5625} = 9/16，正是 {@code BlockMaidBed} 的碰撞箱高度，也就是床面本身。
+     * 1.18.2 上游写的是 {@code 0.8}，会让女仆悬空 0.24 格；1.20.1 已经改成
+     * {@code 0.5625}，这里跟 1.20.1 一致。</p>
+     */
+    private void pinToBed(BlockPos headPos) {
+        BlockPos center = headPos;
+        Direction facing = com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed
+                .getMaidBedFacing(this.level, headPos);
+        if (facing != null) {
+            center = headPos.relative(facing.getOpposite());
+        }
+        this.setPos(center.getX() + 0.5D, headPos.getY() + 0.5625D, center.getZ() + 0.5D);
     }
 
     @Override
