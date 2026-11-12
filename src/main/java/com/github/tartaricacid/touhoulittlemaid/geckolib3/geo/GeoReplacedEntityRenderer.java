@@ -173,13 +173,6 @@ public abstract class GeoReplacedEntityRenderer<T extends LivingEntity, E extend
             netHeadYaw = lerpHeadRot - lerpBodyRot;
         }
 
-        // NOTE: the SLEEPING translate is intentionally NOT duplicated here.
-        // setupRotations() below reaches LivingEntityRenderer#setupRotations, which
-        // already applies  translate(-bedFacing * (getEyeHeight(STANDING) - 0.1)).
-        // geckolib shipped both copies; upstream never noticed because its maid bed
-        // reports no bed orientation, so neither copy ever ran. Now that the maid bed
-        // returns a real facing, keeping both would shift her by 2.35 blocks.
-        // See EntityMaid#getBedOrientation.
 
         float lerpedAge = entity.tickCount + partialTick;
         float limbSwingAmount = 0;

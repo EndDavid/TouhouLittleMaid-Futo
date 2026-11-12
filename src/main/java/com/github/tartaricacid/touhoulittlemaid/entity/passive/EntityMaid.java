@@ -2022,31 +2022,30 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
-     * 把身体放到床面正中 —— 与 1.20.1 上游对齐。
+     * 把女仆放到两格床的正中、床面上。
      *
-     * <h2>水平：为什么要挪到另一格</h2>
-     * <p>{@code MaidBedTask} 只在<b>床头</b>（{@code PART == HEAD}）那一格入睡，
-     * 而 {@code sleep} 动画里身体的延展方向是「从 {@code FACING} 指向的方向继续往床外」
-     * —— 也就是头和上半身会越过枕头、伸到床外一格多。1.18.2 上游就停在这里
-     * （所以它的女仆睡觉也是歪出去的），1.20.1 之后才改为把落点算到整张床上。</p>
-     *
-     * <p>女仆床是双格：睡眠坐标永远是床头那一格，另一格在 {@code FACING} 的反方向。
-     * 把落点移到那一格的格心，1.5 格高的模型就正好铺满两格床面
-     * （身体在床内约 -1 … +0.5 的区间）。</p>
+     * <h2>水平：床头格中心再退半格</h2>
+     * <p>{@code MaidBedTask} 只用床头（{@code PART == HEAD}）那一格的 POI 入睡，
+     * 所以睡眠坐标永远是床头格。而两格床的中点在它沿 {@code FACING} 反方向半格处。
+     * 把坐标放在中点，再让渲染侧回退半个身长
+     * （{@link com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.GeoReplacedEntityRenderer}），
+     * 1.5 格高的身体就正好以床心为中心铺满两格。</p>
      *
      * <h2>竖直：0.5625 而不是 0.8</h2>
-     * <p>{@code 0.5625} = 9/16，正是 {@code BlockMaidBed} 的碰撞箱高度，也就是床面本身。
-     * 1.18.2 上游写的是 {@code 0.8}，会让女仆悬空 0.24 格；1.20.1 已经改成
+     * <p>{@code 0.5625} = 9/16，正是 {@code BlockMaidBed} 碰撞箱的高度，也就是床面本身。
+     * 1.18.2 上游写的是 {@code 0.8}，会让女仆悬空 0.24 格；1.20.1 已改成
      * {@code 0.5625}，这里跟 1.20.1 一致。</p>
      */
     private void pinToBed(BlockPos headPos) {
-        BlockPos center = headPos;
+        double cx = headPos.getX() + 0.5D;
+        double cz = headPos.getZ() + 0.5D;
         Direction facing = com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed
                 .getMaidBedFacing(this.level, headPos);
         if (facing != null) {
-            center = headPos.relative(facing.getOpposite());
+            cx -= facing.getStepX() * 0.5D;
+            cz -= facing.getStepZ() * 0.5D;
         }
-        this.setPos(center.getX() + 0.5D, headPos.getY() + 0.5625D, center.getZ() + 0.5D);
+        this.setPos(cx, headPos.getY() + 0.5625D, cz);
     }
 
     @Override
