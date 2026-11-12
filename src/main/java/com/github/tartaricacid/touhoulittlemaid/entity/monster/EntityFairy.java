@@ -44,7 +44,6 @@ import net.minecraft.world.level.ServerLevelAccessor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Random;
-import java.util.function.BiPredicate;
 
 /**
  * 女仆妖精（上游 {@code entity/monster/EntityFairy}）—— P 点的<b>唯一</b>常规来源。
@@ -64,9 +63,9 @@ import java.util.function.BiPredicate;
  *         5% 概率把名字设成 {@code rick}（上游彩蛋，对应 {@code maid_fairy_rick.png}）。</li>
  * </ol>
  *
- * <p><b>与本移植版的一个取舍：</b>稻草人方块尚未移植，因此第 2 层的 POI 检查改成一个
- * 可插拔的钩子 {@link #setRepellentCheck}。等稻草人落地时，只需在那里注册一个
- * 「附近有没有稻草人」的判定，不必回来改妖精的代码。</p>
+ * <p><b>第 2 层用的是稻草人 POI：</b>{@code InitPoi.SCARECROW} 只登记稻草人的下半格，
+ * 半径取自 {@code MiscConfig.SCARECROW_RANGE}。稻草人落地后这里就没有任何占位逻辑了，
+ * 与上游逐字一致。</p>
  */
 public class EntityFairy extends Monster implements RangedAttackMob, FlyingAnimal, IHasPowerPoint {
     /**
@@ -82,22 +81,10 @@ public class EntityFairy extends Monster implements RangedAttackMob, FlyingAnima
      */
     private static final double AIMED_SHOT_PROBABILITY = 0.9;
 
-    /**
-     * 稻草人（或未来任何「驱散物」）的判定钩子。
-     *
-     * <p>返回 {@code true} 表示「这个位置被驱散，不许刷妖精」。</p>
-     */
-    @Nullable
-    private static BiPredicate<ServerLevel, BlockPos> repellentCheck;
-
     public EntityFairy(EntityType<? extends Monster> type, Level level) {
         super(type, level);
         // 飞行移动控制器：maxTurn = 15，followGroundPath = true（与上游一致）
         this.moveControl = new FlyingMoveControl(this, 15, true);
-    }
-
-    public static void setRepellentCheck(@Nullable BiPredicate<ServerLevel, BlockPos> check) {
-        repellentCheck = check;
     }
 
     public static AttributeSupplier.Builder createFairyAttributes() {
@@ -117,10 +104,15 @@ public class EntityFairy extends Monster implements RangedAttackMob, FlyingAnima
         if (!Monster.checkMonsterSpawnRules(type, levelAccessor, spawnType, pos, random)) {
             return false;
         }
-        if (repellentCheck != null && levelAccessor instanceof ServerLevel level) {
-            return !repellentCheck.test(level, pos);
+        if (levelAccessor instanceof ServerLevel level) {
+            int scarecrowRange = com.github.tartaricacid.touhoulittlemaid.config.subconfig.MiscConfig.SCARECROW_RANGE.get();
+            long findCount = level.getPoiManager()
+                    .getInSquare(poiType -> poiType.equals(com.github.tartaricacid.touhoulittlemaid.init.InitPoi.SCARECROW),
+                            pos, scarecrowRange, net.minecraft.world.entity.ai.village.poi.PoiManager.Occupancy.ANY)
+                    .count();
+            return findCount <= 0;
         }
-        return true;
+        return false;
     }
 
     @Override
