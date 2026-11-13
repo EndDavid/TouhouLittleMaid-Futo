@@ -2792,6 +2792,15 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                 }
                 player.displayClientMessage(
                         new TranslatableComponent("message.touhou_little_maid.saddle.how_to_eject"), true);
+            } else {
+                // 抱不起来时必须说清原因。
+                //
+                // 「静默 SUCCESS」是这个功能最难查的地方：玩家看到的是「马鞍右键没反应」，
+                // 日志里什么都没有，而且**只有部分女仆**会这样 —— 因为失败条件全是
+                // 每只女仆各自的状态（骑乘开关、是否已经在骑别的东西）。
+                // 上游同样是静默的（MaidMountEvent 直接 cancel 掉 EntityMountEvent），
+                // 但上游玩家能靠「女仆骑乘」按钮的位置猜到；这里给一句明确提示更省事。
+                this.reportSaddleFailure(player);
             }
             return InteractionResult.SUCCESS;
         }
@@ -2801,6 +2810,39 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             player.ejectPassengers();
         }
         return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * 抱不起来时给玩家一句具体原因，并记一条 WARN。
+     *
+     * <p>三条失败路径互斥，按「最容易误解」的顺序判定：</p>
+     * <ol>
+     *     <li>{@code isRideable() == false} —— 主界面左下角第三个按钮（{@code 女仆骑乘}）被关掉了。
+     *         它同时是「用鞍抱起女仆」的总开关，与上游 {@code MaidMountEvent} 一致。</li>
+     *     <li>她正骑着别的东西（坐垫 / 船 / 扫帚 / 别的载具）。原版
+     *         {@code Entity#startRiding} 会先 {@code stopRiding()} 再挂新载具，
+     *         但如果连 {@code canRide} 都没过（见下一条），这一步根本不会执行。</li>
+     *     <li>原版 {@code Entity#canRide} 的两个条件：{@code boardingCooldown <= 0} 与
+     *         {@code !isShiftKeyDown()}。前者在每次 {@code stopRiding()} 时被置为 60 tick，
+     *         所以刚放下她、或她刚从一个载具上下来时，3 秒内再抱会失败 —— 这是原版行为，
+     *         不是移植偏差，但必须说出来，否则玩家只会觉得「时灵时不灵」。</li>
+     * </ol>
+     */
+    private void reportSaddleFailure(Player player) {
+        String reason;
+        if (!this.isRideable()) {
+            reason = "message.touhou_little_maid.saddle.rideable_off";
+        } else if (this.getVehicle() != null) {
+            reason = "message.touhou_little_maid.saddle.riding_other";
+        } else {
+            reason = "message.touhou_little_maid.saddle.cooldown";
+        }
+        player.displayClientMessage(new TranslatableComponent(reason), true);
+        TouhouLittleMaid.LOGGER.warn(
+                "[Futo] Saddle pickup refused for maid id={} uuid={} reason={} rideable={} vehicle={} passengers={}",
+                this.getId(), this.getUUID(), reason, this.isRideable(),
+                this.getVehicle() == null ? "none" : this.getVehicle().getType().toString(),
+                this.getPassengers().size());
     }
 
     /**
