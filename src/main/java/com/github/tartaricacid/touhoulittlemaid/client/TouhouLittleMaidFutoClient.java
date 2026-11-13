@@ -94,6 +94,14 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         EntityRendererRegistry.register(InitEntities.BOX,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityBoxRender::new);
 
+        // 坐垫：实体渲染走 Gecko 管线；物品图标用 Fabric 的 BuiltinItemRenderer 直接画实体
+        EntityRendererRegistry.register(InitEntities.CHAIR,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityChairRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.BuiltinItemRendererRegistry.INSTANCE.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitItems.CHAIR,
+                new com.github.tartaricacid.touhoulittlemaid.client.renderer.item.ChairItemRenderer());
+
+
         // 灵力 HUD：手持御币时显示 ×N.NN（上游 ShowPowerEvent）
         com.github.tartaricacid.touhoulittlemaid.client.event.ShowPowerEvent.init();
         // 未安装帕秋莉手册时，登录后在聊天栏给出「点这里下载」提示（上游 PlayerLoggedInNotice）
@@ -217,8 +225,10 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                         // 失败会打 error 日志（BedrockBlockModels#load 里）。
                         com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("altar");
                         com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("shrine");
-
+                        // 坐垫模型必须【在女仆模型之后】加载：GeckoLibCache 在上面那行被整体清空过
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.ChairModelLoader.reload();
                     }
+
                 });
     }
 }

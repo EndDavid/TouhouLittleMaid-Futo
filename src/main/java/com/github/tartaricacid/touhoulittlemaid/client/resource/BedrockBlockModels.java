@@ -47,7 +47,8 @@ import java.util.Map;
  * 硬编码任何数字都注定只对一个模型正确。</p>
  *
  * <p>所以改成按模型自身量出来的包围盒计算：{@link #floorOffset} 返回
- * {@code -minY}，把模型最低点摆到方块底面。神社量出来接近 0，祭坛是个正数 —— 两者都对。</p>
+ * {@code -max(0, minY)}（只压不抬，因为 y = 0 本身就是方块底面），
+ * 绝不硬编码任何数字。神社量出来的 minY 正好 0，祭坛是 −0.125（装饰件故意埋进地面），两者都不会被抬高。</p>
  */
 public final class BedrockBlockModels {
     /** 名称 → 模型；值可能是 {@code null}（文件缺失 / 解析失败）。 */
@@ -128,10 +129,14 @@ public final class BedrockBlockModels {
             float[] b = GeoBlockRenderer.measureBounds(model);
             CACHE.put(name, model);
             BOUNDS.put(name, b);
+            // 注意占位符数量必须和参数个数严格一致：SLF4J 不会因为参数不足报错，
+            // 而是把多余的 "{}" 原样打进日志（上一版就漏了一个参数，日志里出现 "model minY={}"）。
+            // 这里的 offset 与 floorOffset 用的是同一条规则（只压不抬）。
             TouhouLittleMaid.LOGGER.info(
-                    "[Futo] Block model {} loaded: {} bones, bbox x[{}..{}] y[{}..{}] z[{}..{}] offset={} (model minY={})",
+                    "[Futo] Block model {} loaded: {} bones, bbox x[{}..{}] y[{}..{}] z[{}..{}] floorOffset={} (model minY={})",
                     name, model.bones().size(),
-                    fmt(b[0]), fmt(b[3]), fmt(b[1]), fmt(b[4]), fmt(b[2]), fmt(b[5]), fmt(-b[1]));
+                    fmt(b[0]), fmt(b[3]), fmt(b[1]), fmt(b[4]), fmt(b[2]), fmt(b[5]),
+                    fmt(-Math.max(0, b[1])), fmt(b[1]));
         } catch (Throwable e) {
             // 与 GeckoModelLoader 一致：几何层级异常时可能抛 StackOverflowError，不是 Exception
             TouhouLittleMaid.LOGGER.error("Failed to load bedrock block model {}", location, e);
@@ -159,4 +164,3 @@ public final class BedrockBlockModels {
         }
     }
 }
-

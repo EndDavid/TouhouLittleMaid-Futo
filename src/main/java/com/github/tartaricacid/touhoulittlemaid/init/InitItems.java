@@ -35,6 +35,28 @@ public final class InitItems {
             })
             .build();
 
+    /**
+     * 坐垫专用创造模式物品栏（上游 {@code MaidGroup.CHAIR_TAB}）。
+     *
+     * <p>坐垫有二十多种模型，全塞进主物品栏会把其余物品挤得找不到，所以上游单开一栏。
+     * 图标用默认坐垫 {@code touhou_little_maid:cushion} 的带 NBT 物品 ———
+     * 这里的 lambda 是<b>延迟求值</b>的，因此可以先声明本栏、后声明 {@link #CHAIR}。</p>
+     */
+    public static final CreativeModeTab CHAIR_TAB = FabricItemGroupBuilder
+            .create(TouhouLittleMaid.rl("chair"))
+            .icon(() -> com.github.tartaricacid.touhoulittlemaid.item.ItemChair.setData(
+                    new ItemStack(InitItems.CHAIR),
+                    new com.github.tartaricacid.touhoulittlemaid.item.ItemChair.Data(
+                            "touhou_little_maid:cushion", 0.0F, true, false)))
+            .appendItems((items, tab) -> {
+                NonNullList<ItemStack> defaults = NonNullList.create();
+                for (Item item : Registry.ITEM) {
+                    item.fillItemCategory(tab, defaults);
+                }
+                items.addAll(defaults);
+            })
+            .build();
+
     public static final Item MAID_SPAWN_EGG = Registry.register(Registry.ITEM,
             TouhouLittleMaid.rl("maid_spawn_egg"),
             // 与上游一致：底色与斑点色都是纯白（ForgeSpawnEggItem(..., 0xffffff, 0xffffff, ...)）
@@ -168,6 +190,28 @@ public final class InitItems {
     public static final Item POWER_POINT = Registry.register(Registry.ITEM,
             TouhouLittleMaid.rl("power_point"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemPowerPoint());
+
+    // ------------------------------------------------------------------ 坐垫
+
+    /**
+     * 自定义坐垫（上游 {@code InitItems.CHAIR}）。
+     *
+     * <p>一个物品承载<b>所有</b>坐垫模型：模型 id、坐高、可骑、无重力四项写在 NBT 里，
+     * 由 {@code ItemChair.Data} 读写。因此物品栏里看到的一排坐垫其实是同一个物品的
+     * 不同 NBT 变体（由 {@code fillItemCategory} 铺出）。</p>
+     */
+    public static final Item CHAIR = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("chair"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemChair());
+
+    /**
+     * 坐垫碰撞箱显示器（上游 {@code InitItems.CHAIR_SHOW}）。
+     *
+     * <p>手持并蹲下时，所有坐垫只画红色线框，方便对齐多方块家具。</p>
+     */
+    public static final Item CHAIR_SHOW = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("chair_show"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemChairShow());
 
     // ------------------------------------------------------------------ 女仆饰品
 

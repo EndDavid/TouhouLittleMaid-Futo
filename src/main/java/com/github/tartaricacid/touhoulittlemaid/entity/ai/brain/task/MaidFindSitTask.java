@@ -20,7 +20,7 @@ import java.util.Optional;
  * 但这两个类都<b>不是</b> {@code LivingEntity}，那个记忆里永远不可能出现它们 ——
  * 于是「女仆对水边的船毫无反应」。这里改成直接按类型在附近查询实体，并按距离取最近的。</p>
  *
- * <p>上游同时接受「女仆坐垫」与「船」；坐垫系统尚未移植，因此目前只认 {@link Boat}。</p>
+ * <p>上游同时接受「女仆坐垫」与「船」，这里两者都认。</p>
  */
 public class MaidFindSitTask extends MaidCheckRateTask {
     private static final int MAX_DELAY_TIME = 12;
@@ -78,7 +78,7 @@ public class MaidFindSitTask extends MaidCheckRateTask {
         if (!entity.getPassengers().isEmpty()) {
             return false;
         }
-        return entity instanceof Boat;
+        return entity instanceof com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair
+                || entity instanceof Boat;
     }
 }
-

@@ -52,6 +52,16 @@ loom_version=1.15.5
 **不会被重映射**。所以每次动过反射、或新增了依赖 `Class#getDeclaredMethod(name, …)` 的代码，
 必须把 `build/libs/` 的 jar 装进启动器实测一次。见下文兼容层的「反射只能按参数类型找」。
 
+- **行尾是 CRLF，且 `core.autocrlf=false`。** `git ls-files --eol` 显示 `i/crlf attr/-text` ——
+  **git 不做事先转换**，文件里是什么字节就提交什么字节。于是「用哪种 API 写文件」直接决定 diff 大小：
+  `insert_edit_into_file` 写 **LF**、`[System.IO.File]::WriteAllLines` 写 CRLF、
+  `WriteAllText(…, -join "`n")` 写 LF。写错一次，`git diff` 就把整个文件算成「全改」，
+  一行的改动变成上千行噪音（本章就踩了两次：`README.md` 与两份 `lang`）。
+
+  正确姿势是**先读原始字节、只在目标位置插入、再原样写回**；或事后跑
+  `port/fix-eol.ps1` 统一行尾。注意 `lang/en_us.json`、`lang/zh_cn.json` 的**原始行尾是 mixed**，
+  整体转换同样会造出近两千行 diff —— 只有字节级插入才能保住「1 行」的 diff。
+
 
 ---
 
@@ -80,7 +90,8 @@ loom_version=1.15.5
 | **神社 / 胶片 / 女仆床 / 稻草人** | **完成** |
 
 | **墓碑（死亡收纳）+ 祭坛召唤箱** | **完成** |
-| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（36 条目 / 3 分类） |
+| **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器）** | **完成**（换肤 GUI 待 `AbstractModelGui` 泛型化） |
+| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（39 条目 / 3 分类） |
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | 未开始 |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
@@ -1548,4 +1559,88 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
   `@Invoker("breakItem") void futo$breakItem(ItemStack stack);` ——
   `futo$` 前缀是必须的（invoker 会在目标类里生成同名方法）。
   目标方法带 `@Environment(CLIENT)` 时，mixin 必须放在 `client` 块里。
+
+---
+
+## 坐垫（自定义坐垫）
+
+上游的「坐垫」是一整套「可摆放、可回收、可骑」的装饰家具：**一个物品承载所有模型**，
+右键地面生成实体，蹲下左键拆除后又变回同样数据的物品。本轮整套搬过来了。
+
+### 数据流
+
+坐垫有四个属性，全部写在物品 NBT 里（`ItemChair.Data`）：
+`ModelId` / `MountedHeight` / `TameableCanRide` / `IsNoGravity`。
+生成实体时抄进 `SynchedEntityData`，拆除时再抄回物品 —— 所以拆了重放不会丢模型。
+
+`MountedHeight` 在 JSON 里是**像素**，`ChairModelInfo#decorate` 转成格：
+`(mounted_height - 3) * 0.0625`。那个 `- 3` 是上游的基准偏移，不是笔误，
+`cushion` 写 `mounted_height: 3` 落地就是 0。
+
+### 模型包
+
+`assets/<ns>/maid_chair.json`，结构与女仆的 `maid_model.json` 完全同构。
+内置三个包，顺序照上游 `DefaultPackConstant.CHAIR_SORT`：
+`touhou_little_maid` → `geckolib` → `next_update_model`，实测 **58 个模型**。
+
+几何与动画直接走女仆那条管线（`GeckoModelLoader#buildGeoModel(ResourceLocation)`），
+所以旧版 `1.10.0` 与 Gecko 两种格式都能读。**但绝不合入 `maid.animation.json`** ——
+两套骨架毫无关系，合进去只会让坐垫按女仆的骨骼名去找根本不存在的骨。
+坐垫只用自己的 `chair.animation.json` 兜底。
+
+坐垫的动画约定是「八条并行轨道」：`parallel0` ~ `parallel7` 各一条控制器同时播
+（`GeckoChairEntity` 注册 8 条）。这样模型作者可以把「轮子转」「猫尾摆」拆到不同轨道，
+不必在同一时间轴上对拍。
+
+### 渲染
+
+实体侧只有**一个**渲染器：`EntityChairRenderer` 直接继承 `GeoReplacedEntityRenderer`。
+上游分了 `EntityChairRenderer` + `GeckoEntityChairRenderer` 两层，是因为它要同时支持
+「旧版基岩模型 + JS 动画」和「Gecko 模型」两条路径；本移植没有 JS 引擎、旧版坐垫模型
+在加载时也已统一转成 `GeoModel`，两条路在 `GeoReplacedEntityRenderer` 里本来就合一了，
+再拆一层只是空壳。
+
+物品图标侧是 `client/renderer/item/ChairItemRenderer`，用 Fabric 的
+`BuiltinItemRendererRegistry` 把**一个真实体**画进物品槽。上游用的是 Forge 的
+`IItemRenderProperties#getItemStackRenderer()`，Fabric 1.18.2 没有对应机制。
+
+> **`models/item/chair.json` 必须保留 `"parent": "builtin/entity"`。**
+> 少了它，原版烘焙器会生成一个空模型，并且**不会**调用 `BuiltinItemRendererRegistry`
+> 注册的渲染器 —— 表现就是物品栏里彻底空白（不是「白方块」，是空槽）。
+
+坐标与缩放逐字照抄上游：先按 `render_item_scale` 整体缩放，再把实体摆在
+`(1/scale - 0.125, 0.25, 0.75)`。那三个数字是在模型空间里手调出来的居中值，换掉就偏。
+
+### 三处 API 差异（`AbstractEntityFromItem` 里逐条写明）
+
+| 上游写法 | 1.18.2 实际 | 处理 |
+|---|---|---|
+| `!EffectiveSide.get().isServer()` | Fabric 没有 `EffectiveSide` | 用 `level.isClientSide()` |
+| `attackable()` 返回 `false` | 原版叫 `isAttackable()`；上游那个**没有 `@Override`**，从来没生效过 | **不移植** —— 照抄会让玩家左键打不到坐垫，「蹲下左键拆除」直接失效 |
+| `getPickedResult(HitResult)` | 1.18.2 是 `getPickResult()`，**无参**（`HitResult` 参数是 1.19 才加的） | 按无参签名重写 |
+
+第二条值得单独记一笔：**上游那个方法是死代码**。它在 1.18.2 的映射里找不到同名父类方法，
+所以只是个普通方法，既不参与覆盖也不会被调用。这类「看起来是覆盖、其实没生效」的写法
+在搬运时最容易原样搬成 bug —— 判断依据只能是去 vanilla 里核对方法签名。
+
+### 与女仆的接线
+
+- `MaidFindSitTask` 原来只认 `Boat`，现在 `EntityChair` 也认。这里保留着原有的
+  **上游 bug 修复**：上游拿 `NEAREST_VISIBLE_LIVING_ENTITIES` 去筛，而 `EntityChair` /
+  `Boat` 都不是 `LivingEntity`，那个记忆里永远不可能出现它们，于是「女仆对椅子毫无反应」。
+- `EntityChair#pushEntities` 会让走近的 `TamableAnimal` 自动坐下（只有 `tameable_can_ride`
+  为真的坐垫才有这个行为，课桌 / 麻将桌之类没有）。
+- 创造模式单开 `chair` 页签（`InitItems.CHAIR_TAB`），由一个物品铺出全部模型变体，
+  与上游 `MaidGroup.CHAIR_TAB` 一致。
+- `chair_show`（碰撞箱显示器）：蹲下手持时所有坐垫改画红色线框，用来对齐多方块家具。
+  这个分流写在 `EntityChairRenderer#render` 最前面，位置与上游一致；物品图标渲染期间
+  会临时把 `renderHitBox` 关掉，否则图标里会多一个红框。
+
+### 还没做的
+
+**蹲下右键的换肤界面（`ChairModelGui`）。** 上游复用的是 `AbstractModelGui`，
+而本移植的 `AbstractModelGui` 把模型类型钉死在 `MaidModelInfo` 上；
+要复用必须先把它泛型化成 `<T extends LivingEntity, M>`。
+在此之前蹲下右键保持无动作，换模型只能靠创造模式物品栏里的各个变体 ——
+功能不缺，只是少一个入口。
 

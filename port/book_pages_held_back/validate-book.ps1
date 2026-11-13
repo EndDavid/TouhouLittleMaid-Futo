@@ -26,7 +26,11 @@ $registered = @(
   'touhou_little_maid:film',
   'touhou_little_maid:shrine',
   'touhou_little_maid:maid_bed',
-  'touhou_little_maid:substitute_jizo'
+  'touhou_little_maid:substitute_jizo',
+  # --- chair milestone: chair / chair_show / scarecrow ---
+  'touhou_little_maid:chair',
+  'touhou_little_maid:chair_show',
+  'touhou_little_maid:scarecrow'
 )
 $entities = @('touhou_little_maid:maid','touhou_little_maid:fairy','touhou_little_maid:power_point')
 

@@ -33,40 +33,35 @@
 
 ## 现在还剩什么缺口
 
-被挪出来的 20 页，缺的是**尚未移植的物品 / 方块**：
+被挪出来的 14 页，缺的是**尚未移植的物品 / 方块**：
 
 | 词条 | 缺失的物品 ID | 所属子系统 |
 | --- | --- | --- |
-| `maid/film` | `film` | 神社复兴 |
 | `maid/gap` | `wireless_io` | 女仆饰品（无线 IO） |
 | `maid/kappa_compass` | `kappa_compass` | 搜索类工具 |
 | `maid/servant_bell` | `servant_bell` | 搜索类工具 |
-| `maid/substitute_jizo` | `substitute_jizo` | 神社复兴 |
 | `other/broom` | `broom` | 扫帚 |
-| `other/chair` | `chair`、`cat_cart`、`beach_chair` | 坐垫 / 椅子 |
-| `other/chair_show` | `chair_show` | 坐垫 / 椅子 |
 | `other/chisel_and_statues` | `chisel`、`statue` | 手办与雕像 |
 | `other/favorability_tool` | `favorability_tool_add/full/reduce` | 好感度工具 |
 | `other/fox_scroll` | `red_fox_scroll`、`white_fox_scroll` | 搜索类工具 |
 | `other/garage_kit` | `garage_kit` | 手办与雕像 |
 | `other/gomoku` | `gomoku` | 棋类与娱乐方块 |
-| `other/granite_inari_fox` | `scarecrow` | 神社复兴 |
-| `other/maid_bed` | `maid_bed` | 神社复兴 |
 | `other/maid_joy` | `keyboard`、`bookshelf`、`computer`、`gomoku` | 棋类与娱乐方块 |
 | `other/model_switcher` | `model_switcher` | 模型切换器 |
 | `other/picnic_basket` | `picnic_basket` | 野餐与娱乐 |
-| `other/shrine` | `shrine` | 神社复兴（含祭坛） |
 | `other/trumpet` | `trumpet` | 搜索类工具 |
 
-对应 6 个子系统：**坐垫 / 椅子**、**手办与雕像**、**棋类与娱乐方块**、
-**扫帚**、**神社复兴**（含祭坛）、**搜索类工具**。
+对应 5 个子系统：**手办与雕像**、**棋类与娱乐方块**、**扫帚**、
+**野餐与娱乐**、**搜索类工具**。
 
-## 已经还回去的（女仆饰品）
+## 已经还回去的
 
-`maid/maid_bauble.json`、`maid/mute_bauble.json`、`maid/item_magnet.json`
-三页已经还原进资源 —— 饰品子系统移植完成后，它们引用的
-`ultramarine_orb_elixir` / `*_protect_bauble` / `nimble_fabric` /
-`item_magnet_bauble` / `mute_bauble` 全部完成注册。
+- **女仆饰品**：`maid/maid_bauble.json`、`maid/mute_bauble.json`、`maid/item_magnet.json`
+  —— 饰品子系统移植完成后，它们引用的 `ultramarine_orb_elixir` /
+  `*_protect_bauble` / `nimble_fabric` / `item_magnet_bauble` / `mute_bauble` 全部完成注册。
+- **神社复兴**：`maid/film.json`、`maid/substitute_jizo.json`、`other/maid_bed.json`、
+  `other/shrine.json`、`other/granite_inari_fox.json`（稻草人）。
+- **坐垫**：`other/chair.json`、`other/chair_show.json`（本轮）。
 
 `maid/gap.json` 仍留在本目录：它讲的是 `wireless_io`（无线 IO 饰品），
 这件物品要等 IO 配置界面一起移植，所以先不还原。
@@ -92,21 +87,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File port/book_pages_held_back/va
 它按帕秋莉的规则静态检查 `spotlight` 物品 / 词条与分类图标 / 分类引用 / entity 页。
 **每还原一页就要跑一次，并同步在 `$registered` 里补上新增的物品 id。**
 
-## 目前手册里保留了什么（32 词条 / 3 分类）
+## 目前手册里保留了什么（39 词条 / 3 分类）
 
-- `maid/`：backpack、chat_bubbles、item_magnet、last_slot、maid_bauble、maid_base、
+`validate-book.ps1` 的当前输出：`entries=39 categories=3 problems=0`。
+
+- `maid/`：backpack、chat_bubbles、film、item_magnet、last_slot、maid_bauble、maid_base、
   maid_config、maid_home、maid_meal、maid_skin、maid_sound、maid_task、mute_bauble、
-  naming_eggs、other_backpack、snowball_fight、spawn_maid
-- `other/`：camera_and_photo、command、extinguisher、maid_beacon、power_point
+  naming_eggs、other_backpack、snowball_fight、spawn_maid、substitute_jizo
+- `other/`：camera_and_photo、chair、chair_show、command、extinguisher、
+  granite_inari_fox、maid_beacon、maid_bed、power_point、shrine
 - `overview/`：download_custom_pack、favorability、gohei_and_danmaku、
   make_custom_chatbubble_text、make_custom_model、multiblocks_altar、power_point、
   vanilla_change、what_is_touhou、world_spawn
 
 其中 `overview/favorability` 的图标从 `favorability_tool_add`（未移植）改成了
-`minecraft:cake`，`categories/other.json` 的图标从 `chair{...}`（未移植）改成了
-`minecraft:chest`，否则帕秋莉会画一个空槽。
+`minecraft:cake`，否则帕秋莉会画一个空槽。`categories/other.json` 的图标
+已经换回上游的 `chair{ModelId:'touhou_little_maid:beach_chair'}` —— 坐垫移植完成
+之后这个图标可以正常显示了。
 
-还有一点：手册里 43 个 `altar_recipe` 页目前是空框架，因为**祭坛合成系统整体
-没移植**（见 `compat/patchouli/AltarRecipeComponent`）。那是核心玩法而不是手册
-联动，等祭坛落地后这些页面自然会填满。
-
+还有一点：手册里 43 个 `altar_recipe` 页目前是空框架，因为祭坛的**配方渲染组件**
+（`compat/patchouli/AltarRecipeComponent`）仍是占位实现。祭坛本体与 26 个配方都已
+落地，缺的是把配方画进手册的那部分，属于手册联动而非核心玩法。

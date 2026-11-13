@@ -188,6 +188,18 @@ public final class InitEntities {
             TouhouLittleMaid.rl("box"),
             com.github.tartaricacid.touhoulittlemaid.entity.item.EntityBox.createType());
 
+    /**
+     * 坐垫（上游 {@code EntityChair.TYPE}，尺寸 {@code 0.875 × 0.5}）。
+     *
+     * <p>与刷怪蛋那类实体不同，它完全由物品摆放出来，所以没有 {@code noSave()} ——
+     * 坐垫必须能存盘，否则玩家摆好的一屋子坐垫会随重启消失。</p>
+     */
+    public static final EntityType<com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair>
+            CHAIR = Registry.register(Registry.ENTITY_TYPE,
+            TouhouLittleMaid.rl("chair"),
+            com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair.createType());
+
+
     // ------------------------------------------------------------------ 自定义记忆
 
     public static final MemoryModuleType<List<Entity>> VISIBLE_PICKUP_ENTITIES = Registry.register(

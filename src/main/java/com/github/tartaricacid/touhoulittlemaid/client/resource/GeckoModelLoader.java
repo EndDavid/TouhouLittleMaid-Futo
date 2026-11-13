@@ -270,7 +270,18 @@ public final class GeckoModelLoader {
      */
     @Nullable
     public static GeoModel buildGeoModel(MaidModelInfo info) {
-        ResourceLocation modelLocation = info.getModel();
+        return buildGeoModel(info.getModel());
+    }
+
+    /**
+     * 从任意模型文件构建几何（坐垫 / 方块模型复用）。
+     *
+     * <p>与女仆模型走同一条管线：{@code 1.10.0} 会被改写成 {@code 1.12.0}，并且统一做骨骼改名
+     * （见 {@link #LEGACY_BONE_ALIASES}）。坐垫模型的骨骼名（{@code passengerHidden} 之类）
+     * 不在别名表里，因此等于原样保留。</p>
+     */
+    @Nullable
+    public static GeoModel buildGeoModel(ResourceLocation modelLocation) {
         if (modelLocation == null) {
             return null;
         }
@@ -436,7 +447,7 @@ public final class GeckoModelLoader {
                 geometry.add("bones", bones);
             }
 
-            // 骨骼改名（对本来就是 Gecko 命名的模型不会命中，等于无操作）
+            // 骨骼改名（对本来就是 Gecko 命名的模型不会命中，等于無操作）
             for (JsonElement boneElement : bones) {
                 if (!boneElement.isJsonObject()) {
                     continue;
@@ -495,13 +506,13 @@ public final class GeckoModelLoader {
                 if (!location.getPath().endsWith(".animation.json")) {
                     continue;
                 }
-                merge(animationFile, readAnimationFile(location));
+                mergeAnimationFiles(animationFile, readAnimationFile(location));
             }
         }
         // 旧版（1.10.0）模型：先放旧版专用动画，覆盖默认的 sit。
         // 旧骨架没有膝盖/脚骨，套用 Gecko 版 sit（大腿 -142.5°）会让腿翻到头顶。
         if (!info.isGeckoModel()) {
-            merge(animationFile, legacySitAnimation);
+            mergeAnimationFiles(animationFile, legacySitAnimation);
         }
         fillMissing(animationFile, defaultMaidAnimation);
         fillMissing(animationFile, defaultTacAnimation);
@@ -515,7 +526,7 @@ public final class GeckoModelLoader {
     /**
      * 只补充缺失的动画名，不覆盖已有项。
      */
-    private static void fillMissing(AnimationFile main, @Nullable AnimationFile defaults) {
+    public static void fillMissing(AnimationFile main, @Nullable AnimationFile defaults) {
         if (defaults == null) {
             return;
         }
@@ -526,15 +537,25 @@ public final class GeckoModelLoader {
         });
     }
 
-    private static void merge(AnimationFile main, @Nullable AnimationFile other) {
+    public static void mergeAnimationFiles(AnimationFile main, @Nullable AnimationFile other) {
         if (other == null) {
             return;
         }
         other.animations().forEach(main::putAnimation);
     }
 
+    /**
+     * 默认坐垫动画（{@code animation/chair.animation.json}）。
+     *
+     * <p>供 {@code ChairModelLoader} 兜底：带 {@code is_gecko} 的坐垫模型如果没写
+     * {@code animation} 字段，{@code ChairModelInfo#decorate} 会把动画列表填成这个文件。</p>
+     */
+    public static AnimationFile getDefaultChairAnimation() {
+        return defaultChairAnimation;
+    }
+
     @Nullable
-    private static AnimationFile readAnimationFile(ResourceLocation location) {
+    public static AnimationFile readAnimationFile(ResourceLocation location) {
         JsonObject jsonObject = readJson("animation " + location, location);
         if (jsonObject == null) {
             return null;
@@ -557,7 +578,7 @@ public final class GeckoModelLoader {
     // ------------------------------------------------------------------ 资源读取
 
     @Nullable
-    private static JsonObject readJson(String description, ResourceLocation location) {
+    public static JsonObject readJson(String description, ResourceLocation location) {
         try (InputStream stream = open(location)) {
             if (stream == null) {
                 TouhouLittleMaid.LOGGER.debug("Missing {}: {}", description, location);
