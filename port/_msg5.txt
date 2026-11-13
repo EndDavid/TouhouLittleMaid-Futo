@@ -1,0 +1,50 @@
+Fix the statue tab's missing names and the game-freezing garage-kit tab
+
+Two reported problems, two independent causes.
+
+1) No translated names (tab title and every statue)
+
+The tab title was simply an absent key: itemGroup.touhou_little_maid.garage_kit
+existed in neither en_us.json nor zh_cn.json. Added, using upstream's wording
+("Garage Kit" / "手办") taken from _ref/_1201assets/lang rather than invented.
+
+The statues were a real bug in my own code. MaidModelInfo#decorate stores the
+display name as "{model.<namespace>.<path>.name}" -- braces included -- because
+that is the ParseI18n template syntax, not a translation key. ItemGarageKit passed
+that whole string to new TranslatableComponent(...), so the tooltip rendered the
+literal text "{model.touhou_little_maid.hakurei_reimu.name}". Upstream calls
+ParseI18n.parse(...); this port already had ParseI18n, so it now calls it too.
+
+2) Progressive slowdown until the game freezes (this is the serious one)
+
+Not recursion, despite looking like it: unbounded growth at ~60-200 iterations per
+second. The garage-kit item renderer used
+
+    EntityCacheUtil.GARAGE_KIT_CACHE.get(stack.copy(), () -> createMaidEntity(level))
+
+with Cache<ItemStack, Entity>. ItemStack does not override equals/hashCode in
+1.18.2, so a Guava cache keyed by it has *identity* semantics. Combined with
+stack.copy() (a brand-new object every call) every single render was a cache miss,
+which inserted an entry AND built a fresh EntityMaid complete with GeckoLib
+animation controllers. expireAfterAccess cannot keep up with that, so the cache
+grew without limit, the heap filled, and the GC ran flat out -- which is exactly
+"gets slower and slower until the CPU is pegged and the game stops".
+
+Three fixes:
+- GARAGE_KIT_CACHE is now Cache<String, Entity> keyed by data.toString(), i.e. the
+  NBT *value*, so the same kit hits the same entry forever. Bounded at 256.
+- STATUE_CACHE (1024) and ENTITY_CACHE (256) also got maximumSize as a backstop.
+- The tab icon no longer builds a new ItemStack every frame; it is a reusable
+  static GARAGE_KIT_ICON.
+
+One more amplifier, found while chasing this: BlockGarageKit#fillItemCategory added
+all 194 NBT kits to *every* creative tab, because BlockItem#fillItemCategory
+delegates to Block#fillItemCategory and every tab's appendItems runs that over all
+items. The main tab was therefore holding 194 garage kits, each drawn as a real 3D
+entity per frame. It now returns early unless the tab is GARAGE_KIT_TAB.
+
+Also dropped a dead placeholder field from GarageKitItemRenderer.
+
+Verified: gradlew build green, jar 38,908,630 bytes, deployed with a matching
+SHA-256.
+

@@ -81,6 +81,13 @@ public class BlockGarageKit extends Block implements EntityBlock {
      */
     @Override
     public void fillItemCategory(CreativeModeTab group, NonNullList<ItemStack> items) {
+        // 只填自己的那一栏。这一条不能省：BlockItem#fillItemCategory 会转调
+        // Block#fillItemCategory，而三个创造模式栏（main / chair / garage_kit）的
+        // appendItems 都会对【每一个物品】调一次 —— 不判栏位的话，主物品栏里会多出
+        // 194 个带 NBT 的手办，每一个每帧都要真画一个 3D 实体，直接把帧率拖死。
+        if (group != InitItems.GARAGE_KIT_TAB) {
+            return;
+        }
         for (MaidModelInfo info : MaidModelRegistry.all()) {
             ItemStack stack = new ItemStack(InitBlocks.GARAGE_KIT);
             CompoundTag data = stack.getOrCreateTagElement(ENTITY_INFO);
@@ -200,4 +207,3 @@ public class BlockGarageKit extends Block implements EntityBlock {
                 com.github.tartaricacid.touhoulittlemaid.init.InitEntities.MAID;
     }
 }
-

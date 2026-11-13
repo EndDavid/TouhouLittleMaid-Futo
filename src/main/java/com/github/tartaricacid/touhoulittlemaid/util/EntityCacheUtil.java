@@ -39,37 +39,45 @@ import java.util.concurrent.TimeUnit;
 public final class EntityCacheUtil {
     /**
      * 实体缓存，客户端会大量运用实体渲染，这个缓存可以减少重复创建实体带来的性能问题。
+     *
+     * <p>{@code maximumSize} 是兜底：正常只有个位数条目，但这是唯一一个按
+     * {@code EntityType} 缓存的通道，任何「用错键」的调用方都能把它撑爆。</p>
      */
     public static final Cache<EntityType<?>, Entity> ENTITY_CACHE =
-            CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
+            CacheBuilder.newBuilder().maximumSize(256).expireAfterAccess(5, TimeUnit.MINUTES).build();
 
     /**
      * 女仆实体缓存，用于雕像。每个方块坐标一个实例，避免 GeckoLib 骨骼互相覆盖。
      */
     public static final Cache<Long, Entity> STATUE_CACHE =
-            CacheBuilder.newBuilder().expireAfterAccess(10, TimeUnit.SECONDS).build();
+            CacheBuilder.newBuilder().maximumSize(1024).expireAfterAccess(10, TimeUnit.SECONDS).build();
 
     /**
-     * 女仆实体缓存，用于物品形态的手办。每个物品栈一个实例，原因同上。
+     * 女仆实体缓存，用于物品形态的手办。
+     *
+     * <h2>键为什么是 String 而不是 ItemStack</h2>
+     * <p>这一条曾经把游戏卡死，务必别再改回去。{@code ItemStack} 在 1.18.2
+     * <b>没有重写 {@code equals} / {@code hashCode}</b>，所以 Guava 缓存拿到的是
+     * <b>身份</b>语义（同一个对象才算同一个键）。而调用方每帧都会
+     * {@code stack.copy()} / {@code new ItemStack(...)} 出一个新对象 ——
+     * 于是每次渲染都当作「没命中」，插入一条新条目并<b>新建一只 EntityMaid</b>
+     * （还带一整套 GeckoLib 动画控制器）。创造模式物品栏一开就是 60~200 帧每秒，
+     * 每秒上千只实体堆进缓存，{@code expireAfterAccess} 完全挡不住，
+     * 内存爆掉后 GC 疯狂回收 —— 表现就是「越用越卡，最后 CPU 占满、游戏不动了」。</p>
+     *
+     * <p>换成 {@code data.toString()}（NBT 的<b>值</b>）之后，同一个手办的数据永远
+     * 命中同一条，条目数上限就是「同时出现的不同手办 NBT 种数」。
+     * 相同模型的手办共用一只实体是可以的：物品图标是逐个立即绘制的，
+     * 不存在同帧覆盖的问题（雕像不受影响，它按方块坐标分实例）。</p>
      */
-    public static final Cache<ItemStack, Entity> GARAGE_KIT_CACHE =
-            CacheBuilder.newBuilder().expireAfterAccess(10, TimeUnit.SECONDS).build();
+    public static final Cache<String, Entity> GARAGE_KIT_CACHE =
+            CacheBuilder.newBuilder().maximumSize(256).expireAfterAccess(10, TimeUnit.SECONDS).build();
 
     private static ResourceKey<Level> dimAt;
 
     private EntityCacheUtil() {
     }
 
-    /**
-     * 把女仆身上的「瞬时状态」清干净，让她看起来像一尊静物。
-     *
-     * <p>不清会怎样：{@code entity.load(data)} 只还原存档字段，
-     * 受伤闪红（{@code hurtTime}）、倒地计时（{@code deathTime}）、坐姿、
-     * 头顶自定名、背包模型都还是上一个使用者的残留 —— 雕像会莫名其妙闪红或者
-     * 显示别人的名字。</p>
-     *
-     * @param clearEquipmentData 是否连装备一起清空（手办要，否则手里会多出一把剑）
-     */
     /**
      * Build a throwaway maid for rendering.
      *
@@ -85,6 +93,17 @@ public final class EntityCacheUtil {
         }
         return entity;
     }
+
+    /**
+     * 把女仆身上的「瞬时状态」清干净，让她看起来像一尊静物。
+     *
+     * <p>不清会怎样：{@code entity.load(data)} 只还原存档字段，
+     * 受伤闪红（{@code hurtTime}）、倒地计时（{@code deathTime}）、坐姿、
+     * 头顶自定名、背包模型都还是上一个使用者的残留 —— 雕像会莫名其妙闪红或者
+     * 显示别人的名字。</p>
+     *
+     * @param clearEquipmentData 是否连装备一起清空（手办要，否则手里会多出一把剑）
+     */
     public static void clearMaidDataResidue(EntityMaid maid, boolean clearEquipmentData) {
         maid.hurtDuration = 0;
         maid.hurtTime = 0;
@@ -118,4 +137,3 @@ public final class EntityCacheUtil {
         }
     }
 }
-

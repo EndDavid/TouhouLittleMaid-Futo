@@ -2,6 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.item;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
+import com.github.tartaricacid.touhoulittlemaid.util.ParseI18n;
 import net.fabricmc.fabric.api.item.v1.FabricItemSettings;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -26,7 +27,7 @@ import java.util.Objects;
  * <h2>为什么它是个「物品」而不是普通 BlockItem 的语义</h2>
  * <p>它的 NBT 里装着<b>一整只女仆的存档数据</b>（{@code EntityInfo} 子标签），
  * 放下时原样抄进 {@code TileEntityGarageKit}。所以同一个 {@code garage_kit} 物品，
- * 每一份 NBT 都是不同的手办 —— 名字、模型、手里拿的东西全鍏ㄩ兘不一样。</p>
+ * 每一份 NBT 都是不同的手办 —— 全都不一样。</p>
  *
  * <h2>与上游的差异</h2>
  * <table border="1">
@@ -106,12 +107,18 @@ public class ItemGarageKit extends BlockItem {
             }
         }
 
-        // 然后才是默认模型名
+        // 然后才是默认模型名。
+        //
+        // 注意这里必须走 ParseI18n，不能直接 new TranslatableComponent(info.getName())：
+        // MaidModelInfo 的 name 默认值是【带大括号的】"{model.<ns>.<path>.name}"
+        // （见 MaidModelInfo#decorate），大括号是 ParseI18n 自己的格式，把整串当翻译键
+        // 传给 TranslatableComponent 只会原样画出 "{model.touhou_little_maid.xxx.name}"。
+        // 这正是「所有雕像都没有译名」的原因。
         String modelId = data.getString(EntityMaid.MODEL_ID_TAG);
         com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo info =
                 com.github.tartaricacid.touhoulittlemaid.client.resource.MaidModelRegistry.get(modelId);
         if (info != null && info.getName() != null && !info.getName().isEmpty()) {
-            return prefix.append(new TranslatableComponent(info.getName()));
+            return prefix.append(ParseI18n.parse(info.getName()));
         }
         return super.getName(stack);
     }

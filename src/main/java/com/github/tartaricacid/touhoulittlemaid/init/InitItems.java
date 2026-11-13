@@ -67,9 +67,18 @@ public final class InitItems {
      * 鍐呭鐢?{@code BlockGarageKit#fillItemCategory} 閾猴紙瀹冭璇绘ā鍨嬫敞鍐岃〃锛?
      * 鎵€浠ヤ笅闈㈣繖涓€閬?fillItemCategory 灏辨槸鍏ㄩ儴鍐呭锛屼笉闇€瑕侀澶栬拷鍔狅級銆?/p>
      */
+    /**
+     * 鎵嬪姙鏍忕殑鍥炬爣鐗╁搧銆傚繀椤绘槸涓€涓€愬鐢ㄣ€戠殑 ItemStack銆?
+     *
+     * <p>鍐欐垚 {@code () -> new ItemStack(...)} 涔熷彲浠ヨ窇锛屼絾 icon lambda 姣忓抚閮戒細姹傚€硷紝
+     * 浜庢槸姣忓抚鏂板缓涓€涓?ItemStack銆佹瘡甯у杺缁欑墿鍝佹覆鏌撳櫒涓€涓叏鏂扮殑閿€傛墜鍔炲浘鏍囩殑 3D 瀹炰綋
+     * 缂撳瓨鏇剧粡鍥犱负杩欑銆屾瘡甯ф柊瀵硅薄銆嶈鎾戠垎杩囷紙瑙?EntityCacheUtil.GARAGE_KIT_CACHE锛夛紝
+     * 鎵€浠ヨ繖閲屼粠涓€寮€濮嬪氨澶嶇敤鍚屼竴涓爤銆?/p>
+     */
+    private static final ItemStack GARAGE_KIT_ICON = new ItemStack(InitItems.GARAGE_KIT);
     public static final CreativeModeTab GARAGE_KIT_TAB = FabricItemGroupBuilder
             .create(TouhouLittleMaid.rl("garage_kit"))
-            .icon(() -> new ItemStack(InitItems.GARAGE_KIT))
+            .icon(() -> GARAGE_KIT_ICON)
             .appendItems((items, tab) -> {
                 NonNullList<ItemStack> defaults = NonNullList.create();
                 for (Item item : Registry.ITEM) {

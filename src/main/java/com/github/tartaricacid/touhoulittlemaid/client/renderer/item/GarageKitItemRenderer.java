@@ -1,7 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.client.renderer.item;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
-import com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityGarageKitRenderer;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemGarageKit;
@@ -36,8 +35,6 @@ import java.util.concurrent.ExecutionException;
  * 因为台座模型自己带了 {@code ZN(180)} 的翻转。</p>
  */
 public class GarageKitItemRenderer implements BuiltinItemRendererRegistry.DynamicItemRenderer {
-    private static final TileEntityGarageKitRenderer DUMMY_STATE_MARKER = null;
-
     @Override
     public void render(ItemStack stack, ItemTransforms.TransformType mode, PoseStack poseStack,
                        MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
@@ -69,8 +66,12 @@ public class GarageKitItemRenderer implements BuiltinItemRendererRegistry.Dynami
             throws ExecutionException {
         Entity entity;
         if (type.equals(InitEntities.MAID)) {
-            // 按物品栈缓存：物品栏里可能同时有好几只不同模型的手办
-            entity = EntityCacheUtil.GARAGE_KIT_CACHE.get(stack.copy(), () -> EntityCacheUtil.createMaidEntity(level));
+            // 按 NBT 的【值】缓存，不能用 stack.copy()。
+            // ItemStack 没有重写 equals/hashCode，身份语义 + 每帧新建 = 每次渲染都
+            // 「未命中」→ 每帧新建一只带 GeckoLib 控制器的 EntityMaid → 内存爆掉、
+            // GC 打满 CPU、游戏卡死。详见 EntityCacheUtil.GARAGE_KIT_CACHE 的注释。
+            entity = EntityCacheUtil.GARAGE_KIT_CACHE.get(data.toString(),
+                    () -> EntityCacheUtil.createMaidEntity(level));
         } else {
             entity = EntityCacheUtil.ENTITY_CACHE.get(type, () -> {
                 Entity e = type.create(level);
@@ -100,4 +101,3 @@ public class GarageKitItemRenderer implements BuiltinItemRendererRegistry.Dynami
         return Minecraft.getInstance();
     }
 }
-
