@@ -229,7 +229,14 @@
           {"origin": [-0.75, 15.5, -3.5], "size": [1, 1, 1], "uv": [30, 30]},
           {"origin": [-0.5, 13.5, -3.5], "size": [1, 1, 1], "uv": [38, 28]},
           {"origin": [3.004, 12, -0.5], "size": [0, 6, 1], "uv": [38, 30]},
-          {"origin": [-3.003, 12, -0.5], "size": [0, 6, 1], "uv": [40, 30]},
+          {"origin": [-3.003, 12, -0.5], "size": [0, 6, 1], "uv": [40, 30]}
+        ]
+      },
+      {
+        "name": "sittingRotationSkirt",
+        "parent": "body",
+        "pivot": [0, 12, 0],
+        "cubes": [
           {"origin": [-3, 10, -3], "size": [6, 2, 6], "uv": [0, 62]},
           {"origin": [-3.5, 8.75, -3.5], "size": [7, 2, 7], "uv": [0, 70]},
           {"origin": [-4, 7.5, -4], "size": [8, 2, 8], "uv": [0, 79]},
@@ -239,7 +246,7 @@
       },
       {
         "name": "clothFront",
-        "parent": "body",
+        "parent": "sittingRotationSkirt",
         "pivot": [0, 12, -3],
         "rotation": [-25, 0, 0],
         "cubes": [
@@ -264,7 +271,7 @@
       },
       {
         "name": "clothFront2",
-        "parent": "body",
+        "parent": "sittingRotationSkirt",
         "pivot": [0, 12.5, -2],
         "rotation": [-30, 0, 0],
         "cubes": [
@@ -275,7 +282,7 @@
       },
       {
         "name": "clothBack",
-        "parent": "body",
+        "parent": "sittingRotationSkirt",
         "pivot": [0, 12, 3],
         "rotation": [25, 0, 0],
         "cubes": [
@@ -286,7 +293,7 @@
       },
       {
         "name": "clothBack2",
-        "parent": "body",
+        "parent": "sittingRotationSkirt",
         "pivot": [0, 12.5, 2],
         "rotation": [30, 0, 0],
         "cubes": [
