@@ -71,14 +71,30 @@ public final class BedrockBlockModels {
     }
 
     /**
-     * 把模型最低点摆到方块底面所需的竖直位移（单位：格）。
+     * 把模型摆到方块底面所需的竖直位移（单位：格）。
      *
-     * <p>模型缺失时返回 0，让渲染器原样画（总比不画要好排查）。</p>
+     * <p>规则：<b>只往下压，绝不往上抬</b> —— {@code -max(0, minY)}。</p>
+     *
+     * <p>为什么不能无条件用 {@code -minY}：这些基岩方块模型的坐标约定就是
+     * <b>y = 0 是方块底面</b>。祭坛模型里有 17 个未旋转的立方体底部正好在 0
+     * （6 根 {@code pillar*} 柱子、{@code bone56} 的 10 个、{@code bone62} 的 8 个），
+     * 那就是落地的部分；另有 42 个立方体在 0 以下、最低到 −0.125，
+     * 是带旋转的装饰件，本来就要稍微埋进地面。</p>
+     *
+     * <p>所以按包围盒下限抬升会把整台抬高 0.125 格 —— 肉眼就是「差一点点悬空、
+     * 但说不清差多少」。反过来，如果某个模型整体浮在 0 以上（{@code minY > 0}，
+     * 说明它的原点比几何更低），那才需要往下压。</p>
+     *
+     * <p>神社的 {@code minY} 实测正好 0.000，两种规则都是 0，因此不受影响。</p>
      */
     public static float floorOffset(String name) {
         get(name);
         float[] b = BOUNDS.get(name);
-        return b == null ? 0 : -b[1];
+        if (b == null) {
+            return 0;
+        }
+        // push down, never lift: y = 0 is the block floor, geometry below 0 is meant to be sunk
+        return -Math.max(0, b[1]);
     }
 
     /** 模型包围盒；缺失时返回 {@code null}。 */
@@ -113,7 +129,7 @@ public final class BedrockBlockModels {
             CACHE.put(name, model);
             BOUNDS.put(name, b);
             TouhouLittleMaid.LOGGER.info(
-                    "[Futo] Block model {} loaded: {} bones, bbox x[{}..{}] y[{}..{}] z[{}..{}] floorOffset={}",
+                    "[Futo] Block model {} loaded: {} bones, bbox x[{}..{}] y[{}..{}] z[{}..{}] offset={} (model minY={})",
                     name, model.bones().size(),
                     fmt(b[0]), fmt(b[3]), fmt(b[1]), fmt(b[4]), fmt(b[2]), fmt(b[5]), fmt(-b[1]));
         } catch (Throwable e) {
