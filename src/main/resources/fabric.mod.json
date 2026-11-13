@@ -20,7 +20,8 @@
 			"com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaidFuto"
 		],
 		"client": [
-			"com.github.tartaricacid.touhoulittlemaid.client.TouhouLittleMaidFutoClient"
+			"com.github.tartaricacid.touhoulittlemaid.client.TouhouLittleMaidFutoClient",
+			"com.github.tartaricacid.touhoulittlemaid.client.init.InitStatueClient"
 		]
 	},
 	"mixins": [

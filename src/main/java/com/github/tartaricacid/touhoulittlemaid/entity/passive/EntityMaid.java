@@ -114,6 +114,26 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     public static final String DEFAULT_MODEL_ID = "touhou_little_maid:hakurei_reimu";
 
     /**
+     * 濂充粏 NBT 閲屻€屾ā鍨?id銆嶇殑閿悕銆?
+     *
+     * <p>鍚屾鏁版嵁鐢ㄧ殑鏄?{@code DATA_MODEL_ID}锛屼絾钀界洏 / 鐗╁搧 NBT锛堣兌鐗囩殑
+     * {@code MaidInfo}銆佹墜鍔炵殑 {@code EntityInfo}锛夐噷鐢ㄧ殑閮芥槸杩欎釜瀛楃涓查敭銆?
+     * 涓婃父鎶婂畠鏆撮湶鎴?{@code EntityMaid.MODEL_ID_TAG}锛岄洉鍍?/ 鎵嬪姙 / 鑳剁墖閮藉紩瀹冿紝
+     * 鎵€浠ヨ繖閲屼篃蹇呴』鏄?public 甯搁噺锛屼笉鑳藉悇鍐欏悇鐨勫瓧闈㈤噺銆?/p>
+     */
+    public static final String MODEL_ID_TAG = "ModelId";
+
+    /**
+     * 娓叉煋鐘舵€侊紝榛樿 {@link MaidRenderState#ENTITY}銆?
+     *
+     * <p>闆曞儚涓庢墜鍔炴妸瀹炰綋 NBT 璇昏繘涓€涓笉鍙備笌 tick 鐨勪复鏃跺疄浣撴潵娓叉煋锛?
+     * 璇诲埌鐨勬槸銆屽揩鐓с€嶈€屼笉鏄湰浣擄紱缃垚 {@code STATUE} / {@code GARAGE_KIT}
+     * 璁╂覆鏌撻摼璺笂闇€瑕佸尯鍒嗙殑鍦版柟鏈夋嵁鍙緷锛屽悓鏃朵篃鏄粰闄勫睘妯＄粍鐣欑殑鍏紑瀛楁銆?/p>
+     */
+    public com.github.tartaricacid.touhoulittlemaid.api.client.render.MaidRenderState renderState =
+            com.github.tartaricacid.touhoulittlemaid.api.client.render.MaidRenderState.ENTITY;
+
+    /**
      * 刷怪蛋 / 结构生成时随机挑选的模型（与 Forge 1.18.2 观感一致：会刷出不同东方角色）。
      *
  * <p>只收录「模型与动画能对上」的条目：灵梦、魔理沙、琪露诺、咲夜、芙兰朵露，

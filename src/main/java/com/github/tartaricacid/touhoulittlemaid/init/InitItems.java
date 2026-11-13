@@ -60,6 +60,25 @@ public final class InitItems {
             })
             .build();
 
+    /**
+     * 鎵嬪姙涓撶敤鍒涢€犳ā寮忕墿鍝佹爮锛堜笂娓?{@code MaidGroup.GARAGE_KIT_TAB}锛夈€?
+     *
+     * <p>姣忎釜濂充粏妯″瀷涓€鍙紝鍑犲崄鍙杩涗富鐗╁搧鏍忎細鎶婂埆鐨勭墿鍝佹尋娌★紝鎵€浠ヤ笂娓稿崟寮€涓€鏍忋€?
+     * 鍐呭鐢?{@code BlockGarageKit#fillItemCategory} 閾猴紙瀹冭璇绘ā鍨嬫敞鍐岃〃锛?
+     * 鎵€浠ヤ笅闈㈣繖涓€閬?fillItemCategory 灏辨槸鍏ㄩ儴鍐呭锛屼笉闇€瑕侀澶栬拷鍔狅級銆?/p>
+     */
+    public static final CreativeModeTab GARAGE_KIT_TAB = FabricItemGroupBuilder
+            .create(TouhouLittleMaid.rl("garage_kit"))
+            .icon(() -> new ItemStack(InitItems.GARAGE_KIT))
+            .appendItems((items, tab) -> {
+                NonNullList<ItemStack> defaults = NonNullList.create();
+                for (Item item : Registry.ITEM) {
+                    item.fillItemCategory(tab, defaults);
+                }
+                items.addAll(defaults);
+            })
+            .build();
+
     public static final Item MAID_SPAWN_EGG = Registry.register(Registry.ITEM,
             TouhouLittleMaid.rl("maid_spawn_egg"),
             // 与上游一致：底色与斑点色都是纯白（ForgeSpawnEggItem(..., 0xffffff, 0xffffff, ...)）
@@ -235,6 +254,22 @@ public final class InitItems {
     public static final Item FAVORABILITY_TOOL_FULL = Registry.register(Registry.ITEM,
             TouhouLittleMaid.rl("favorability_tool_full"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemFavorabilityTool("full"));
+    /**
+     * 鍑垮瓙锛堜笂娓?{@code InitItems.CHISEL}锛夛細鍓墜鎷跨収鐗囥€佸鐫€绮樺湡鍙抽敭鍑垮嚭闆曞儚銆?
+     * 64 鑰愪箙锛屾寜闆曞儚灏哄鎵?1~4 鐐广€?
+     */
+    public static final Item CHISEL = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("chisel"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemChisel());
+
+    /**
+     * 鎵嬪姙锛堜笂娓?{@code InitItems.GARAGE_KIT}锛夈€侼BT 閲岃鐫€涓€鏁村彧濂充粏锛?
+     * 鎵€浠ユ槸 {@code ItemGarageKit} 鑰屼笉鏄櫘閫?{@code BlockItem}銆?
+     */
+    public static final Item GARAGE_KIT = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("garage_kit"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemGarageKit());
+
 
 
     // ------------------------------------------------------------------ 女仆饰品

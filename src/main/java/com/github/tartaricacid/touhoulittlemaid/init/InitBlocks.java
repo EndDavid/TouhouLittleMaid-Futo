@@ -2,12 +2,16 @@ package com.github.tartaricacid.touhoulittlemaid.init;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockAltar;
+import com.github.tartaricacid.touhoulittlemaid.block.BlockGarageKit;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBeacon;
+import com.github.tartaricacid.touhoulittlemaid.block.BlockStatue;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockScarecrow;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockShrine;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
+import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityGarageKit;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityMaidBeacon;
+import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityStatue;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityShrine;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.minecraft.core.Registry;
@@ -89,6 +93,32 @@ public final class InitBlocks {
      */
     public static final Block SCARECROW = Registry.register(Registry.BLOCK,
             TouhouLittleMaid.rl("scarecrow"), new BlockScarecrow());
+
+    // ------------------------------------------------------------------ 闆曞儚 / 鎵嬪姙
+
+    /**
+     * 闆曞儚鏂瑰潡銆備竴搴ч洉鍍忕敱 N 涓湰鏂瑰潡鎷兼垚锛?x1x1 / 1x2x1 / 2x4x2 / 3x6x3锛夛紝
+     * 鐢?{@code ItemChisel} 鍑垮嚭鏉ワ紝鎷嗕换鎰忎竴鏍兼暣搴ц繕鍘熸垚绮樺湡銆?
+     *
+     * <p><b>娌℃湁鐗╁搧褰㈡€?/b>锛氱帺瀹舵嬁涓嶅埌銆岄洉鍍忔柟鍧椼€嶏紝鍙兘鎷垮嚳瀛愬嚳鍑烘潵銆?
+     * 鎵嬪姙鐑?鎸栦箣鍚庢帀鐨勬槸绮樺湡锛屼笉鏄畠銆?/p>
+     */
+    public static final Block STATUE = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("statue"), new BlockStatue());
+
+    public static final BlockEntityType<TileEntityStatue> STATUE_TE = Registry.register(
+            Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("statue"),
+            FabricBlockEntityTypeBuilder.create(TileEntityStatue::new, STATUE).build());
+
+    /**
+     * 鎵嬪姙鏂瑰潡銆傚崟鏍硷紝鏂瑰潡瀹炰綋閲屽瓨涓€浠藉疄浣?NBT锛岀墿鍝佸舰鎬佽 {@code InitItems.GARAGE_KIT}銆?
+     */
+    public static final Block GARAGE_KIT = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("garage_kit"), new BlockGarageKit());
+
+    public static final BlockEntityType<TileEntityGarageKit> GARAGE_KIT_TE = Registry.register(
+            Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("garage_kit"),
+            FabricBlockEntityTypeBuilder.create(TileEntityGarageKit::new, GARAGE_KIT).build());
 
     private InitBlocks() {
     }

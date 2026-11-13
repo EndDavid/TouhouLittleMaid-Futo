@@ -31,6 +31,9 @@ $registered = @(
   'touhou_little_maid:chair',
   'touhou_little_maid:chair_show',
   'touhou_little_maid:scarecrow',
+  'touhou_little_maid:chisel',
+  'touhou_little_maid:garage_kit',
+  'touhou_little_maid:statue',
   # --- favorability tools (creative-only debug items) ---
   'touhou_little_maid:favorability_tool_add',
   'touhou_little_maid:favorability_tool_reduce',
