@@ -903,6 +903,31 @@ poseStack.mulPose(Vector3f.YP.rotationDegrees((float) time / 10));
 
 ---
 
+### 祭坛为什么还要再降 3 格
+
+修好朝向后祭坛仍然整体高 3 格，原因在多方块的锚点，不在模型：
+
+```java
+// MultiBlockAltar
+private static final BlockPos SOUTH_POS = new BlockPos(-4, -3, 0);   // 四个方向的 Y 都是 -3
+BlockPos currentCenterPos = posStart.subtract(getCenterPos(direction));
+```
+
+`posStart` 是结构的**最底层**（所以贡品原木挂在 `blockInfo.pos().getY() == 2`），
+而负责渲染的那个方块实体被放在 `posStart.subtract(getCenterPos(...))`，
+也就是比最底层**高 3 格**的地方。基岩模型的原点正好在结构底面，
+直接画在锚点上自然整体高 3 格 —— 所以 `setTranslateAndPose` 的 Y 从 `0` 改成 `-3`。
+
+这个 −3 不是凑出来的数：它就是 `getCenterPos` 返回值的 Y 分量取反。
+水平分量（x/z）不动 —— 实测是对的，它们只决定绕哪个点旋转、朝哪一面。
+
+> 顺带一提，上一步把 `-1.5` 改成 `0` 时其实已经少了这 3 格补偿，
+> 但因为同时去掉了 `ZN(180)`，两个错误互相抵消了一部分，看起来只是「高 3 格」。
+> 现在的组合是：**无 Z 翻转** + **Y = −3** + **`floorOffset` = 0.125**（把模型自身最低点对齐方块底面），
+> 三者各自有独立依据，不再互相打补丁。
+
+---
+
 
 ### 神社（胶片复活）
 

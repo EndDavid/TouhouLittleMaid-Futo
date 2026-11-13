@@ -57,23 +57,34 @@ public class TileEntityAltarRenderer implements BlockEntityRenderer<TileEntityAl
         return true;
     }
 
+    /**
+     * 把模型原点的世界坐标摆到祭坛结构的最底层（{@code posStart}）。
+     *
+     * <p>Y 之所以是 -3：{@code MultiBlockAltar#getCenterPos} 四个方向返回的 Y 分量全是 -3，
+     * 而负责渲染的方块实体是 {@code posStart.subtract(getCenterPos(direction))}，
+     * 也就是锚点比结构最底层<b>高 3 格</b>（贡品原木挂在 {@code y == 2} 也是同一套坐标）。
+     * 基岩模型的原点就在结构底面，直接画在锚点上会整体高 3 格，所以要减掉锚点自身的高度。</p>
+     *
+     * <p>x/z 沿用旧值：水平方向实测是对的，它们只决定绕哪个点旋转、朝哪一面。</p>
+     */
+
     private void setTranslateAndPose(TileEntityAltar te, PoseStack poseStack) {
         switch (te.getDirection()) {
             case SOUTH:
-                poseStack.translate(1, 0, -3);
+                poseStack.translate(1, -3, -3);
                 poseStack.mulPose(Vector3f.YP.rotationDegrees(180));
                 break;
             case EAST:
-                poseStack.translate(-3, 0, 0);
+                poseStack.translate(-3, -3, 0);
                 poseStack.mulPose(Vector3f.YP.rotationDegrees(270));
                 break;
             case WEST:
-                poseStack.translate(4, 0, 1);
+                poseStack.translate(4, -3, 1);
                 poseStack.mulPose(Vector3f.YP.rotationDegrees(90));
                 break;
             case NORTH:
             default:
-                poseStack.translate(0, 0, 4);
+                poseStack.translate(0, -3, 4);
         }
     }
 }
