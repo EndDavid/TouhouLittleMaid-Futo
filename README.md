@@ -83,7 +83,7 @@ loom_version=1.15.5
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | 未开始 |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
-| **睡觉的横向落点** | **仍在调整**（见文末） |
+| **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
 
 ---
 
@@ -357,6 +357,30 @@ pushPose → setupRotations → scale(-1,-1,1) → scale(k) → translate(0,-1.5
 
 > 附带一条：`scale(k)`（`renderEntityScale`）在 `setupRotations` **之后**，
 > 因此只缩放模型本体，不缩放这里的位移 —— 模型包调小比例不会连带改变抱持偏移。
+
+### 旧版模型的裙摆：只能改模型，代码侧没有落点
+
+坐下时裙摆要跟着抬起来，否则 -65° 的大腿会直接穿过裙子。旧版模型里这条规则挂在
+一根叫 `sittingRotationSkirt` 的骨骼上：
+
+- `GeckoModelLoader#LEGACY_BONE_ALIASES` 把它改名成 `Skirt`（子骨骼的 `parent` 一起改）；
+- `maid_legacy.animation.json` 的 `sit` / `chair` 已按 `Skirt` 写好 `-32.5°`（= -0.567 rad）。
+
+模型里没有这根骨骼就**再没有别的地方能转**：`InnerAnimations#sitSkirtRotation`
+查的是 `sittingRotationSkirt` 这个名字，而旧版模型在加载时已经被改名成 `Skirt`，
+那条 Java 分支永远取不到骨骼、直接 `return`。全库 254 个模型里 116 个带这根骨骼。
+
+布都（`mononobe_no_futo.json`，1.10.0 几何）原本就缺它，已按上游旧版模型的写法补上：
+
+| 项 | 值 |
+|---|---|
+| 新骨骼 | `sittingRotationSkirt`，`parent: body`，`pivot: [0, 12, 0]` |
+| 裙摆 5 层 | 从 `body` 原样挪进来（`uv` [0,62] / [0,70] / [0,79] / [0,89] / [0,100]） |
+| `clothFront` / `clothFront2` / `clothBack` / `clothBack2` | `parent` 由 `body` 改成 `sittingRotationSkirt` |
+
+枢轴取 12：最高那层裙摆的上沿，与大转子的高度一致，坐下时裙摆与大腿同轴转。
+94 个 cube 的 `origin` / `size` / `uv` 一个没动（`port/check-futo-skirt.ps1` 的断言），
+而 `sit` / `chair` 只在坐姿播放，所以站立时的外形完全不变。
 
 ---
 
@@ -819,6 +843,20 @@ Y(sleepDirectionToRotation(bedFacing)) → Z(getFlipDegrees() = 90) → Y(270)
 （head 抬 15°、隐藏帽子/尾巴/翅膀、切换睡眠贴图，**无任何躯干翻滚**）。
 修法与 `boat` 同款：`AnimationRegister` 里给旧版模型注册一个 HIGHEST 的 `empty` 状态
 （动画集里本来就有的空动画），让四肢完全交给 `InnerAnimations`。
+
+**落点要同时管「碰撞箱」和「渲染」两条链路**，只改一条就会看出偏差：
+
+- `EntityMaid#pinToBed`：碰撞箱落在两格床的**中点**（床头格中心沿 `FACING` 反退半格），
+  竖直用 `headPos.getY() + 0.6875`（11/16，比 9/16 的床面高 2/16），与 vanilla
+  `LivingEntity#setPosToBed` 同值。上游 1.18.2 写的 `0.8` 会浮起来，1.20.1 改的 `0.5625` 又会陷进去。
+- `GeoReplacedEntityRenderer#render`：它覆写了 `render()` 且**不调 super**，所以 vanilla
+  `LivingEntityRenderer#render` 里那段 `translate(-dir * (getEyeHeight(Pose.STANDING) - 0.1f))`
+  一次都不会执行，必须自己补一次，且**只补一次**（两处都写就是双倍位移）。
+  补的量取**站立**身长的一半。
+
+> **不要用 `getBbHeight()` 算这个量。** 它返回的是**当前姿态**的碰撞箱，而 `Pose.SLEEPING`
+> 只有 `0.2 × 0.2`，半身长会塌成 0.1，位移几乎为零 —— 这也是好几次改数值都「看不出变化」的原因。
+> 用 `getDimensions(Pose.STANDING).height * 0.5F`。
 
 ### 稻草人
 
@@ -1293,16 +1331,12 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 
 ## 已知问题
 
-**睡觉的横向落点仍在调整。** 竖直方向已正确（`pinToBed` 用 `headPos.getY() + 0.6875`，
-与 vanilla `LivingEntity#setPosToBed` 同值），碰撞箱也确实落在床心，
-但模型的纵向前后位置仍与碰撞箱有偏差。当前实现的两条链路：
-
-- `EntityMaid#pinToBed`：落点 = 两格床中点（床头格中心沿 `FACING` 反方向退半格）。
-- `GeoReplacedEntityRenderer#render`：沿床轴回退半个**站立**身长
-  （`getDimensions(Pose.STANDING).height * 0.5F`）。
-
-> **不要用 `getBbHeight()` 算这个量。** 它取的是**当前姿态**的碰撞箱，
-> 而 `Pose.SLEEPING` 的碰撞箱只有 `0.2 × 0.2`，半个身长会塌成 0.1，位移几乎为零。
+- **未移植的子系统**：`EntitySit` / `EntityChair` 娱乐方块（椅子、野餐垫、连坐棋类都依赖它）、
+  `MaidModelDetailsGui`、图标缓存、彩蛋模型、声音包 GUI。完整清单见上方「进度总览」。
+- **`AltarRecipeComponent` 仍是占位实现**，目前只解析物品与标签两种。
+- **部分祭坛配方未收录**，因为产物本身还没移植：书柜 / 扫帚 / 中国象棋 / 凿子 / 电脑 / 五子棋 /
+  河童罗盘 / 键盘 / 野餐篮 / 红狐卷轴 / 小号 / 西洋棋 / 白狐卷轴 / 无线 IO / 仆人铃。
+- **23 个帕秋莉页面**暂存在 `port/book_pages_held_back/`，等对应功能补齐再放回去。
 
 ---
 
