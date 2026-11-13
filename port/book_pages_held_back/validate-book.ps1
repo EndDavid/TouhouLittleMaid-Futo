@@ -32,7 +32,7 @@ $registered = @(
   'touhou_little_maid:chair_show',
   'touhou_little_maid:scarecrow'
 )
-$entities = @('touhou_little_maid:maid','touhou_little_maid:fairy','touhou_little_maid:power_point')
+$entities = @('touhou_little_maid:maid','touhou_little_maid:fairy','touhou_little_maid:power_point','touhou_little_maid:box')
 
 function Get-Id([string]$s) {
   # "namespace:path{...}" or "namespace:path@meta" -> "namespace:path"
@@ -95,6 +95,74 @@ foreach ($f in Get-ChildItem -Recurse -Filter *.json (Join-Path $book 'entries')
 # templates must still parse
 foreach ($f in Get-ChildItem -Filter *.json (Join-Path $book 'templates')) {
   $null = Get-Content $f.FullName -Raw | ConvertFrom-Json
+}
+
+# ---- altar recipes are part of the book: their pages are generated from data ----
+# Every "altar_recipe" page names a recipe_id; the recipe itself decides the six
+# ingredient slots, the power cost and the output. So a wrong/missing recipe file,
+# a missing c: tag or an unported ingredient all show up as an empty page.
+$dataRoot = Join-Path $root 'src\main\resources\data'
+$altarDir = Join-Path $dataRoot 'touhou_little_maid\recipes\altar'
+$tagDefined = @{}
+foreach ($f in (Get-ChildItem -Recurse -Filter *.json (Join-Path $dataRoot 'c\tags\items'))) {
+  $tagDefined['c:' + $f.BaseName] = $true
+}
+$recipeFiles = @{}
+foreach ($f in (Get-ChildItem -Filter *.json $altarDir)) {
+  $recipeFiles['touhou_little_maid:altar/' + $f.BaseName] = $f.FullName
+}
+
+function Test-Ingredient([string]$file, [string]$rel) {
+  $j = Get-Content $file -Raw | ConvertFrom-Json
+  if ($null -eq $j.ingredients) {
+    Write-Output ("ALTAR RECIPE NO INGREDIENTS  {0}" -f $rel)
+    $script:problems++
+    return
+  }
+  foreach ($ing in $j.ingredients) {
+    if ($ing.tag) {
+      # c: is our own convention: if we do not ship the file, the tag is empty,
+      # the Ingredient has zero items and the recipe can never match.
+      if ($ing.tag -like 'c:*' -and -not $tagDefined.ContainsKey($ing.tag)) {
+        Write-Output ("ALTAR EMPTY c: TAG  {0} -> {1}" -f $rel, $ing.tag)
+        $script:problems++
+      }
+    } elseif ($ing.item -and $ing.item -like 'touhou_little_maid:*') {
+      if (-not ($registered -contains $ing.item)) {
+        Write-Output ("ALTAR INGREDIENT MISSING  {0} -> {1}" -f $rel, $ing.item)
+        $script:problems++
+      }
+    }
+  }
+  if ($j.output -and $j.output.type -like 'touhou_little_maid:*') {
+    if (-not ($entities -contains $j.output.type)) {
+      Write-Output ("ALTAR OUTPUT ENTITY MISSING  {0} -> {1}" -f $rel, $j.output.type)
+      $script:problems++
+    }
+  }
+}
+
+# page -> recipe link: a page whose recipe_id does not exist renders as an empty frame
+foreach ($f in (Get-ChildItem -Recurse -Filter *.json (Join-Path $book 'entries'))) {
+  $rel = $f.FullName.Substring((Join-Path $book 'entries').Length + 1)
+  $j = Get-Content $f.FullName -Raw | ConvertFrom-Json
+  $n = 0
+  foreach ($p in $j.pages) {
+    if ($p.type -like '*altar_recipe') {
+      if (-not $p.recipe_id) {
+        Write-Output ("ALTAR PAGE WITHOUT recipe_id  {0} [p{1}]" -f $rel, $n)
+        $script:problems++
+      } elseif (-not $recipeFiles.ContainsKey($p.recipe_id)) {
+        Write-Output ("ALTAR RECIPE MISSING  {0} [p{1}] -> {2}" -f $rel, $n, $p.recipe_id)
+        $script:problems++
+      }
+    }
+    $n++
+  }
+}
+
+foreach ($k in $recipeFiles.Keys) {
+  Test-Ingredient $recipeFiles[$k] ($k -replace '^touhou_little_maid:','')
 }
 
 Write-Output ''

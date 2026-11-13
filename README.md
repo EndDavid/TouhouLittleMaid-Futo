@@ -1081,7 +1081,10 @@ Y(sleepDirectionToRotation(bedFacing)) → Z(getFlipDegrees() = 90) → Y(270)
   一个不存在的物品 ID 直接抛 `JsonParseException` → `BookContents.empty` → 「Loading error!」。
   而 entry 的 `icon` **不是**致命的（`BookIcon#from` 只 warn 并回退成空 `StackIcon`）。
   所以产物未移植的页要用 `port/book_pages_held_back/` 暂存，不能用「图标占位」蒙过去。
-- 当前 36 条目 / 3 分类，`port/validate-book.ps1` 校验 0 问题。
+- 当前 **39 条目 / 3 分类**，`port/book_pages_held_back/validate-book.ps1` 校验 0 问题。
+  它按帕秋莉的规则静态检查 `spotlight` 物品、词条 / 分类图标、`entity` 页，
+  另外还检查祭坛配方的 `recipe_id` 是否存在、`c:` 标签是否真的定义了、
+  以及 ingredients / output 里引用的物品与实体 id 是否已注册。
 - 创造模式页签用 `FabricItemGroupBuilder#appendItems` —— **它会替换默认填充**（反编译
   `FabricItemGroupBuilder$1#fillItemList` 确认不调 `super`），所以回调里必须自己遍历
   `Registry.ITEM` + `fillItemCategory`。
@@ -1537,10 +1540,21 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 
 - **未移植的子系统**：`EntitySit` / `EntityChair` 娱乐方块（椅子、野餐垫、连坐棋类都依赖它）、
   `MaidModelDetailsGui`、图标缓存、彩蛋模型、声音包 GUI。完整清单见上方「进度总览」。
-- **`AltarRecipeComponent` 仍是占位实现**，目前只解析物品与标签两种。
+- **祭坛配方渲染（`AltarRecipeComponent`）已可用**：28 个 `altar_recipe` 页会画出真实的
+  六个材料槽、灵力消耗、产物槽与产物实体。上游那句「产物是盒子时就改画女仆」的特判
+  （`InitEntities.BOX` → `InitEntities.MAID`）在盒子移植完成后已经补回。
+- **祭坛配方的 `c:` 标签必须自己补。** 这个环境里没有任何模组提供 `c:` 约定标签
+  （Fabric API 0.77.0 的全部模块里 `data/c/tags/` 一个文件都没有，已用 zip 逐个确认），
+  而上游写的是 Forge 自带的 `forge:gems/diamond` / `forge:ingots/gold` / `forge:dyes/*`。
+  移植时只补了 9 个，另外 12 个（diamonds / emeralds / lapis / redstone_dusts /
+  gold_ingots / iron_ingots 加六种染料）漏了。缺标签的 `Ingredient` 物品列表为空，
+  `RecipeMatcher` 永远匹配不上，**27 个祭坛配方里有 16 个因此完全做不出来**
+  —— 包括神社复活的 `reborn_maid` 和召唤女仆的 `spawn_box` 这两个最核心的配方。
+  现已补齐，`validate-book.ps1` 也加了这条静态检查。
 - **部分祭坛配方未收录**，因为产物本身还没移植：书柜 / 扫帚 / 中国象棋 / 凿子 / 电脑 / 五子棋 /
   河童罗盘 / 键盘 / 野餐篮 / 红狐卷轴 / 小号 / 西洋棋 / 白狐卷轴 / 无线 IO / 仆人铃。
-- **23 个帕秋莉页面**暂存在 `port/book_pages_held_back/`，等对应功能补齐再放回去。
+- **13 个帕秋莉页面**暂存在 `port/book_pages_held_back/`，等对应功能补齐再放回去
+  （对应 5 个子系统：手办与雕像 / 棋类与娱乐方块 / 扫帚 / 野餐与娱乐 / 搜索类工具）。
 
 ---
 

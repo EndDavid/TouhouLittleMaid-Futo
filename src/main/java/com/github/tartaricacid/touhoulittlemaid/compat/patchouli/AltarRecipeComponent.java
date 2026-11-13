@@ -2,6 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.compat.patchouli;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.crafting.AltarRecipe;
+import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
 import com.github.tartaricacid.touhoulittlemaid.init.InitRecipes;
 import com.google.common.collect.Lists;
 import net.minecraft.client.Minecraft;
@@ -47,9 +48,8 @@ import java.util.Locale;
  * </table>
  *
  * <h2>与上游的差异</h2>
- * <p>上游有一句「产物是盒子时把实体改成女仆」的特判（{@code InitEntities.BOX}）。
- * {@code spawn_box} 配方与 {@code EntityBox} 在本移植版里还没移植，没有任何配方会
- * 产出盒子，这条分支现在不可达，所以先不写 —— 等盒子移植后补回即可。</p>
+ * <p>上游的 {@code InitEntities.BOX} / {@code InitEntities.MAID} 是 {@code RegistryObject}，
+ * 这里两个都是直接的 {@code EntityType} 字段，所以 {@code get()} 去掉，其余逐字一致。</p>
  */
 public class AltarRecipeComponent implements IComponentProcessor {
     private static final String RECIPE_ID = "recipe_id";
@@ -129,7 +129,13 @@ public class AltarRecipeComponent implements IComponentProcessor {
                 return IVariable.wrap(I18n.get(langKey));
             }
             case OUTPUT_ENTITY -> {
-                ResourceLocation entityId = Registry.ENTITY_TYPE.getKey(this.recipe.getEntityType());
+                EntityType<?> entityType = this.recipe.getEntityType();
+                // 特判：spawn_box 的产物是「装着一只女仆的盒子」，直接把盒子画出来是个空箱子，
+                // 所以手册里改画女仆 —— 上游 compat/patchouli/AltarRecipeComponent 同款分支。
+                if (entityType.equals(InitEntities.BOX)) {
+                    entityType = InitEntities.MAID;
+                }
+                ResourceLocation entityId = Registry.ENTITY_TYPE.getKey(entityType);
                 if (entityId != null) {
                     return IVariable.wrap(entityId.toString());
                 }
