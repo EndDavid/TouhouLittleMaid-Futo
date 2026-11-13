@@ -1,0 +1,42 @@
+# Confirm the rebuilt jar carries the bedrock block models and the new textures.
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$repo = 'D:\codename_EndDavid\hello java\touhou_little_maid_futo'
+$jar  = Join-Path $repo 'build\libs\touhoulittlemaid-fabric-1.18.2-futo-1.2.2-futo.1.jar'
+$out  = Join-Path $repo 'port\_jarcheck.txt'
+$sb = New-Object System.Text.StringBuilder
+
+$z = [System.IO.Compression.ZipFile]::OpenRead($jar)
+[void]$sb.AppendLine("jar: " + (Split-Path $jar -Leaf) + "  " + (Get-Item $jar).Length + " bytes  " + (Get-Item $jar).LastWriteTime)
+[void]$sb.AppendLine("entries=" + $z.Entries.Count)
+
+$want = @(
+    'assets/touhou_little_maid/models/bedrock/block/altar.json',
+    'assets/touhou_little_maid/models/bedrock/block/shrine.json',
+    'assets/touhou_little_maid/textures/bedrock/block/altar.png',
+    'assets/touhou_little_maid/textures/bedrock/block/shrine.png',
+    'assets/touhou_little_maid/models/block/maid_beacon_up.json',
+    'assets/touhou_little_maid/textures/block/scarecrow_lower.png',
+    'assets/touhou_little_maid/textures/item/spawn_box.png',
+    'assets/touhou_little_maid/textures/item/camera.png',
+    'com/github/tartaricacid/touhoulittlemaid/client/resource/BedrockBlockModels.class',
+    'com/github/tartaricacid/touhoulittlemaid/client/renderer/tileentity/GeoBlockRenderer.class'
+)
+foreach ($w in $want) {
+    $e = $z.Entries | Where-Object { $_.FullName -eq $w }
+    [void]$sb.AppendLine(("{0,-88} {1,10}" -f $w, $(if ($e) { $e.Length } else { 'MISSING' })))
+}
+# the removed ones must be gone
+foreach ($w in @('assets/touhou_little_maid/textures/block/scarecrow.png',
+                 'assets/touhou_little_maid/textures/item/camera_2d.png',
+                 'com/github/tartaricacid/touhoulittlemaid/client/model/AltarModel.class',
+                 'com/github/tartaricacid/touhoulittlemaid/client/model/ShrineModel.class')) {
+    $e = $z.Entries | Where-Object { $_.FullName -eq $w }
+    [void]$sb.AppendLine(("{0,-88} {1,10}" -f $w, $(if ($e) { 'STILL PRESENT' } else { 'gone' })))
+}
+$z.Dispose()
+
+[System.IO.File]::WriteAllText($out, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
+Write-Host 'checked'
+

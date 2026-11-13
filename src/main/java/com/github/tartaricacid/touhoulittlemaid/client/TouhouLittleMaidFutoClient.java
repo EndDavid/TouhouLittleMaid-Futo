@@ -65,18 +65,22 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
 
         // 祭坛与神社：两者都是 ENTITYBLOCK_ANIMATED，方块本身不画，全靠方块实体渲染器。
         // 模型层必须先烘焙，渲染器的构造函数里会 bakeLayer。
-        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
-                com.github.tartaricacid.touhoulittlemaid.client.model.AltarModel.LAYER,
-                com.github.tartaricacid.touhoulittlemaid.client.model.AltarModel::createBodyLayer);
-        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
-                com.github.tartaricacid.touhoulittlemaid.client.model.ShrineModel.LAYER,
-                com.github.tartaricacid.touhoulittlemaid.client.model.ShrineModel::createBodyLayer);
+
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.ALTAR_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityAltarRenderer::new);
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SHRINE_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityShrineRenderer::new);
+        // 神社庭灯与稻草人的模型来自 1.20.1，字段里写的是 "render_type": "cutout"。
+        // 1.18.2 的 BlockModel 不认这个字段（它是 1.19.4 才进原版的），
+        // 所以必须在这里显式把方块登记成 cutout，否则透明区域会渲染成黑色实心。
+        net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap.INSTANCE.putBlock(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.MAID_BEACON,
+                net.minecraft.client.renderer.RenderType.cutout());
+        net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap.INSTANCE.putBlock(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SCARECROW,
+                net.minecraft.client.renderer.RenderType.cutout());
 
         // 墓碑与祭坛召唤箱：模型层同样必须先烘焙（渲染器构造函数里 bakeLayer）。
         net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
@@ -206,7 +210,14 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
 
                     @Override
                     public void onResourceManagerReload(ResourceManager resourceManager) {
-                        GeckoModelLoader.reload();
+                        GeckoModelLoader.reload();                        // 方块基岩模型同样要丢缓存，否则资源包换了模型还在用旧的
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.clear();
+                        // 预热两个方块模型：首次渲染时再加载会卡一帧，而且模型写错
+                        // 只会在「方块看不见」这种很难定位的现象里暴露，这里提前解析一遍，
+                        // 失败会打 error 日志（BedrockBlockModels#load 里）。
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("altar");
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("shrine");
+
                     }
                 });
     }

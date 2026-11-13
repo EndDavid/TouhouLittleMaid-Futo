@@ -16,6 +16,7 @@ import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -178,12 +179,17 @@ public class BlockAltar extends Block implements EntityBlock {
             this.getAltar(worldIn, storagePos).ifPresent(
                     altar -> worldIn.setBlock(storagePos, altar.getStorageState(), Block.UPDATE_ALL));
         }
+        // 上游 1.20.1 在这里补了一声「信标熄灭」，1.18.2 没有。
+        worldIn.playSound(null, currentPos, SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 1.5f, 1);
     }
 
     private void takeOutItem(Level world, TileEntityAltar altar, Player player) {
         if (altar.isCanPlaceItem() && !altar.handler.getStackInSlot(0).isEmpty()) {
             ItemStack extractItem = altar.handler.extractItem(0, 1, false);
             ItemHandlerHelper.giveItemToPlayer(player, extractItem);
+            // 物品展示框同款「取下」音效，1.20.1 新增
+            world.playSound(null, altar.getBlockPos(), SoundEvents.ITEM_FRAME_REMOVE_ITEM,
+                    SoundSource.PLAYERS, 1, 1);
             altarCraft(world, altar, player);
         }
     }
@@ -195,6 +201,9 @@ public class BlockAltar extends Block implements EntityBlock {
             if (!playerIn.isCreative()) {
                 playerIn.getMainHandItem().shrink(1);
             }
+            // 物品展示框同款「放上」音效，1.20.1 新增
+            world.playSound(null, altar.getBlockPos(), SoundEvents.ITEM_FRAME_ADD_ITEM,
+                    SoundSource.PLAYERS, 1, 1);
             altarCraft(world, altar, playerIn);
         }
     }

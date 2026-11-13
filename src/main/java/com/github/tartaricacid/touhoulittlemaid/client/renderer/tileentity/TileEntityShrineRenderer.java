@@ -2,10 +2,10 @@ package com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockShrine;
-import com.github.tartaricacid.touhoulittlemaid.client.model.ShrineModel;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels;
+import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoModel;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityShrine;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Vector3f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -19,11 +19,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 public class TileEntityShrineRenderer implements BlockEntityRenderer<TileEntityShrine> {
-    private static final ResourceLocation TEXTURE = new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/shrine.png");
-    private final ShrineModel model;
+    private static final ResourceLocation TEXTURE = new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/bedrock/block/shrine.png");
 
     public TileEntityShrineRenderer(BlockEntityRendererProvider.Context context) {
-        model = new ShrineModel(context.bakeLayer(ShrineModel.LAYER));
+        // 懒加载，理由同 TileEntityAltarRenderer
     }
 
     @Override
@@ -33,8 +32,9 @@ public class TileEntityShrineRenderer implements BlockEntityRenderer<TileEntityS
         poseStack.translate(0.5, 1.5, 0.5);
         poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
         poseStack.mulPose(Vector3f.YN.rotationDegrees(180 - facing.get2DDataValue() * 90));
-        VertexConsumer buffer = bufferIn.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        model.renderToBuffer(poseStack, buffer, combinedLightIn, combinedOverlayIn, 1.0F, 1.0F, 1.0F, 1.0F);
+        AnimatedGeoModel model = BedrockBlockModels.get("shrine");
+        GeoBlockRenderer.render(model, TEXTURE, poseStack, bufferIn, combinedLightIn, combinedOverlayIn,
+                RenderType.entityCutoutNoCull(TEXTURE));
         poseStack.popPose();
 
         Level level = shrine.getLevel();

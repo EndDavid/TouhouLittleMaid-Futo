@@ -78,6 +78,7 @@ loom_version=1.15.5
 | 手持物品渲染 | 完成（两条模型管线都走通） |
 | **祭坛多方块 + 祭坛合成** | **完成** |
 | **神社 / 胶片 / 女仆床 / 稻草人** | **完成** |
+
 | **墓碑（死亡收纳）+ 祭坛召唤箱** | **完成** |
 | **帕秋莉手册（书内容 + 侧边页签）** | **完成**（36 条目 / 3 分类） |
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
@@ -765,6 +766,83 @@ private boolean shouldPlayVoice() {
 
 `getCentrePos` 由上游的硬编码 `/ 8` 改成按「贡品那一层的实际坐标数」求平均 ——
 当前模板下结果完全相同，但模板改动时不会再算偏。
+### 1.20.1 的模型与纹理已回填
+
+上游 1.20.1 把一批方块从「原版 JSON 模型」换成了 **GeckoLib 基岩模型**，纹理也从 16/32 px
+升到 64/128/512 px，于是出现了「同一个祭坛，新版像摆件、旧版像灰盒子」的差别。
+这一轮把能给的部分全换过来了。
+
+**能直接换的，逐个字节覆盖：**
+
+| 类别 | 文件 |
+|---|---|
+| 物品模型 | `models/item/*.json` 共 85 个（全部重写，1.20.1 版是一行紧凑 JSON） |
+| 物品纹理 | `textures/item/*.png` 共 99 个，含新加的 `.mcmeta` 动画（保护类饰品、相机、无线 IO…） |
+| 神社庭灯 | `models/block/maid_beacon_{down,up}.json`（`texture_size 128`，UV 按 128 记）+ 128×128 贴图 |
+| 稻草人 | `models/block/scarecrow_{lower,upper}.json` + 64/128 px 贴图 |
+
+**要改代码才能换的：祭坛与神社。**
+1.20.1 里 `models/block/altar.json` 和 `shrine.json` 只剩一个 `particle` 字段（「灰尘粒子用什么贴图」），
+几何全在 `models/bedrock/block/altar.json`（87 根骨骼 / 220 个 cube / 512×512 贴图）与
+`shrine.json`（1 根骨骼 / 9 个 cube / 128×128）里。
+
+本移植没有对应的方块渲染器，所以新增了两个小类：
+
+- `client/resource/BedrockBlockModels`：按名字懒加载并缓存 `AnimatedGeoModel`。
+  **只做解析，不做骨骼改名、也不补 `Root`** —— `GeckoModelLoader` 那两步是给旧版女仆模型
+  复用 `maid.animation.json` 用的；方块模型名是 `new`/`A`/`B`，改名表根本不命中。
+- `client/renderer/tileentity/GeoBlockRenderer`：把 `AnimatedGeoModel` 当静态模型画。
+  `IGeoRenderer` 的方法几乎全是 `default`，只需要提供「当前 buffer」和「贴图」，
+  逐骨骼矩阵 / 逐面顶点 / 面法线全部复用实体那条已经调好的实现 ——
+  尤其是 `renderCube` 里那段「不要翻转扁平立方体法线」的修正，重写一遍必然重新踩坑。
+
+原来 Java 里烘焙的 `AltarModel` / `ShrineModel`（`EntityModelLayer` + 手写 `ModelPart`）已删除。
+
+**三个 1.18.2 侧必须补的坑：**
+
+1. **`render_type` 字段 1.18.2 不认。** 它是 1.19.4 才进原版的，1.18.2 的 `BlockModel`
+   会直接忽略。神社庭灯 / 稻草人的模型写着 `"render_type": "cutout"`，
+   不显式登记的话镂空处会渲染成黑色实心 —— 必须
+   `BlockRenderLayerMap.INSTANCE.putBlock(block, RenderType.cutout())`。
+   这是**唯一**一处 `grep` 不到 `ItemBlockRenderTypes` 的原因：本项目此前一个都没有。
+2. **模型是懒加载的，构造函数里不能读文件。** `BlockEntityRenderer` 在首次资源重载
+   **之前**就被创建，那时 `ResourceManager` 还读不到 mod 自带资源。
+   所以 `TileEntityAltarRenderer` / `TileEntityShrineRenderer` 的构造函数留空，
+   改为 `render()` 里 `BedrockBlockModels.get(name)`，并在资源重载监听器里
+   `clear()` 缓存 + 预热一次（预热会把「模型写错」变成启动日志里的一条 error，
+   而不是游戏里「方块看不见」）。
+3. **UV 两套写法都要支持。** 1.12.0 几何用 `"uv": [x,y]` 盒式 UV，1.21.0 几何
+   （神社）用 `"uv": {"north": {"uv": [..], "uv_size": [..]}, ...}` 逐面 UV。
+   本移植的 `UvUnion` / `UvFaces` / `FaceUv` 本来就两套都实现了，所以不用改。
+
+**祭坛上悬空旋转的贡品**（1.20.1 新增，1.18.2 没有）：
+
+```java
+double time = (System.currentTimeMillis() + te.getBlockPos().asLong()) % 3600;
+poseStack.translate(0.5, 1.25 + Math.sin(time / 1800 * Math.PI) * 0.1, 0.5);
+poseStack.mulPose(Vector3f.YP.rotationDegrees((float) time / 10));
+```
+
+`sin` 周期 3600 ms（3.6 秒一次上下，振幅 0.1 格），Y 轴 3.6 秒转满 360°。
+把 `asLong()` 掺进时间基准是为了让每座祭坛的相位不同 —— 否则一排祭坛上的物品会齐步升降。
+
+**放 / 取贡品的音效**（同属 1.20.1 新增）：`ITEM_FRAME_ADD_ITEM` / `ITEM_FRAME_REMOVE_ITEM`，
+音源 `PLAYERS`。拆祭坛时补了一声 `BEACON_DEACTIVATE`（`SoundSource.BLOCKS`，音量 1.5）。
+
+**没换的**（各自原因不同）：
+
+| 文件 | 原因 |
+|---|---|
+| `models/block/maid_bed_{head,foot}.json` | 1.20.1 也只剩 `particle` 字段，几何在 `models/bedrock/block/maid_bed/<颜色>.json`（7 种颜色）。床的渲染器还是 1.18.2 那套原版模型，换上基岩模型要重写渲染器并处理「7 种颜色怎么选」，留到女仆床重做时一起 |
+| `models/bedrock/block/{bookshelf,computer,keyboard,picnic_mat,snack_cabinet,statue_base,cchess,gomoku,wchess}.json` | 对应的方块本身还没移植；文件已一并放进资源目录，等方块移植时直接接上 |
+| `sounds.json` / `lang/*.json` | 1.20.1 版会覆盖掉本移植自己加的条目，必须逐键合并而不是整体覆盖 |
+| `textures/entity/**` | 女仆模型走的是模型包（`maid_model.json` + 资源包），不属于方块贴图体系 |
+
+`camera_2d.png`（→ `camera.png`，改成 16×160 的动画贴图）与
+`block/scarecrow.png`（→ 拆成 `scarecrow_lower` / `scarecrow_upper`）已随上游删除。
+
+---
+
 
 ### 神社（胶片复活）
 
