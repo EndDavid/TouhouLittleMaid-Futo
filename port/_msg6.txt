@@ -1,0 +1,36 @@
+Fix the blank garage-kit tab icon (my own regression) and restore the pedestal in item icons
+
+The tab icon was empty because of a field-initialisation order bug I introduced last
+round. GARAGE_KIT_ICON was declared as a static final field up next to CHAIR_TAB,
+i.e. BEFORE the GARAGE_KIT item field is registered further down InitItems. Java
+initialises static fields in declaration order, so at that point InitItems.GARAGE_KIT
+is still null and the icon stack ends up empty -- and an empty stack is never drawn,
+which is exactly the blank slot in the screenshot.
+
+Upstream never had this problem because MaidGroup#makeIcon creates the stack on
+first call. So the icon goes back to a lazy supplier:
+
+    .icon(() -> new ItemStack(InitItems.GARAGE_KIT))
+
+Separately, the item icon was drawing less than upstream. Upstream's
+TileEntityItemStackGarageKitRenderer draws the pedestal (StatueBaseModel) first, then
+the entity, with two independent transform blocks:
+
+    pedestal: scale(0.5) -> translate(1, 0.5, 1)       -> ZN(180)
+    entity:   scale(0.5) -> translate(1, 0.21328125, 1) -> YP(180)
+
+I had dropped the pedestal and written a comment claiming upstream did not draw it --
+that comment was wrong. It is back, which also gives the icon a floor: even if the
+entity render ever fails, the slot shows a pedestal instead of nothing. Also added
+upstream's RenderSystem.runAsFancy around the entity so translucent layers survive,
+and a one-shot INFO line recording that the renderer ran (this icon has now cost two
+rounds of debugging; a log line makes the next one trivial).
+
+While in there: the GARAGE_KIT_TAB javadoc was mojibake in the source. The script
+that added it had Chinese literals inside a BOM-less .ps1, which Windows PowerShell
+5.1 parses as ANSI, so the text was mangled before it reached the file. Rewritten
+from a UTF-8 snippet, and a scan of all port sources for the same damage now comes
+back clean.
+
+Verified: gradlew build green, jar 38,909,401 bytes, deployed with a matching SHA-256.
+

@@ -61,24 +61,20 @@ public final class InitItems {
             .build();
 
     /**
-     * 鎵嬪姙涓撶敤鍒涢€犳ā寮忕墿鍝佹爮锛堜笂娓?{@code MaidGroup.GARAGE_KIT_TAB}锛夈€?
+     * 手办专用创造模式物品栏（上游 {@code MaidGroup.GARAGE_KIT_TAB}）。
      *
-     * <p>姣忎釜濂充粏妯″瀷涓€鍙紝鍑犲崄鍙杩涗富鐗╁搧鏍忎細鎶婂埆鐨勭墿鍝佹尋娌★紝鎵€浠ヤ笂娓稿崟寮€涓€鏍忋€?
-     * 鍐呭鐢?{@code BlockGarageKit#fillItemCategory} 閾猴紙瀹冭璇绘ā鍨嬫敞鍐岃〃锛?
-     * 鎵€浠ヤ笅闈㈣繖涓€閬?fillItemCategory 灏辨槸鍏ㄩ儴鍐呭锛屼笉闇€瑕侀澶栬拷鍔狅級銆?/p>
-     */
-    /**
-     * 鎵嬪姙鏍忕殑鍥炬爣鐗╁搧銆傚繀椤绘槸涓€涓€愬鐢ㄣ€戠殑 ItemStack銆?
+     * <p>每个女仆模型一只，几十只塞进主物品栏会把别的物品挤没，所以上游单开一栏。
+     * 内容由 {@code BlockGarageKit#fillItemCategory} 铺（它要读模型注册表，
+     * 所以下面这一遍 fillItemCategory 就是全部内容，不需要额外追加）。</p>
      *
-     * <p>鍐欐垚 {@code () -> new ItemStack(...)} 涔熷彲浠ヨ窇锛屼絾 icon lambda 姣忓抚閮戒細姹傚€硷紝
-     * 浜庢槸姣忓抚鏂板缓涓€涓?ItemStack銆佹瘡甯у杺缁欑墿鍝佹覆鏌撳櫒涓€涓叏鏂扮殑閿€傛墜鍔炲浘鏍囩殑 3D 瀹炰綋
-     * 缂撳瓨鏇剧粡鍥犱负杩欑銆屾瘡甯ф柊瀵硅薄銆嶈鎾戠垎杩囷紙瑙?EntityCacheUtil.GARAGE_KIT_CACHE锛夛紝
-     * 鎵€浠ヨ繖閲屼粠涓€寮€濮嬪氨澶嶇敤鍚屼竴涓爤銆?/p>
+     * <p><b>图标必须写成 lambda。</b>{@code GARAGE_KIT} 这个物品在本文件里注册得比
+     * 本栏晚，写成静态字段会在类初始化时就拿到 {@code null}，于是图标是一个空栈、
+     * 永远画不出来（Java 的静态字段按声明顺序初始化）。上游的
+     * {@code MaidGroup#makeIcon} 也是第一次调用时才去建这个栈。</p>
      */
-    private static final ItemStack GARAGE_KIT_ICON = new ItemStack(InitItems.GARAGE_KIT);
     public static final CreativeModeTab GARAGE_KIT_TAB = FabricItemGroupBuilder
             .create(TouhouLittleMaid.rl("garage_kit"))
-            .icon(() -> GARAGE_KIT_ICON)
+            .icon(() -> new ItemStack(InitItems.GARAGE_KIT))
             .appendItems((items, tab) -> {
                 NonNullList<ItemStack> defaults = NonNullList.create();
                 for (Item item : Registry.ITEM) {
