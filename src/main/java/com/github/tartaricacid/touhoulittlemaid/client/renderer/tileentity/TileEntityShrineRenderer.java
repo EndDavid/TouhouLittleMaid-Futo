@@ -29,10 +29,9 @@ public class TileEntityShrineRenderer implements BlockEntityRenderer<TileEntityS
     public void render(TileEntityShrine shrine, float partialTick, PoseStack poseStack, MultiBufferSource bufferIn, int combinedLightIn, int combinedOverlayIn) {
         Direction facing = shrine.getBlockState().getValue(BlockShrine.FACING);
         poseStack.pushPose();
-        poseStack.translate(0.5, 1.5, 0.5);
-        poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
-        poseStack.mulPose(Vector3f.YN.rotationDegrees(180 - facing.get2DDataValue() * 90));
         AnimatedGeoModel model = BedrockBlockModels.get("shrine");
+        poseStack.translate(0.5, BedrockBlockModels.floorOffset("shrine"), 0.5);
+        poseStack.mulPose(Vector3f.YN.rotationDegrees(180 - facing.get2DDataValue() * 90));
         GeoBlockRenderer.render(model, TEXTURE, poseStack, bufferIn, combinedLightIn, combinedOverlayIn,
                 RenderType.entityCutoutNoCull(TEXTURE));
         poseStack.popPose();

@@ -1,6 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.client.resource;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.GeoBlockRenderer;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoModel;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.raw.pojo.Converter;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.raw.pojo.RawGeoModel;
@@ -17,33 +18,42 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 静态（无动画）基岩方块模型的加载与缓存。
+ * 静态（无动画）基岩方块模型的加载、缓存与包围盒。
  *
  * <p>上游 1.20.1 把这批方块从「原版 JSON 模型」换成了「GeckoLib 基岩模型」，
  * 只有这样才能做出那种高精度外形：{@code models/bedrock/block/*.json} 里是
- * {@code format_version 1.12.0} 的 {@code minecraft:geometry}，纹理动辄 512×512，
- * 一个祭坛就有上千个 cube —— 原版 JSON 模型做不出来。</p>
+ * {@code minecraft:geometry}，纹理动辄 512×512，一个祭坛就有上千个 cube。</p>
  *
  * <h2>为什么可以复用实体那条管线</h2>
  * 本移植的 {@code geckolib3} 是完整的一套，几何解析（{@code Converter} →
  * {@code RawGeometryTree#parseHierarchy} → {@code GeoBuilder}）与渲染
  * （{@code IGeoRenderer}）都不依赖动画；{@link AnimatedGeoModel} 也只是给
  * {@code GeoModel} 包了一层可变骨骼，静止时旋转/位移全为 0，画出来就是静态模型。
- * 所以方块模型只要拿到一个 {@link AnimatedGeoModel} 就够，不需要另写渲染器。
  *
  * <h2>与实体模型的区别</h2>
  * <b>不做骨骼改名、也不补 {@code Root}。</b>{@link GeckoModelLoader} 那两步是为了让
  * 旧版女仆模型能复用 {@code maid.animation.json}；方块模型没有动画，而且它们的骨骼名
- * 是 {@code new} / {@code A} / {@code B} 这种，改名表根本不会命中，插入的
- * 合成 {@code Root} 也只会多一层无意义的变换。
+ * 是 {@code new} / {@code A} / {@code B} 这种，改名表根本不会命中。
  *
- * <h2>缓存与重载</h2>
- * 第一次请求时加载，之后直接用；{@link #clear()} 由资源重载监听器调用，
- * 这样资源包替换模型后不需要重启游戏。
+ * <h2>{@link #floorOffset} 与「上下颠倒 + 沉进地里」</h2>
+ *
+ * <p>换用基岩模型之前，这两个渲染器画的是原版 {@code EntityModel}，其顶点空间是
+ * <b>Y 向下</b>的，所以代码里有一句 {@code ZN(180)} 把它翻上来，另外还有手调的
+ * {@code +1.5} / {@code -1.5} 竖直偏移去凑各自模型的坐标原点。</p>
+ *
+ * <p>基岩几何（见 {@code GeoCube}）本来就是 <b>Y 向上</b>的 —— 女仆就是这么画的 ——
+ * 于是那句 {@code ZN(180)} 反而把方块模型翻了个底朝天，手调偏移也不再对应新的原点
+ * （祭坛的几何有相当一部分压在原点下方，神社的原点却正好在底面）。
+ * 硬编码任何数字都注定只对一个模型正确。</p>
+ *
+ * <p>所以改成按模型自身量出来的包围盒计算：{@link #floorOffset} 返回
+ * {@code -minY}，把模型最低点摆到方块底面。神社量出来接近 0，祭坛是个正数 —— 两者都对。</p>
  */
 public final class BedrockBlockModels {
-    /** 值可能是 {@code null}（文件缺失 / 解析失败），用 {@code containsKey} 区分「没加载过」。 */
+    /** 名称 → 模型；值可能是 {@code null}（文件缺失 / 解析失败）。 */
     private static final Map<String, AnimatedGeoModel> CACHE = new HashMap<>();
+    /** 名称 → 包围盒 {@code [minX, minY, minZ, maxX, maxY, maxZ]}（单位：格）。 */
+    private static final Map<String, float[]> BOUNDS = new HashMap<>();
 
     private BedrockBlockModels() {
     }
@@ -54,48 +64,66 @@ public final class BedrockBlockModels {
      */
     @Nullable
     public static AnimatedGeoModel get(String name) {
-        if (CACHE.containsKey(name)) {
-            return CACHE.get(name);
+        if (!CACHE.containsKey(name)) {
+            load(name);
         }
-        AnimatedGeoModel model = load(name);
-        CACHE.put(name, model);
-        return model;
+        return CACHE.get(name);
+    }
+
+    /**
+     * 把模型最低点摆到方块底面所需的竖直位移（单位：格）。
+     *
+     * <p>模型缺失时返回 0，让渲染器原样画（总比不画要好排查）。</p>
+     */
+    public static float floorOffset(String name) {
+        get(name);
+        float[] b = BOUNDS.get(name);
+        return b == null ? 0 : -b[1];
+    }
+
+    /** 模型包围盒；缺失时返回 {@code null}。 */
+    @Nullable
+    public static float[] bounds(String name) {
+        get(name);
+        return BOUNDS.get(name);
     }
 
     public static void clear() {
         CACHE.clear();
+        BOUNDS.clear();
     }
 
-    @Nullable
-    private static AnimatedGeoModel load(String name) {
+    private static void load(String name) {
+        CACHE.put(name, null);
+        BOUNDS.put(name, null);
+
         ResourceLocation location = new ResourceLocation(TouhouLittleMaid.MOD_ID,
                 "models/bedrock/block/" + name + ".json");
         try (InputStream stream = open(location)) {
             if (stream == null) {
                 TouhouLittleMaid.LOGGER.warn("Missing bedrock block model: {}", location);
-                return null;
+                return;
             }
             String json = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
             RawGeoModel rawModel = Converter.fromJsonString(json);
             RawGeometryTree tree = RawGeometryTree.parseHierarchy(rawModel);
             AnimatedGeoModel model = new AnimatedGeoModel(GeoBuilder.getGeoBuilder().constructGeoModel(tree));
-            TouhouLittleMaid.LOGGER.info("[Futo] Block model {} loaded: {} bones, {} cubes", name,
-                    model.bones().size(), countCubes(model));
-            return model;
+
+            float[] b = GeoBlockRenderer.measureBounds(model);
+            CACHE.put(name, model);
+            BOUNDS.put(name, b);
+            TouhouLittleMaid.LOGGER.info(
+                    "[Futo] Block model {} loaded: {} bones, bbox x[{}..{}] y[{}..{}] z[{}..{}] floorOffset={}",
+                    name, model.bones().size(),
+                    fmt(b[0]), fmt(b[3]), fmt(b[1]), fmt(b[4]), fmt(b[2]), fmt(b[5]), fmt(-b[1]));
         } catch (Throwable e) {
             // 与 GeckoModelLoader 一致：几何层级异常时可能抛 StackOverflowError，不是 Exception
             TouhouLittleMaid.LOGGER.error("Failed to load bedrock block model {}", location, e);
-            return null;
         }
     }
 
-    /** 只用于日志：统计整棵骨骼树里的方块面数，确认模型不是空的。 */
-    private static int countCubes(AnimatedGeoModel model) {
-        int total = 0;
-        for (com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoBone bone : model.bones().values()) {
-            total += bone.geoBone().cubes().size();
-        }
-        return total;
+    private static String fmt(float v) {
+        return String.format("%.3f", v);
     }
 
     @Nullable

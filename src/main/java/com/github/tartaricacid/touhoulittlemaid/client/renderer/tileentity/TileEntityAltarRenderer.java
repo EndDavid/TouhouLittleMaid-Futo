@@ -29,8 +29,8 @@ public class TileEntityAltarRenderer implements BlockEntityRenderer<TileEntityAl
         if (te.isRender()) {
             poseStack.pushPose();
             this.setTranslateAndPose(te, poseStack);
-            poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
             AnimatedGeoModel model = BedrockBlockModels.get("altar");
+            poseStack.translate(0, BedrockBlockModels.floorOffset("altar"), 0);
             GeoBlockRenderer.render(model, TEXTURE, poseStack, bufferIn, combinedLightIn, combinedOverlayIn,
                     RenderType.entityTranslucent(TEXTURE));
             poseStack.popPose();
@@ -60,20 +60,20 @@ public class TileEntityAltarRenderer implements BlockEntityRenderer<TileEntityAl
     private void setTranslateAndPose(TileEntityAltar te, PoseStack poseStack) {
         switch (te.getDirection()) {
             case SOUTH:
-                poseStack.translate(1, -1.5, -3);
+                poseStack.translate(1, 0, -3);
                 poseStack.mulPose(Vector3f.YP.rotationDegrees(180));
                 break;
             case EAST:
-                poseStack.translate(-3, -1.5, 0);
+                poseStack.translate(-3, 0, 0);
                 poseStack.mulPose(Vector3f.YP.rotationDegrees(270));
                 break;
             case WEST:
-                poseStack.translate(4, -1.5, 1);
+                poseStack.translate(4, 0, 1);
                 poseStack.mulPose(Vector3f.YP.rotationDegrees(90));
                 break;
             case NORTH:
             default:
-                poseStack.translate(0, -1.5, 4);
+                poseStack.translate(0, 0, 4);
         }
     }
 }

@@ -843,6 +843,66 @@ poseStack.mulPose(Vector3f.YP.rotationDegrees((float) time / 10));
 
 ---
 
+### 物品图标消失：`forge:separate_transforms` 在 1.18.2 是空模型
+
+1.20.1 的 6 个物品模型（`camera` / `extinguisher` / `hakurei_gohei` / `sanae_gohei` /
+`maid_beacon` / `snack_cabinet`）用的是 **Forge 专属的 `forge:separate_transforms` 加载器**：
+
+```json
+{
+  "loader": "forge:separate_transforms",
+  "base":            { "parent": "..._in_hand" },   // 手持 3D 模型
+  "perspectives": { "gui": { "parent": "item/generated", "textures": { "layer0": "..." } } }
+}
+```
+
+原版 `ModelBakery` **不认识 `loader` 字段**，而顶层又没有 `parent` / `textures` / `elements`，
+于是把它烘焙成一个**空模型**。表现就是「拿在手上是好的、物品栏里的图标没了」——
+手持模型来自本移植自己的 `InHandModelUnbaked`，而那张平面图标正好来自这个空模型。
+
+修法是把这 6 个文件翻译成等价的原版写法（就是它们 `perspectives.gui` 那一支）：
+
+```json
+{ "parent": "item/generated", "textures": { "layer0": "touhou_little_maid:item/<同名>" } }
+```
+
+上游文件已存档在 `port/upstream-forge-item-models/`，转换脚本 `port/convert-forge-item-models.ps1`
+（会断言「没有残留 loader」且「每个 layer0 都指向真实 png」）。
+
+顺带：`item/sanae_gohei.json` 原来有一句 `"parent": "hakurei_gohei"`（缺 namespace），
+解析成 `minecraft:hakurei_gohei` 后是不存在的模型，是启动日志里那条
+`Unable to load model: 'minecraft:hakurei_gohei'` 的来源。随本次转换一并消失。
+
+### 基岩方块模型的朝向：`ZN(180)` 必须去掉，竖直偏移必须量出来
+
+换模型之前这两个渲染器画的是原版 `EntityModel`，顶点空间 **Y 向下**，所以有一句
+`mulPose(ZN.rotationDegrees(180))` 把它翻上来；另外还有手调的 `+1.5`（神社）/
+`-1.5`（祭坛）去凑各自模型的坐标原点。
+
+基岩几何（`GeoCube`）本身就是 **Y 向上**的 —— 女仆就是这条路画出来的 —— 于是那句
+`ZN(180)` 反而把方块翻了个底朝天，手调偏移也不再对应新模型的原点。
+祭坛更糟：它的骨骼里有 `rotation: [90, 87.5, 90]` 这种大角度旋转，
+**直接读 JSON 的 `origin` 得到的包围盒完全是错的**（原始值说 y 从 −1.42 到 5.88，
+真实值是从 −0.125 到 5.93，X 也从「不对称」变成对称的 ±4.278）。
+照原始值猜偏移，祭坛就会整个沉进地里。
+
+所以改成 **量**：`GeoBlockRenderer#measureBounds` 用一个只记录坐标的 `VertexConsumer`
+走一遍真实渲染路径（复用 `renderRecursively`，同一套骨骼矩阵），得到模型在方块空间里的
+真实包围盒；`BedrockBlockModels#floorOffset` 返回 `-minY`，把模型最低点摆到方块底面。
+
+启动日志会打出来，两个模型的实际测量值：
+
+```
+[Futo] Block model altar  loaded: 87 bones, bbox x[-4.278..4.278] y[-0.125..5.928] z[-4.889..4.278] floorOffset=0.125
+[Futo] Block model shrine loaded:  1 bones, bbox x[-0.685..0.686] y[0.000..1.439] z[-0.501..0.501] floorOffset=-0.000
+```
+
+神社偏移是 0（原点正好在底面），祭坛是 0.125 —— 两者都不需要再手调。
+「竖直偏移必须从模型量出来」这条对后面要接的 9 个基岩方块模型（书架 / 电脑 / 键盘 /
+野餐垫 / 零食柜 / 雕像底座 / 象棋 / 五子棋 / 国际象棋）同样适用。
+
+---
+
 
 ### 神社（胶片复活）
 
