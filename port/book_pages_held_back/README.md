@@ -33,7 +33,7 @@
 
 ## 现在还剩什么缺口
 
-被挪出来的 **13 页**，缺的是**尚未移植的物品 / 方块**：
+被挪出来的 **12 页**，缺的是**尚未移植的物品 / 方块**：
 
 | 词条 | 缺失的物品 ID | 所属子系统 |
 | --- | --- | --- |
@@ -42,7 +42,6 @@
 | `maid/servant_bell` | `servant_bell` | 搜索类工具 |
 | `other/broom` | `broom` | 扫帚 |
 | `other/chisel_and_statues` | `chisel`、`statue` | 手办与雕像 |
-| `other/favorability_tool` | `favorability_tool_add/full/reduce` | 好感度工具 |
 | `other/fox_scroll` | `red_fox_scroll`、`white_fox_scroll` | 搜索类工具 |
 | `other/garage_kit` | `garage_kit` | 手办与雕像 |
 | `other/gomoku` | `gomoku` | 棋类与娱乐方块 |
@@ -61,7 +60,10 @@
   `*_protect_bauble` / `nimble_fabric` / `item_magnet_bauble` / `mute_bauble` 全部完成注册。
 - **神社复兴**：`maid/film.json`、`maid/substitute_jizo.json`、`other/maid_bed.json`、
   `other/shrine.json`、`other/granite_inari_fox.json`（稻草人）。
-- **坐垫**：`other/chair.json`、`other/chair_show.json`（本轮）。
+- **坐垫**：`other/chair.json`、`other/chair_show.json`。
+- **好感度工具**：`other/favorability_tool.json`（本轮）。`favorability_tool_add` /
+  `_reduce` / `_full` 三个变体一起注册，交互在 `EntityMaid#useFavorabilityTool`
+  （上游 `UseFavorabilityToolEvent`），潜行 1 点、否则 64 点。
 
 `maid/gap.json` 仍留在本目录：它讲的是 `wireless_io`（无线 IO 饰品），
 这件物品要等 IO 配置界面一起移植，所以先不还原。
@@ -87,23 +89,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File port/book_pages_held_back/va
 它按帕秋莉的规则静态检查 `spotlight` 物品 / 词条与分类图标 / 分类引用 / entity 页。
 **每还原一页就要跑一次，并同步在 `$registered` 里补上新增的物品 id。**
 
-## 目前手册里保留了什么（39 词条 / 3 分类）
+## 目前手册里保留了什么（40 词条 / 3 分类）
 
-`validate-book.ps1` 的当前输出：`entries=39 categories=3 problems=0`。
+`validate-book.ps1` 的当前输出：`entries=40 categories=3 problems=0`。
 
 - `maid/`：backpack、chat_bubbles、film、item_magnet、last_slot、maid_bauble、maid_base、
   maid_config、maid_home、maid_meal、maid_skin、maid_sound、maid_task、mute_bauble、
   naming_eggs、other_backpack、snowball_fight、spawn_maid、substitute_jizo
-- `other/`：camera_and_photo、chair、chair_show、command、extinguisher、
+- `other/`：camera_and_photo、chair、chair_show、command、extinguisher、favorability_tool、
   granite_inari_fox、maid_beacon、maid_bed、power_point、shrine
 - `overview/`：download_custom_pack、favorability、gohei_and_danmaku、
   make_custom_chatbubble_text、make_custom_model、multiblocks_altar、power_point、
   vanilla_change、what_is_touhou、world_spawn
 
-其中 `overview/favorability` 的图标从 `favorability_tool_add`（未移植）改成了
-`minecraft:cake`，否则帕秋莉会画一个空槽。`categories/other.json` 的图标
-已经换回上游的 `chair{ModelId:'touhou_little_maid:beach_chair'}` —— 坐垫移植完成
-之后这个图标可以正常显示了。
+图标现在是上游原样：`overview/favorability` 用 `favorability_tool_add`
+（好感度工具移植完成后已经能用，不必再用 `minecraft:cake` 占位），
+`categories/other.json` 用 `chair{ModelId:'touhou_little_maid:beach_chair'}`。
 
 ## 祭坛配方的渲染组件（`AltarRecipeComponent`）
 

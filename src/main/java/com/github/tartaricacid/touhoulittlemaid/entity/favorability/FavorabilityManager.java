@@ -228,6 +228,18 @@ public class FavorabilityManager {
         this.maid.spawnHeartParticles(1);
     }
 
+
+    /**
+     * 把好感度直接拉满（上游 {@code FavorabilityManager#max}）。
+     *
+     * <p>上游的实现就是一句 {@code this.add(LEVEL_3_POINT)} —— 借 {@link #add}
+     * 的钳制与升阶逻辑自然停在三级上限，并顺带刷新攻击 / 生命属性，
+     * 所以这里也照抄，不另写一套赋值。</p>
+     */
+    public void max() {
+        this.add(LEVEL_3_POINT);
+    }
+
     public void reduce(int reducePoint) {
         int favorability = this.maid.getFavorability();
         int pointByLevel = getPointByLevel(getLevel());

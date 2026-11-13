@@ -1,0 +1,4 @@
+图标现在是上游原样：`overview/favorability` 用 `favorability_tool_add`
+（好感度工具移植完成后已经能用，不必再用 `minecraft:cake` 占位），
+`categories/other.json` 用 `chair{ModelId:'touhou_little_maid:beach_chair'}`。
+

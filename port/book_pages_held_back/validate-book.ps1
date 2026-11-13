@@ -30,7 +30,11 @@ $registered = @(
   # --- chair milestone: chair / chair_show / scarecrow ---
   'touhou_little_maid:chair',
   'touhou_little_maid:chair_show',
-  'touhou_little_maid:scarecrow'
+  'touhou_little_maid:scarecrow',
+  # --- favorability tools (creative-only debug items) ---
+  'touhou_little_maid:favorability_tool_add',
+  'touhou_little_maid:favorability_tool_reduce',
+  'touhou_little_maid:favorability_tool_full'
 )
 $entities = @('touhou_little_maid:maid','touhou_little_maid:fairy','touhou_little_maid:power_point','touhou_little_maid:box')
 

@@ -91,7 +91,7 @@ loom_version=1.15.5
 
 | **墓碑（死亡收纳）+ 祭坛召唤箱** | **完成** |
 | **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器）** | **完成**（换肤 GUI 待 `AbstractModelGui` 泛型化） |
-| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（39 条目 / 3 分类） |
+| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（40 条目 / 3 分类） |
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | 未开始 |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
@@ -1081,7 +1081,7 @@ Y(sleepDirectionToRotation(bedFacing)) → Z(getFlipDegrees() = 90) → Y(270)
   一个不存在的物品 ID 直接抛 `JsonParseException` → `BookContents.empty` → 「Loading error!」。
   而 entry 的 `icon` **不是**致命的（`BookIcon#from` 只 warn 并回退成空 `StackIcon`）。
   所以产物未移植的页要用 `port/book_pages_held_back/` 暂存，不能用「图标占位」蒙过去。
-- 当前 **39 条目 / 3 分类**，`port/book_pages_held_back/validate-book.ps1` 校验 0 问题。
+- 当前 **40 条目 / 3 分类**，`port/book_pages_held_back/validate-book.ps1` 校验 0 问题。
   它按帕秋莉的规则静态检查 `spotlight` 物品、词条 / 分类图标、`entity` 页，
   另外还检查祭坛配方的 `recipe_id` 是否存在、`c:` 标签是否真的定义了、
   以及 ingredients / output 里引用的物品与实体 id 是否已注册。
@@ -1553,7 +1553,7 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
   现已补齐，`validate-book.ps1` 也加了这条静态检查。
 - **部分祭坛配方未收录**，因为产物本身还没移植：书柜 / 扫帚 / 中国象棋 / 凿子 / 电脑 / 五子棋 /
   河童罗盘 / 键盘 / 野餐篮 / 红狐卷轴 / 小号 / 西洋棋 / 白狐卷轴 / 无线 IO / 仆人铃。
-- **13 个帕秋莉页面**暂存在 `port/book_pages_held_back/`，等对应功能补齐再放回去
+- **12 个帕秋莉页面**暂存在 `port/book_pages_held_back/`，等对应功能补齐再放回去
   （对应 5 个子系统：手办与雕像 / 棋类与娱乐方块 / 扫帚 / 野餐与娱乐 / 搜索类工具）。
 
 ---

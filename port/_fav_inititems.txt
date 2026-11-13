@@ -1,0 +1,20 @@
+    /**
+     * 好感度工具三件套（上游 {@code InitItems.FAVORABILITY_TOOL_ADD / _REDUCE / _FULL}）。
+     *
+     * <p>创造模式专属的调试工具：右键女仆直接加 / 减 / 拉满好感度。三个物品共用一个类，
+     * 靠 {@code type} 字符串区分，见 {@code item.ItemFavorabilityTool}。
+     * 效果不写在物品里，而在 {@code EntityMaid#useFavorabilityTool}（上游是
+     * {@code event/maid/UseFavorabilityToolEvent}）。</p>
+     */
+    public static final Item FAVORABILITY_TOOL_ADD = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("favorability_tool_add"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemFavorabilityTool("add"));
+
+    public static final Item FAVORABILITY_TOOL_REDUCE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("favorability_tool_reduce"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemFavorabilityTool("reduce"));
+
+    public static final Item FAVORABILITY_TOOL_FULL = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("favorability_tool_full"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemFavorabilityTool("full"));
+
