@@ -1,0 +1,44 @@
+Stop adding the manual twice to the creative tab
+
+Symptom: the Touhou Little Maid creative tab shows two "Memorizable Gensokyo"
+stacks, both opening the same book.
+
+Cause: Patchouli supplies the book itself. ItemModBook#fillItemCategory is
+
+    String tabName = tab.getRecipeFolderName();
+    BookRegistry.INSTANCE.books.values().forEach(b -> {
+        if (!b.noBook && !b.isExtension
+            && (tab == CreativeModeTab.TAB_SEARCH || b.creativeTab.equals(tabName))) {
+            items.add(forBook(b));
+        }
+    });
+
+and data/touhou_little_maid/patchouli_books/memorizable_gensokyo/book.json declares
+"creative_tab": "touhou_little_maid.main", which is exactly the recipe folder name
+FabricItemGroupBuilder gives TouhouLittleMaid.rl("main").
+
+MAIN_TAB.appendItems has to run the vanilla pass by hand -- Fabric's
+FabricItemGroupBuilder replaces the default fill rather than extending it, so the
+callback loops over Registry.ITEM calling item.fillItemCategory(tab, defaults).
+That loop already reaches ItemModBook and puts the book into `defaults`.
+CreativeTabCompat.appendBook() then added a second copy, and items.addAll(defaults)
+appended the first one after it.
+
+So the manual add was pure duplication, not a workaround: the Forge hook that
+upstream 1.18.2 relies on is "read creative_tab from book.json and let Forge's
+Item#fillItemCategory add it", and the manual loop reproduces that hook exactly.
+
+Fix: drop the appendBook call and delete compat/patchouli/CreativeTabCompat, which
+had no other callers (the class only existed to make that one redundant call, and
+it drags vazkii.patchouli.* types, so removing it also removes a class-loading
+edge case when Patchouli is absent). The comment on MAIN_TAB now records why the
+book must not be added a second time, quoting the Patchouli method.
+
+One behavioural note: the book is no longer the first stack in the tab -- it now
+sits wherever Patchouli's iteration lands. Upstream 1.20.1 puts it first because
+it calls output.accept() before anything else; 1.18.2 has no such ordering hook,
+and a correct single entry is worth more than the position.
+
+Verified: gradlew build green, jar 38,865,187 bytes, deployed with a matching
+SHA-256.
+
