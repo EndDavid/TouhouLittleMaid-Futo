@@ -1,8 +1,10 @@
 package com.github.tartaricacid.touhoulittlemaid.client.renderer.item;
 
+import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityChairRenderer;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.ChairModelRegistry;
 import com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair;
+import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemChair;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -35,15 +37,38 @@ public final class ChairItemRenderer implements BuiltinItemRendererRegistry.Dyna
     private EntityChair cachedChair;
     @Nullable
     private Level cachedLevel;
+    /**
+     * 一次性熔断标志。
+     *
+     * <p>物品图标渲染抛异常 = 整个游戏崩（它挂在 {@code ItemRenderer} 里，没有任何一层会接住）。
+     * 图标画不出来顶多是「物品栏里少个模型」，绝不该升级成崩溃 —— 所以这里接住一次、
+     * 打一条带完整堆栈的 ERROR、然后把 3D 图标整个关掉。日志里那一条是留给排查的线索，
+     * 不会静默吞掉。</p>
+     */
+    private boolean broken = false;
 
     @Override
     public void render(ItemStack stack, ItemTransforms.TransformType mode, PoseStack poseStack,
                        MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+        if (this.broken) {
+            return;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         Level level = minecraft.level;
         if (level == null) {
             return;
         }
+        try {
+            renderChair(minecraft, stack, poseStack, bufferSource, packedLight, level);
+        } catch (Throwable e) {
+            this.broken = true;
+            TouhouLittleMaid.LOGGER.error(
+                    "[Futo] Chair item icon renderer failed; the 3D icon is disabled for this session", e);
+        }
+    }
+
+    private void renderChair(Minecraft minecraft, ItemStack stack, PoseStack poseStack,
+                             MultiBufferSource bufferSource, int packedLight, Level level) {
         EntityChair chair = getChair(level);
         if (chair == null) {
             return;
@@ -67,7 +92,10 @@ public final class ChairItemRenderer implements BuiltinItemRendererRegistry.Dyna
     private EntityChair getChair(Level level) {
         // 换过世界就得重建：实体身上挂着 Level 引用
         if (this.cachedChair == null || this.cachedLevel != level) {
-            this.cachedChair = new EntityChair(level);
+            // 与上游一致走 EntityType#create —— 它才能真正走工厂与（Fabric 侧的）属性表注入，
+            // 直接 new 会绕过这些钩子。
+            EntityChair chair = InitEntities.CHAIR.create(level);
+            this.cachedChair = chair != null ? chair : new EntityChair(level);
             this.cachedLevel = level;
         }
         return this.cachedChair;

@@ -248,6 +248,11 @@ public final class InitEntities {
 
     public static void init() {
         FabricDefaultAttributeRegistry.register(MAID, EntityMaid.createAttributes());
+        // 坐垫同样继承 LivingEntity，必须注册属性表；漏掉会在「构造实体」时直接 NPE
+        // （LivingEntity 的构造函数里就调 setHealth(getMaxHealth())），
+        // 表现是「一切到坐垫页签就崩」，因为页签图标会把坐垫物品渲染一次、从而构造一个假实体。
+        FabricDefaultAttributeRegistry.register(CHAIR,
+                com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair.createAttributes());
         // 女仆不自然生成，因此无需注册 SpawnPlacements（1.18.2 中该方法为 private）。
         FabricDefaultAttributeRegistry.register(FAIRY,
                 com.github.tartaricacid.touhoulittlemaid.entity.monster.EntityFairy.createFairyAttributes());

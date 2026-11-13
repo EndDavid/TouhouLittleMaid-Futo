@@ -1644,3 +1644,39 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 在此之前蹲下右键保持无动作，换模型只能靠创造模式物品栏里的各个变体 ——
 功能不缺，只是少一个入口。
 
+### 必须注册属性表（Forge 有兜底，Fabric 没有）
+
+`EntityChair` 继承 `LivingEntity`，而 `LivingEntity` 的构造函数里第一件事就是
+`setHealth(getMaxHealth())` —— `getMaxHealth()` 读 `Attributes.MAX_HEALTH`，
+`AttributeMap` 找不到实例时会回落到构造时传进来的 `AttributeSupplier`。
+**Fabric 那边这个 supplier 来源于原版 `DefaultAttributes` 那张表**，
+没注册就是 `null`：
+
+```
+java.lang.NullPointerException: Cannot invoke "AttributeSupplier.getValue(Attribute)"
+    because "this.supplier" is null
+  at AttributeMap.getValue
+  at LivingEntity.getMaxHealth
+  at LivingEntity.<init>
+  at AbstractEntityFromItem.<init>
+  at EntityChair.<init>
+  at ChairItemRenderer.getChair
+```
+
+所以必须 `FabricDefaultAttributeRegistry.register(CHAIR, EntityChair.createAttributes())`。
+机制可以用 `javap` 核对：`DefaultAttributeRegistryMixin` 的目标类是 `DefaultAttributes`
+（`class_5135`，注解是 `@Shadow @Final @Mutable Map field_23730`，注入点是静态初始化的 `TAIL`），
+配合 `DefaultAttributeRegistryAccessor` —— 也就是说 `register` 是**直接写进原版那张表**，
+再被 `LivingEntity` 构造函数里原有的 `DefaultAttributes.getSupplier(type)` 取出来，
+不需要任何 `LivingEntity` 侧 mixin。
+
+**上游不需要写这一步**，所以搬代码时极易漏：Forge 给未注册的实体兜了默认属性表，
+Fabric 没有。凡直接或间接继承 `LivingEntity` 的类型都要注册，漏掉的表现是
+**构造实体的那一刻就崩** —— 坐垫这次是「一切到坐垫页签就崩」，因为页签图标会把坐垫物品
+渲染一次、从而构造一个假实体。
+
+顺带一条同源的防御：物品图标渲染器抛异常**没有任何一层会接住**，会直接崩游戏。
+`ChairItemRenderer` 因此接一次 `Throwable`、打一条带堆栈的 ERROR、然后把 3D 图标整个关掉 ——
+图标画不出来顶多是「物品栏里少个模型」，不该升级成崩溃；那条日志保证问题不会被静默吞掉。
+
+

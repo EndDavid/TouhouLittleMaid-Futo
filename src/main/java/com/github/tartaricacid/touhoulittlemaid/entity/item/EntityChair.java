@@ -24,6 +24,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -97,6 +98,33 @@ public class EntityChair extends AbstractEntityFromItem {
                 .sized(0.875F, 0.5F)
                 .clientTrackingRange(10)
                 .build(TouhouLittleMaid.MOD_ID + ":chair");
+    }
+
+    /**
+     * 属性表。
+     *
+     * <p><b>这个方法是必须的，漏了会在构造实体时直接 NPE。</b>
+     * {@link LivingEntity} 的构造函数里就调了 {@code setHealth(getMaxHealth())}，
+     * 而 {@code getMaxHealth()} 读的是 {@code Attributes.MAX_HEALTH}；
+     * {@code AttributeMap} 在找不到实例时会回落到构造时传进来的 {@code AttributeSupplier} ——
+     * Fabric 那边这个 supplier 由 {@code FabricDefaultAttributeRegistry} 提供，
+     * <b>没有注册就是 {@code null}</b>，于是：</p>
+     *
+     * <pre>
+     * NullPointerException: Cannot invoke "AttributeSupplier.getValue(Attribute)"
+     *     because "this.supplier" is null
+     *   at AttributeMap.getValue
+     *   at LivingEntity.getMaxHealth
+     *   at LivingEntity.&lt;init&gt;
+     * </pre>
+     *
+     * <p>上游（Forge）不需要显式写这一步，因为 Forge 给未注册的实体兜了默认属性表；
+     * Fabric 没有那个兜底，凡是直接或间接继承 {@code LivingEntity} 的类型都必须注册。
+     * 坐垫用的是 {@link LivingEntity#createLivingAttributes()}（生命 / 击退抗性 / 移速 /
+     * 护甲 / 护甲韧性），与上游「当方盒子用」的定位一致 —— 它不移动，也从不掉血。</p>
+     */
+    public static AttributeSupplier.Builder createAttributes() {
+        return LivingEntity.createLivingAttributes();
     }
 
     @Override
