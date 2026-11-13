@@ -1437,4 +1437,8 @@
   "model.touhou_little_maid_old.yuuka_old.desc": "§7Youkai"
 ,
     "itemGroup.touhou_little_maid.garage_kit": "Garage Kit"
+,
+    "item.touhou_little_maid.trumpet": "Trumpet",
+    "tooltips.touhou_little_maid.trumpet.desc.usage": "Recall all of your maids",
+    "tooltips.touhou_little_maid.trumpet.desc.note": "Please note: only the maids on loaded chunks can be recalled!"
 }

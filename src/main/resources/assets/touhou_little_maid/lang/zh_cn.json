@@ -1434,4 +1434,9 @@
   "model.touhou_little_maid_old.yuuka_old.desc": "§7妖怪小姐"
 ,
     "itemGroup.touhou_little_maid.garage_kit": "手办"
+,
+    "item.touhou_little_maid.trumpet": "小号",
+    "tooltips.touhou_little_maid.trumpet.desc.usage": "召回所有女仆",
+    "tooltips.touhou_little_maid.trumpet.desc.note": "请谨记：只有加载区块上的女仆才可以被召回！",
+    "message.touhou_little_maid.trumpet.unloaded_maid": "在卸载区块上还有%d个女仆，请使用红狐狸卷轴来寻找她们！"
 }

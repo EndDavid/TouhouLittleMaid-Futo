@@ -274,6 +274,16 @@ public final class InitItems {
     public static final Item GARAGE_KIT = Registry.register(Registry.ITEM,
             TouhouLittleMaid.rl("garage_kit"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemGarageKit());
+    /**
+     * 小号（上游 {@code InitItems.TRUMPET}）。
+     *
+     * <p>蓄力 1 秒后松手，把<b>已加载区块里</b>自己的所有女仆召回到身边。
+     * 未加载区块上的女仆召不回来（实体根本不在内存里），只会收到一条提示，
+     * 让玩家去用红狐狸卷轴找。见 {@code item/ItemTrumpet}。</p>
+     */
+    public static final Item TRUMPET = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("trumpet"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemTrumpet());
 
 
 
