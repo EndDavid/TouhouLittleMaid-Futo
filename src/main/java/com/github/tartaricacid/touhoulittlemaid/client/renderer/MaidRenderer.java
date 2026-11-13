@@ -345,7 +345,21 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
     protected void setupRotations(EntityMaid maid, PoseStack poseStack, float ageInTicks,
                                   float rotationYaw, float partialTicks) {
         super.setupRotations(maid, poseStack, ageInTicks, rotationYaw, partialTicks);
+        boolean legacyModel = this.getAnimatableEntity(maid).isLegacyModel();
         if (!maid.isCarried()) {
+            // 非「被抱着」的乘客（坐垫 / 船 / 扫帚）也要吃 ridingPosture 的那 0.3。
+            //
+            // 上游 MaidBaseAnimation#ridingPosture() 末尾无条件执行
+            //     GlWrapper.translate(0, 0.3, 0)
+            // 而它的调用条件是 mob.isPassenger() —— 坐垫、船、扫帚、被玩家抱着全都算。
+            // 之前这里只在「被抱着」那条分支里补了这 0.3，于是「女仆坐坐垫比原版高 0.3 格」。
+            //
+            // 这里没有 Z 轴旋转（super 只做了 Ry(180 - yaw)），而 Y 方向的平移与绕 Y 的旋转
+            // 可交换，所以直接平移即可；geckolib 的 RenderUtils 是
+            // translate(-x/16, +y/16, +z/16)，模型空间里「向下」就是 -Y。
+            if (legacyModel && maid.isPassenger()) {
+                poseStack.translate(0.0D, -LEGACY_RIDING_LIFT, 0.0D);
+            }
             return;
         }
         // 逐字照抄上游 client/renderer/entity/EntityMaidRenderer#setupRotations：
@@ -379,7 +393,7 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
         //                                           = (-0.272, -0.127, 0)
         // 因此在这里（两次 mulPose 之后的 y-up 系）必须写 **-0.3**。
         // 写 +0.3 会把它翻成 (+0.272, +0.127, 0)，正好偏到另一侧。
-        if (this.getAnimatableEntity(maid).isLegacyModel()) {
+        if (legacyModel) {
             poseStack.translate(0.0D, -LEGACY_RIDING_LIFT, 0.0D);
         }
     }

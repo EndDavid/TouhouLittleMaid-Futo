@@ -1680,3 +1680,45 @@ Fabric 没有。凡直接或间接继承 `LivingEntity` 的类型都要注册，
 图标画不出来顶多是「物品栏里少个模型」，不该升级成崩溃；那条日志保证问题不会被静默吞掉。
 
 
+### 坐在坐垫上比原版高 0.3 格：`ridingPosture` 的位移只接了一半
+
+现象：所有坐垫，女仆坐上去的落点都比上游高一点（约 0.3 格）。
+
+根因在 `MaidBaseAnimation#ridingPosture()` 的末尾：
+
+```java
+private static void ridingPosture(ModelRendererWrapper legLeft, ModelRendererWrapper legRight) {
+    legLeft .setRotateAngleX(-1.134f); legLeft .setRotateAngleZ(-0.262f);
+    legRight.setRotateAngleX(-1.134f); legRight.setRotateAngleZ( 0.262f);
+    GlWrapper.translate(0, 0.3, 0);          // ← 关键
+}
+```
+
+它的调用条件是 **`mob.isPassenger()`** —— 也就是坐垫、船、扫帚、被玩家抱着**全都算**。
+（`sittingPosture()` 内部也是先调它，所以ground sit 也带这 0.3。）
+
+本移植版把这句接在了 `MaidRenderer#setupRotations` 里，但**只接在「被玩家抱着」那条分支**：
+
+```java
+if (!maid.isCarried()) {
+    return;                       // ← 坐垫 / 船 在这里就返回了，0.3 从来没生效
+}
+```
+
+于是「抱着」是对的，「坐坐垫」少了 0.3 格。`InnerAnimations` 里那句
+`// GlWrapper.translate(0, 0.3, 0) 由 MaidRenderer#setupRotations 负责` 正是这个约定的记录，
+问题只是渲染器那一半没覆盖全部乘客。
+
+修法：把位移提到 `isCarried()` 判断之前，对**任何** `isPassenger()` 的旧版模型生效。
+非「被抱着」的分支没有 Z 轴旋转（`super` 只做了 `Ry(180 - yaw)`），而 Y 方向平移与绕 Y 的旋转
+可交换，所以直接 `translate(0, -0.3, 0)` 即可 —— 符号取负是因为 geckolib 的
+`RenderUtils` 是 `translate(-x/16, +y/16, +z/16)`，**模型空间没有 Y 翻转**，负 Y 就是向下。
+
+> 别把这条位移搬进 `maid_legacy.animation.json` 的 `Root.position`：那样「被抱着」分支
+> 会重复应用一次（它同时是乘客），抱持姿态会立刻沉 0.6 格。位移必须只由渲染器负责一次。
+
+**残留的极小偏差**：地面坐下（`sit` 状态）在 `maid_legacy.animation.json` 里写的是
+`Root.position [0, -3.5, 0]`（0.219 格），而上游是 0.3 格，差 0.081 格（约 1.3 像素）。
+这一处没有动 —— 它已被视觉验证过，而改动的收益低于打乱已验证几何的风险。
+
+
