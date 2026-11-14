@@ -114,21 +114,21 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     public static final String DEFAULT_MODEL_ID = "touhou_little_maid:hakurei_reimu";
 
     /**
-     * 濂充粏 NBT 閲屻€屾ā鍨?id銆嶇殑閿悕銆?
+     * 女仆 NBT 里「模型 id」的键名。
      *
-     * <p>鍚屾鏁版嵁鐢ㄧ殑鏄?{@code DATA_MODEL_ID}锛屼絾钀界洏 / 鐗╁搧 NBT锛堣兌鐗囩殑
-     * {@code MaidInfo}銆佹墜鍔炵殑 {@code EntityInfo}锛夐噷鐢ㄧ殑閮芥槸杩欎釜瀛楃涓查敭銆?
-     * 涓婃父鎶婂畠鏆撮湶鎴?{@code EntityMaid.MODEL_ID_TAG}锛岄洉鍍?/ 鎵嬪姙 / 鑳剁墖閮藉紩瀹冿紝
-     * 鎵€浠ヨ繖閲屼篃蹇呴』鏄?public 甯搁噺锛屼笉鑳藉悇鍐欏悇鐨勫瓧闈㈤噺銆?/p>
+     * <p>同步数据用的是 {@code DATA_MODEL_ID}，但落盘 / 物品 NBT（胶片的
+     * {@code MaidInfo}、手办的 {@code EntityInfo}）里用的都是这个字符串键。
+     * 上游把它暴露成 {@code EntityMaid.MODEL_ID_TAG}，雕像 / 手办 / 胶片都引它，
+     * 所以这里也必须是 public 常量，不能各写各的字面量。</p>
      */
     public static final String MODEL_ID_TAG = "ModelId";
 
     /**
-     * 娓叉煋鐘舵€侊紝榛樿 {@link MaidRenderState#ENTITY}銆?
+     * 渲染状态，默认 {@link MaidRenderState#ENTITY}。
      *
-     * <p>闆曞儚涓庢墜鍔炴妸瀹炰綋 NBT 璇昏繘涓€涓笉鍙備笌 tick 鐨勪复鏃跺疄浣撴潵娓叉煋锛?
-     * 璇诲埌鐨勬槸銆屽揩鐓с€嶈€屼笉鏄湰浣擄紱缃垚 {@code STATUE} / {@code GARAGE_KIT}
-     * 璁╂覆鏌撻摼璺笂闇€瑕佸尯鍒嗙殑鍦版柟鏈夋嵁鍙緷锛屽悓鏃朵篃鏄粰闄勫睘妯＄粍鐣欑殑鍏紑瀛楁銆?/p>
+     * <p>雕像与手办把实体 NBT 读进一个不参与 tick 的临时实体来渲染，
+     * 读到的是「快照」而不是本体；置成 {@code STATUE} / {@code GARAGE_KIT}
+     * 让渲染链路上需要区分的地方有据可依，同时也是给附属模组留的公开字段。</p>
      */
     public com.github.tartaricacid.touhoulittlemaid.api.client.render.MaidRenderState renderState =
             com.github.tartaricacid.touhoulittlemaid.api.client.render.MaidRenderState.ENTITY;
@@ -2042,24 +2042,24 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
-     * 鎶婂コ浠嗘斁鍒颁袱鏍煎簥鐨勬涓€佸簥闈笂銆?
+     * 把女仆放到两格床的正中、床面上。
      *
-     * <h2>姘村钩锛氬簥澶存牸涓績鍐嶉€€鍗婃牸</h2>
-     * <p>{@code MaidBedTask} 鍙敤搴婂ご锛坽@code PART == HEAD}锛夐偅涓€鏍肩殑 POI 鍏ョ潯锛?
-     * 鎵€浠ョ潯鐪犲潗鏍囨案杩滄槸搴婂ご鏍笺€傝€屼袱鏍煎簥鐨勪腑鐐瑰湪瀹冩部 {@code FACING} 鍙嶆柟鍚戝崐鏍煎銆?
-     * 鎶婂潗鏍囨斁鍦ㄤ腑鐐癸紝鍐嶈娓叉煋渚у洖閫€鍗婁釜韬暱
-     * 锛堣 {@code GeoReplacedEntityRenderer#render}锛夛紝
-     * 1.5 鏍奸珮鐨勮韩浣撳氨姝ｅソ浠ュ簥蹇冧负涓績閾烘弧涓ゆ牸銆?/p>
+     * <h2>水平：床头格中心再退半格</h2>
+     * <p>{@code MaidBedTask} 只用床头（{@code PART == HEAD}）那一格的 POI 入睡，
+     * 所以睡眠坐标永远是床头格。而两格床的中点在它沿 {@code FACING} 反方向半格处。
+     * 把坐标放在中点，再让渲染侧回退半个身长
+     * （见 {@code GeoReplacedEntityRenderer#render}），
+     * 1.5 格高的身体就正好以床心为中心铺满两格。</p>
      *
-     * <h2>绔栫洿锛?.6875锛岀洿鎺ョ収鎶勫師鐗?{@code setPosToBed}</h2>
-     * <p>鍊煎彇鑷?vanilla {@code LivingEntity#setPosToBed}锛坖avap 纭锛夛細</p>
+     * <h2>竖直：0.6875，直接照抄原版 {@code setPosToBed}</h2>
+     * <p>值取自 vanilla {@code LivingEntity#setPosToBed}（javap 确认）：</p>
      * <pre>
      * setPos(pos.getX() + 0.5, pos.getY() + 0.6875, pos.getZ() + 0.5)
      * </pre>
-     * <p>{@code 0.6875} = 11/16锛屾瘮搴婇潰锛坽@code BlockMaidBed} 纰版挒绠?9/16 = 0.5625锛?
-     * 楂?2/16銆傝繖涓綑閲忔槸鍘熺増缁欍€岃汉鐫€鐨勮韩浣撱€嶇暀鐨勶細妯″瀷鏄粫鑴氶儴鍘熺偣鏃嬭浆鐨勶紝
-     * 韬哄钩鍚庤韩浣撶殑妯埅闈㈡暣浣撲綅浜庡疄浣?Y 杩欎竴灞傦紝鎵€浠ュ疄浣?Y 蹇呴』姣斿簥闈㈤珮鍑哄崐涓韩浣撳帤搴︼紝
-     * 鍚﹀垯灏变細闄疯繘搴婇噷 鈥斺€?杩欐鏄箣鍓嶇敤 0.5625锛? 搴婇潰楂樺害锛夋椂鐨勭幇璞°€?/p>
+     * <p>{@code 0.6875} = 11/16，比床面（{@code BlockMaidBed} 碰撞箱 9/16 = 0.5625）
+     * 高 2/16。这个余量是原版给「趴着的身体」留的：模型是绕脚部原点旋转的，
+     * 躺平后身体的横截面整体位于实体 Y 这一层，所以实体 Y 必须比床面高出半个身体厚度，
+     * 否则就会陷进床里 —— 这正是之前用 0.5625（= 床面高度）时的现象。</p>
      */
     private void pinToBed(BlockPos headPos) {
         double cx = headPos.getX() + 0.5D;

@@ -80,7 +80,7 @@ public class ItemChisel extends Item {
     /**
      * 从最大的尺寸开始试，第一个「周围全是粘土」的尺寸胜出。
      *
-     * <p>全部尺寸都放不下时静默失败（上游也是如此）：玩家看到的是���凿子没反应」，
+ * <p>全部尺寸都放不下时静默失败（上游也是如此）：玩家看到的是「凿子没反应」，
      * 因为最可能的原因就是粘土不够大。</p>
      */
     private void genStatueBlocks(@Nonnull Player player, @Nonnull Level level, @Nonnull BlockPos pos,

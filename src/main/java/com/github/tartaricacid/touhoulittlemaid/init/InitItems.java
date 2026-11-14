@@ -260,16 +260,16 @@ public final class InitItems {
             TouhouLittleMaid.rl("favorability_tool_full"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemFavorabilityTool("full"));
     /**
-     * 鍑垮瓙锛堜笂娓?{@code InitItems.CHISEL}锛夛細鍓墜鎷跨収鐗囥€佸鐫€绮樺湡鍙抽敭鍑垮嚭闆曞儚銆?
-     * 64 鑰愪箙锛屾寜闆曞儚灏哄鎵?1~4 鐐广€?
+     * 凿子（上游 {@code InitItems.CHISEL}）：副手拿照片、对着粘土右键凿出雕像。
+     * 64 耐久，按雕像尺寸扣 1~4 点。
      */
     public static final Item CHISEL = Registry.register(Registry.ITEM,
             TouhouLittleMaid.rl("chisel"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemChisel());
 
     /**
-     * 鎵嬪姙锛堜笂娓?{@code InitItems.GARAGE_KIT}锛夈€侼BT 閲岃鐫€涓€鏁村彧濂充粏锛?
-     * 鎵€浠ユ槸 {@code ItemGarageKit} 鑰屼笉鏄櫘閫?{@code BlockItem}銆?
+     * 手办（上游 {@code InitItems.GARAGE_KIT}）。NBT 里装着一整只女仆，
+     * 所以是 {@code ItemGarageKit} 而不是普通 {@code BlockItem}。
      */
     public static final Item GARAGE_KIT = Registry.register(Registry.ITEM,
             TouhouLittleMaid.rl("garage_kit"),

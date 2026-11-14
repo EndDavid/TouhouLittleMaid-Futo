@@ -94,14 +94,14 @@ public final class InitBlocks {
     public static final Block SCARECROW = Registry.register(Registry.BLOCK,
             TouhouLittleMaid.rl("scarecrow"), new BlockScarecrow());
 
-    // ------------------------------------------------------------------ 闆曞儚 / 鎵嬪姙
+    // ------------------------------------------------------------------ 雕像 / 手办
 
     /**
-     * 闆曞儚鏂瑰潡銆備竴搴ч洉鍍忕敱 N 涓湰鏂瑰潡鎷兼垚锛?x1x1 / 1x2x1 / 2x4x2 / 3x6x3锛夛紝
-     * 鐢?{@code ItemChisel} 鍑垮嚭鏉ワ紝鎷嗕换鎰忎竴鏍兼暣搴ц繕鍘熸垚绮樺湡銆?
+     * 雕像方块。一座雕像由 N 个本方块拼成（1x1x1 / 1x2x1 / 2x4x2 / 3x6x3），
+     * 由 {@code ItemChisel} 凿出来，拆任意一格整座还原成粘土。
      *
-     * <p><b>娌℃湁鐗╁搧褰㈡€?/b>锛氱帺瀹舵嬁涓嶅埌銆岄洉鍍忔柟鍧椼€嶏紝鍙兘鎷垮嚳瀛愬嚳鍑烘潵銆?
-     * 鎵嬪姙鐑?鎸栦箣鍚庢帀鐨勬槸绮樺湡锛屼笉鏄畠銆?/p>
+     * <p><b>没有物品形态</b>：玩家拿不到「雕像方块」，只能拿凿子凿出来。
+     * 手办烧 / 挖之后掉的是粘土，不是它。</p>
      */
     public static final Block STATUE = Registry.register(Registry.BLOCK,
             TouhouLittleMaid.rl("statue"), new BlockStatue());
@@ -111,7 +111,7 @@ public final class InitBlocks {
             FabricBlockEntityTypeBuilder.create(TileEntityStatue::new, STATUE).build());
 
     /**
-     * 鎵嬪姙鏂瑰潡銆傚崟鏍硷紝鏂瑰潡瀹炰綋閲屽瓨涓€浠藉疄浣?NBT锛岀墿鍝佸舰鎬佽 {@code InitItems.GARAGE_KIT}銆?
+     * 手办方块。单格，方块实体里存一份实体 NBT，物品形态见 {@code InitItems.GARAGE_KIT}。
      */
     public static final Block GARAGE_KIT = Registry.register(Registry.BLOCK,
             TouhouLittleMaid.rl("garage_kit"), new BlockGarageKit());

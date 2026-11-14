@@ -144,7 +144,7 @@ public class GarageKitItemRenderer implements BuiltinItemRendererRegistry.Dynami
         EntityRenderDispatcher render = Minecraft.getInstance().getEntityRenderDispatcher();
         boolean isShowHitBox = render.shouldRenderHitBoxes();
         render.setRenderHitBoxes(false);
-        // 与上游一致：实体在「花式」画���下渲染，否则某些半透明层会消失
+        // 与上游一致：实体在「花式」画法下渲染，否则某些半透明层会消失
         RenderSystem.runAsFancy(() -> render.render(entity, 0, 0, 0, 0, 0, poseStack, bufferSource, packedLight));
         render.setRenderHitBoxes(isShowHitBox);
         poseStack.popPose();

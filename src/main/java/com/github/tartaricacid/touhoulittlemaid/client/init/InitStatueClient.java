@@ -15,7 +15,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
  * 雕像 / 手办的客户端注册。
  *
  * <p><b>为什么单独一个 {@code ClientModInitializer} 而不是塞进
- * {@code TouhouLittleMaidFutoClient}：</b>那个类有 200 多行、被改过��多次，
+ * {@code TouhouLittleMaidFutoClient}：</b>那个类有 200 多行、被改过很多次，
  * 往里插代码要靠中文锚点定位，风险高（本移植版已经因为大文件插入丢过两次方法）。
  * 新增一个入口点只改 {@code fabric.mod.json} 的一行数组，是纯追加，两边都不碰。</p>
  *

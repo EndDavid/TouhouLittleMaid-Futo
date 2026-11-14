@@ -48,7 +48,7 @@ public class TaskTridentAttack implements IRangedAttackTask {
     public static final int TRIDENT_RANGE = 48;
 
     /**
-     * 瀹為檯浣跨敤鍊硷紙璇婚厤缃?{@code MaidConfig.TRIDENT_RANGE}锛岄粯璁?48锛夈€?
+     * 实际使用值（读配置 {@code MaidConfig.TRIDENT_RANGE}，默认 48）。
      */
     private static int tridentRange() {
         return com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.tridentRange();

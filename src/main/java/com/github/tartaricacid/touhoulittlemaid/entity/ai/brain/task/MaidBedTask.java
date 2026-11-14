@@ -21,17 +21,17 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Comparator;
 
 /**
- * 鎵惧簥鐫¤锛岄€愬瓧绉绘鑷笂娓?{@code entity/ai/brain/task/MaidBedTask}銆?
+ * 找床睡觉，逐字移植自上游 {@code entity/ai/brain/task/MaidBedTask}。
  *
- * <h2>涓ゆ寮忔祦绋?/h2>
+ * <h2>两段式流程</h2>
  * <ol>
- *     <li>绗竴娆¤Е鍙戯細鍦ㄣ€屾悳绱腑蹇冦€嶅崐寰勫唴鎵炬渶杩戠殑绌哄簥锛屽お杩滃氨璧拌繃鍘诲苟
- *         {@code setNextCheckTickCount(5)}锛堣蛋寰楄繎涓€鐐瑰啀閲嶇畻锛夛紱</li>
- *     <li>绗簩娆¤Е鍙戯細璺濈宸茶繘鍏?{@code closeEnoughDist}锛屾妸鍧愭爣鍐欒繘
- *         {@code TARGET_POS} 骞惰繑鍥?true 鈥斺€?{@link #start} 閲岀湡姝?{@code startSleeping}銆?/li>
+ *     <li>第一次触发：在「搜索中心」半径内找最近的空床，太远就走过去并
+ *         {@code setNextCheckTickCount(5)}（走得近一点再重算）；</li>
+ *     <li>第二次触发：距离已进入 {@code closeEnoughDist}，把坐标写进
+ *         {@code TARGET_POS} 并返回 true —— {@link #start} 里真正 {@code startSleeping}。</li>
  * </ol>
  *
- * <p>鎼滅储涓績鐢ㄧ殑鏄?{@code getBrainSearchPos()}锛氬紑浜嗗眳瀹舵ā寮忓氨鏄眳瀹剁偣锛屽惁鍒欐槸鑷繁鑴氫笅銆?/p>
+ * <p>搜索中心用的是 {@code getBrainSearchPos()}：开了居家模式就是居家点，否则是自己脚下。</p>
  */
 public class MaidBedTask extends MaidCheckRateTask {
     private final int closeEnoughDist;
@@ -68,7 +68,7 @@ public class MaidBedTask extends MaidCheckRateTask {
         maid.getBrain().getMemory(InitEntities.TARGET_POS).ifPresent(targetPos -> {
             BlockPos pos = targetPos.currentBlockPosition();
             BlockState blockState = worldIn.getBlockState(pos);
-            // 鍐嶇‘璁や竴娆★細杩欎竴 tick 閲屽簥鍙兘宸茬粡琚埆浜哄崰浜?/ 琚媶浜?
+            // 再确认一次：这一 tick 里床可能已经被别人占了 / 被拆了
             if (blockState.is(InitBlocks.MAID_BED)
                     && blockState.getValue(BlockMaidBed.PART) == BedPart.HEAD
                     && !blockState.getValue(BlockMaidBed.OCCUPIED)) {

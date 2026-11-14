@@ -29,7 +29,7 @@ public final class MaidModelRegistry {
 
     private static final Map<ResourceLocation, MaidModelInfo> MODELS = new LinkedHashMap<>();
 
-    /** 妯″瀷鍖呭垪琛紝椤哄簭鍗崇晫闈㈤《閮ㄩ〉绛剧殑椤哄簭銆?*/
+    /** 模型包列表，顺序即界面顶部页签的顺序。 */
     private static final List<CustomModelPack> PACKS = new ArrayList<>();
 
     private MaidModelRegistry() {
@@ -48,7 +48,7 @@ public final class MaidModelRegistry {
         PACKS.add(pack);
     }
 
-    /** 妯″瀷鍖呭垪琛紙鎹㈣偆鐣岄潰鐢級銆傜┖鍒楄〃琛ㄧず杩樻病鍔犺浇杩囪祫婧愩€?*/
+    /** 模型包列表（换肤界面用）。空列表表示还没加载过资源。 */
     public static List<CustomModelPack> allPacks() {
         return PACKS;
     }

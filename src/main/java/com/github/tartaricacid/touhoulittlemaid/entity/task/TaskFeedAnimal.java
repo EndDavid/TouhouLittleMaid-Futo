@@ -54,7 +54,7 @@ public class TaskFeedAnimal implements IAttackTask {
     public static final int FEED_ANIMAL_MAX_NUMBER = 50;
 
     /**
-     * 瀹為檯浣跨敤鍊硷紙璇婚厤缃?{@code MaidConfig.FEED_ANIMAL_MAX_NUMBER}锛岄粯璁?50锛夈€?
+     * 实际使用值（读配置 {@code MaidConfig.FEED_ANIMAL_MAX_NUMBER}，默认 50）。
      */
     private static int maxAnimalCount() {
         return com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.feedAnimalMaxNumber();

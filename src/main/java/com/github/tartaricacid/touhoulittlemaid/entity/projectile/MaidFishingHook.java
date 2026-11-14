@@ -71,11 +71,11 @@ public class MaidFishingHook extends Entity {
     protected int life;
     protected float fishAngle;
     /**
-     * 鎸佹湁鑰咃紙濂充粏锛夈€?
+     * 持有者（女仆）。
      *
-     * <p>娉ㄦ剰锛?.18.2 閲?{@code Projectile} 鐨勬瀯閫犲嚱鏁版槸<b>鍖呯鏈?/b>鐨勶紝妯＄粍绫绘棤娉曠户鎵?
-     * 锛堜笂娓搁潬 Forge 鐨?AccessTransformer 鎵撳紑锛夈€傛墍浠ヨ繖閲岀洿鎺ョ户鎵?{@link Entity}锛?
-     * 鑷繁缁存姢 owner 瀛楁 鈥斺€?鎴戜滑鏈潵涔熶笉闇€瑕?{@code Projectile} 鐨勭鎾炰激瀹抽€昏緫銆?/p>
+     * <p>注意：1.18.2 里 {@code Projectile} 的构造函数是<b>包私有</b>的，模组类无法继承
+     * （上游靠 Forge 的 AccessTransformer 打开）。所以这里直接继承 {@link Entity}，
+     * 自己维护 owner 字段 —— 我们本来也不需要 {@code Projectile} 的碰撞伤害逻辑。</p>
      */
     @Nullable
     private Entity owner;
@@ -518,9 +518,9 @@ public class MaidFishingHook extends Entity {
         ItemStack mainHandItem = maid.getMainHandItem();
         boolean hasFishingRod = mainHandItem.getItem() instanceof FishingRodItem;
         boolean isFishingTask = maid.getTask() instanceof TaskFishing;
-        // 涓庝笂娓哥殑宸紓锛氫笂娓搁澶栬姹?hasVehicle锛堝コ浠嗗潗鍦ㄨ埞 / 鍧愬灚涓婏級銆?
-        // 鎴戜滑鐨勬覆鏌撶绾垮湪銆岄獞涔?+ 闈炰汉褰㈡ā鍨嬨€嶆椂浼氫笂涓嬬炕杞紝涓?EntityChair 灏氭湭绉绘锛?
-        // 鍥犳鏀逛负銆岀珯鍦ㄥ哺杈归挀楸笺€嶄篃鍏佽锛屽彧淇濈暀瀛樻椿 / 浠诲姟 / 楸肩 / 璺濈鍥涗釜鏉′欢銆?
+        // 与上游的差异：上游额外要求 hasVehicle（女仆坐在船 / 坐垫上）。
+        // 我们的渲染管线在「骑乘 + 非人形模型」时会上下翻转，而 EntityChair 尚未移植，
+        // 因此改为「站在岸边钓鱼」也允许，只保留存活 / 任务 / 鱼竿 / 距离四个条件。
         if (!maid.isRemoved() && maid.isAlive() && isFishingTask && hasFishingRod
             && this.distanceToSqr(maid) < 256) {
             return false;
@@ -551,10 +551,10 @@ public class MaidFishingHook extends Entity {
     @Override
     public void recreateFromPacket(ClientboundAddEntityPacket packet) {
         super.recreateFromPacket(packet);
-        // 鍏抽敭锛欵ntity#recreateFromPacket 涓嶄細鎭㈠ owner锛堥偅鏄?Projectile 鑷繁鍋氱殑锛夈€?
-        // 鎴戜滑鐨?getAddEntityPacket 鎶?owner 鐨勫疄浣?id 鏀捐繘浜?packet.getData()锛?
-        // 杩欓噷蹇呴』鎵嬪伐杩樺師锛屽惁鍒欏鎴风 getMaidOwner() 鎭掍负 null锛?
-        // 娓叉煋鍣ㄧ洿鎺?return锛堢湅涓嶅埌娴紓鍜岄奔绾匡級锛宼ick 閲岃繕浼氱珛鍒?discard銆?
+        // 关键：Entity#recreateFromPacket 不会恢复 owner（那是 Projectile 自己做的）。
+        // 我们的 getAddEntityPacket 把 owner 的实体 id 放进了 packet.getData()，
+        // 这里必须手工还原，否则客户端 getMaidOwner() 恒为 null，
+        // 渲染器直接 return（看不到浮漂和鱼线），tick 里还会立刻 discard。
         this.owner = this.level.getEntity(packet.getData());
         if (this.getMaidOwner() == null) {
             int dataId = packet.getData();
