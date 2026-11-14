@@ -316,6 +316,20 @@ public final class InitItems {
             TouhouLittleMaid.rl("white_fox_scroll"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemFoxScroll());
 
+    /**
+     * 河童的罗盘（上游 {@code InitItems.KAPPA_COMPASS}）。
+     *
+     * <p>它是最后一个「搜索 / 定位」类道具，也是唯一一个<b>写入</b>而不是只读的：
+     * 另外三个（小号、仆从铃、狐狸卷轴）告诉你她在哪儿，河童的罗盘决定她该在哪儿：
+     * 右击方块记下工作 / 娱乐 / 睡觉三个点，右击女仆写进她的
+     * {@code SchedulePos}，之后她开着居家模式就会按日程在三处之间活动。</p>
+     *
+     * <p>堆叠数为 1：罗盘自己带三份坐标 NBT，堆叠会让同一叠里不同位置的坐标互相覆盖。</p>
+     */
+    public static final Item KAPPA_COMPASS = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("kappa_compass"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemKappaCompass());
+
 
     // ------------------------------------------------------------------ 女仆饰品
 

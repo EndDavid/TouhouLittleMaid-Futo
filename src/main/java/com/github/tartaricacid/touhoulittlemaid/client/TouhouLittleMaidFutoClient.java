@@ -159,6 +159,32 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                     }
                 });
 
+        // 原版指南针：服务端把女仆的三个作息坐标发过来（S2C，上游 SyncMaidAreaMessage）。
+        // 数据先读完再 execute —— 出回调后缓冲区就失效了。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.MaidAreaPacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    com.github.tartaricacid.touhoulittlemaid.network.MaidAreaPacket.Area area =
+                            com.github.tartaricacid.touhoulittlemaid.network.MaidAreaPacket.read(buf);
+                    client.execute(() -> com.github.tartaricacid.touhoulittlemaid.client.render.MaidAreaRenderer
+                            .show(area));
+                });
+
+        // 「这次开不了居家模式」的说明（S2C，上游 CheckSchedulePosMessage）。
+        // 只在女仆界面开着的时候弹 —— 否则玩家根本不知道自己点过那个开关。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.CheckSchedulePosPacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    net.minecraft.network.chat.Component tips = buf.readComponent();
+                    client.execute(() -> {
+                        if (client.screen instanceof com.github.tartaricacid.touhoulittlemaid.client.screen
+                                .AbstractMaidScreen<?> parent) {
+                            client.setScreen(new com.github.tartaricacid.touhoulittlemaid.client.screen
+                                    .CheckSchedulePosScreen(parent, tips));
+                        }
+                    });
+                });
+
         // 女仆界面左侧的状态效果列表（S2C 回传，上游 SendEffectMessage）。
         // 效果不是同步数据 —— 原版只把玩家自己的效果下发给 LocalPlayer ——
         // 所以界面每 20 tick 问一次，服务端把那一刻的完整快照发回来。

@@ -52,9 +52,9 @@ import java.util.Optional;
  *         {@code InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.PHOTO_MAID)}，
  *         那套 Forge 触发器体系（{@code InitTrigger} / {@code TriggerType} /
  *          advancement JSON）尚未移植。</li>
- *     <li><b>去掉了拍照时关闭居家模式以外的副作用。</b>上游这里还会清作息点，
- *         但那属于 {@code SchedulePos}，本移植版用 {@code DATA_HOME_POS} 表达，
- *         由两端的「居家模式」按钮管理，相机只负责关掉开关。</li>
+ *     <li><b>去掉了拍照时关闭居家模式以外的副作用。</b>上游这里还会清作息点
+ *         （{@code SchedulePos#clear}），但那会把她用罗盘辛苦摆好的三个点一起抹掉 ——
+ *         而玩家拍照只是想把女仆收进相片，没打算重设作息。本移植版只关掉居家开关。</li>
  * </ul>
  */
 public class ItemCamera extends Item {

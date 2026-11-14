@@ -1,0 +1,16 @@
+# EditorConfig —— 把整个仓库固定在 UTF-8。
+#
+# 背景：本机系统 ANSI 代码页是 936，Windows PowerShell 5.1
+#   - 解析无 BOM 的 .ps1 时按 GBK 解码；
+#   - 用 Set-Content / > / Out-File 写文件时默认也写 GBK。
+# 这已经造成过一次跨 11 个文件、58 行的乱码事故（提交 bae7a6e）。
+# IDE 侧固定为 UTF-8 之后，至少“在 IDE 里编辑并保存”这条路径不会再把中文写成 GBK。
+#
+# 刻意不设置 end_of_line / insert_final_newline：本仓库按字节管理，
+# .java 是 CRLF（见 .gitattributes 的 * -text），让 EditorConfig 去改行尾
+# 只会制造整文件 diff，反而毁掉 git 回滚的价值。
+
+root = true
+
+[*]
+charset = utf-8

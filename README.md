@@ -91,7 +91,8 @@ loom_version=1.15.5
 
 | **墓碑（死亡收纳）+ 祭坛召唤箱** | **完成** |
 | **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器）** | **完成**（换肤 GUI 待 `AbstractModelGui` 泛型化） |
-| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（40 条目 / 3 分类） |
+| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（46 条目 / 3 分类） |
+| **搜索 / 定位（小号 / 仆从铃 / 狐狸卷轴 / 河童罗盘）** | **完成**（含 `SchedulePos` 三坐标作息） |
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | 未开始 |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
@@ -1551,10 +1552,34 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
   `RecipeMatcher` 永远匹配不上，**27 个祭坛配方里有 16 个因此完全做不出来**
   —— 包括神社复活的 `reborn_maid` 和召唤女仆的 `spawn_box` 这两个最核心的配方。
   现已补齐，`validate-book.ps1` 也加了这条静态检查。
-- **部分祭坛配方未收录**，因为产物本身还没移植：书柜 / 扫帚 / 中国象棋 / 凿子 / 电脑 / 五子棋 /
-  河童罗盘 / 键盘 / 野餐篮 / 红狐卷轴 / 小号 / 西洋棋 / 白狐卷轴 / 无线 IO / 仆人铃。
-- **12 个帕秋莉页面**暂存在 `port/book_pages_held_back/`，等对应功能补齐再放回去
-  （对应 5 个子系统：手办与雕像 / 棋类与娱乐方块 / 扫帚 / 野餐与娱乐 / 搜索类工具）。
+- **部分祭坛配方未收录**，因为产物本身还没移植：
+  书柜 / 扫帚 / 中国象棋 / 电脑 / 五子棋 / 键盘 / 野餐篮 / 西洋棋 / 无线 IO。
+- **「搜索 / 定位」四件套已全部可用**（`trumpet` / `servant_bell` / `fox_scroll` ×2 / `kappa_compass`）：
+  前三个告诉你**她在哪儿**，河童的罗盘决定**她该在哪儿**。
+  - 之前缺的是它们共用的那块地基：`MaidWorldData#addInfo` **从未被调用过**，
+    记录表永远是空的，所以仆从铃、小号、狐狸卷轴三件全都「什么也找不到」。
+    上游靠 `EntityMaid#onRemovedFromWorld` 写记录，而那是 **Forge 对 `Entity` 的补丁**
+    （`javap` 确认 vanilla 1.18.2 的 `Entity` 既无 `onAddedToWorld` 也无 `onRemovedFromWorld`，
+    Fabric API 0.77 的 `fabric-entity-events-v1` 里也没有 `ServerEntityEvents`）。
+    替代方案是 `event/MaidWorldDataTicker`：每 60 tick 刷新一次所有女仆的坐标，
+    读取时再按「维度一致 + 区块未加载」过滤，同时清掉「区块已加载但她不在实体表里」
+    的幽灵记录（否则铃会指着一个已经不存在的坐标）。因为改成了周期性刷新，
+    `addInfo` 必须从**追加**改成**覆盖**，否则存档每 3 秒膨胀一条重复记录。
+  - 河童的罗盘补齐了真正的 `entity/passive/SchedulePos`：工作 / 娱乐 / 睡觉**三个点**
+    加维度。早期版本把它们压成一个同步字段 `DATA_HOME_POS`，于是日程表在
+    `WORK` / `IDLE` / `REST` 之间切换时活动范围不会跟着挪 —— 三个点里只有一个生效。
+    现在 `SchedulePos` **不进同步数据**，客户端要看区域时由 `MaidAreaPacket` 按需发一份
+    （上游 `SyncMaidAreaMessage` 同款）。`MaidAreaRenderer` 也因此重新变成
+    「三个圆心各自独立」，两点不重合时还会画白色连线。
+  - 开 Home 的两个拒绝条件照抄上游：记录在**别的维度**、或离三个点**超过 32 格**。
+    两种情况都会弹 `CheckSchedulePosScreen`（上游 `CheckSchedulePosGui`）——
+    用界面而不是聊天栏，是因为玩家此刻正开着女仆界面，聊天栏被挡住看不见。
+  - 「潜行右击女仆清空作息点」是**河童的罗盘**的动作
+    （`ItemKappaCompass#interactLivingEntity`）；原版指南针只负责把坐标发给客户端的
+    区域渲染（上游 `MaidAreaClickEvent`）。早期版本把两者混在一起，
+    导致「潜行 + 原版指南针」会顺手关掉她的居家模式。
+- **6 个帕秋莉页面**暂存在 `port/book_pages_held_back/`，等对应功能补齐再放回去
+  （棋类与娱乐方块 3 页 / 扫帚 1 页 / 野餐与娱乐 1 页 / 无线 IO 1 页）。
 
 ---
 

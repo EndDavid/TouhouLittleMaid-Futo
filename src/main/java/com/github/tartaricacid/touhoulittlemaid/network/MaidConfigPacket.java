@@ -14,6 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.network.chat.TranslatableComponent;
 
 /**
  * 客户端到服务端的「女仆设置」同步包（common 侧）。
@@ -113,6 +114,15 @@ public final class MaidConfigPacket {
      */
     public static final byte MODEL = 15;
 
+    /**
+     * 开启居家模式时，女仆距离她记录的作息点允许的最大距离（格）。
+     *
+     * <p>与上游 {@code MaidConfigMessage#handleHome} 里的 {@code 32 * 32} 一致。
+     * 超过这个值就拒绝开启，因为 {@code SchedulePos#tick} 会立刻把她传送过去，
+     * 而玩家点开关时完全没预期到会瞬移。</p>
+     */
+    private static final int MAX_HOME_DISTANCE = 32;
+
     private MaidConfigPacket() {
     }
 
@@ -176,7 +186,7 @@ public final class MaidConfigPacket {
             return;
         }
         switch (action) {
-            case HOME -> applyHome(maid, value);
+            case HOME -> applyHome(player, maid, value);
             case PICKUP -> maid.setPickup(value);
             case SHOW_BACKPACK -> MaidSubConfig.setShowBackpack(maid, value);
             case SHOW_BACK_ITEM -> MaidSubConfig.setShowBackItem(maid, value);
@@ -300,43 +310,56 @@ public final class MaidConfigPacket {
     }
 
     /**
-     * 切换居家模式，并<b>同时维护工作范围中心</b>。
+     * 切换居家模式（上游 {@code MaidConfigMessage#handleHome}）。
      *
      * <p>这是「开了居家模式后女仆站着不动」的根因：{@code hasRestriction()} 返回
      * {@code isHomeModeEnable()}，一旦为 {@code true}，所有「是否在工作范围内」的判定
      * （{@code isWithinRestriction} / {@code searchDimension} / 寻路目标点）都会生效。
-     * 而工作范围中心默认是 {@code BlockPos.ZERO}（世界原点 y=0），女仆实际可能站在 y=-60，
+     * 而活动范围中心默认是 {@code BlockPos.ZERO}（世界原点 y=0），女仆实际可能站在 y=-60，
      * 距离远超半径 —— 于是她认为自己「一直在界外」，既不走路也不干活。</p>
      *
-     * <p>上游在 {@code SchedulePos#setHomeModeEnable(maid, maid.blockPosition())} 里
-     * 把中心设为女仆当前位置。本移植版等价处理：开启时以当前位置为中心、半径为
-     * 配置 {@code MAID_WORK_RANGE}；关闭时把半径还原成 {@code MAID_NON_HOME_RANGE}
-     * （此时 {@code hasRestriction()} 为 false，中心值只是占位）。</p>
+     * <h2>两个拒绝开启的条件</h2>
+     * <p>上游在写入坐标<b>之前</b>会先检查，本移植版逐条照搬：</p>
+     * <ol>
+     *     <li><b>维度不一致</b>：罗盘记录的是主世界的坐标，女仆却在下界。此时的坐标
+     *         对她毫无意义，开了 Home 会被 {@code SchedulePos#tick} 传送到
+     *         「同一个数字、不同的世界」里去；</li>
+     *     <li><b>距离超过 32 格</b>：同样会被 tick 传送 —— 玩家刚点下开关，人就消失了，
+     *         而且往往是从自己家里被传送到几十上百格之外。</li>
+     * </ol>
+     * <p>两种情况下都用 {@link CheckSchedulePosPacket} 弹一条说明。之所以不用聊天栏：
+     * 玩家此刻正开着女仆界面，聊天栏被挡住看不见。</p>
+     *
+     * <p><b>为什么不在这里顺手关掉 Home：</b>上游先 {@code return}，
+     * {@code setHomeModeEnable} 根本不会执行，所以开关保持原样（客户端会把它画回未开启），
+     * 这正是我们要的 —— 拒绝就是拒绝，不能「悄悄改成另一个状态」。</p>
      */
-    private static void applyHome(EntityMaid maid, boolean enable) {
+    private static void applyHome(ServerPlayer player, EntityMaid maid, boolean enable) {
         if (enable) {
-            // 上游 SchedulePos#setHomeModeEnable 的语义：只有「第一次开启」才写入工作点，
-            // 之后关掉再开不会把位置挪到脚下 —— 指南针的区域因此始终是「当初设定的那一块」。
-            BlockPos homePos = maid.getHomePos();
-            if (!maid.hasHomePos()) {
-                homePos = maid.blockPosition();
-                maid.setHomePos(homePos);
+            ResourceLocation dimension = maid.getSchedulePos().getDimension();
+            if (!dimension.equals(maid.level.dimension().location())) {
+                CheckSchedulePosPacket.send(player, new TranslatableComponent(
+                        "message.touhou_little_maid.kappa_compass.maid_dimension_check"));
+                return;
             }
-            maid.restrictTo(homePos, MaidConfig.workRange());
-            maid.setHomeModeEnable(true);
+            BlockPos nearestPos = maid.getSchedulePos().getNearestPos(maid);
+            if (nearestPos != null
+                    && nearestPos.distSqr(maid.blockPosition()) > MAX_HOME_DISTANCE * MAX_HOME_DISTANCE) {
+                CheckSchedulePosPacket.send(player, new TranslatableComponent(
+                        "message.touhou_little_maid.check_schedule_pos.too_far"));
+                return;
+            }
+            // 未配置过（没用罗盘摆过点）就三个点全部锚在这里；
+            // 已配置过就沿用罗盘写下的坐标（见 SchedulePos#setHomeModeEnable）
+            maid.getSchedulePos().setHomeModeEnable(maid, maid.blockPosition());
         } else {
+            // 上游同款：关掉时把活动半径还原成非居家半径，并把中心归零。
+            // 此时 hasRestriction() 为 false，中心值只是个占位符。
             maid.restrictTo(BlockPos.ZERO, MaidConfig.nonHomeRange());
-            maid.setHomeModeEnable(false);
-            // 与上游 SchedulePos#clear 等价：关掉居家模式就把锚点一起「忘掉」。
-            //
-            // 上游的 setHomeModeEnable 只在 configured == false 时写入工作点，
-            // 而 clear(maid) 正是把 configured 置回 false 的那个入口。
-            // 少了这一步，玩家把女仆挪到新地方再开居家模式，锚点仍然是老位置 ——
-            // 表现就是「指南针画出的圈留在原地不动」。
-            maid.setHomePos(BlockPos.ZERO);
             // 关掉居家后清掉寻路目标，否则她还会朝旧的中心点走一段
             maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
         }
+        maid.setHomeModeEnable(enable);
     }
 
     /**

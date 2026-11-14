@@ -79,6 +79,19 @@ public final class InitSounds {
      */
     public static final SoundEvent BOX_OPEN = register("entity.box");
 
+    /**
+     * 河童的罗盘「记下一个点」的音效（上游 {@code InitSounds.COMPASS_POINT}）。
+     *
+     * <p>{@code sounds.json} 里的键是 {@code item.compass}，音源
+     * {@code item/point.ogg}，分类 {@code voice}。</p>
+     *
+     * <p><b>键名是 {@code item.compass} 而不是 {@code item.compass_point}：</b>
+     * 上游的注册名就叫这个，改成「更好懂」的名字只会让资源包里的 {@code sounds.json}
+     * 对不上，结果是按下去静音。字段名与注册名不必相同，这里字段名讲用途、
+     * 注册名保持上游原样。</p>
+     */
+    public static final SoundEvent COMPASS_POINT = register("item.compass");
+
     // ------------------------------------------------------------------ 女仆妖精
     /**
      * 妖精音效。{@code sounds.json} 里直接指向原版兔子音效

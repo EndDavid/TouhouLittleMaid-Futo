@@ -50,7 +50,9 @@ public class MaidUpdateActivityFromSchedule extends Behavior<EntityMaid> {
         }
         if (!this.cacheActivity.equals(activity) && maid.isHomeModeEnable() && maid.canBrainMoving()) {
             this.cacheActivity = activity;
-            maid.restrictToHome();
+            // 上游同款：活动一变，就把活动范围换成该活动对应的那个作息点
+            // （工作 -> workPos、娱乐 -> idlePos、休息 -> sleepPos）
+            maid.getSchedulePos().restrictTo(maid);
             BehaviorUtils.setWalkAndLookTargetMemories(maid, maid.getRestrictCenter(), 0.7f, 3);
         }
 

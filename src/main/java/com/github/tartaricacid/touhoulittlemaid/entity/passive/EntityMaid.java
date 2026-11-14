@@ -53,6 +53,7 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
@@ -292,22 +293,20 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     private static final EntityDataAccessor<Integer> DATA_CARRIER_ID =
             SynchedEntityData.defineId(EntityMaid.class, EntityDataSerializers.INT);
     /**
-     * 「开启居家模式时女仆所在的位置」—— 上游 {@code SchedulePos.workPos}。
+     * 作息坐标：工作点 / 娱乐点 / 睡觉点 + 它们所属的维度
+     * （上游 {@code entity/passive/SchedulePos}）。
      *
-     * <p>指南针画的三个区域环就是<b>以它为中心</b>（上游 {@code MaidAreaRenderEvent} 用的是
-     * {@code pos.getWorkPos()}，不是玩家位置）。上游把它存在 {@code SchedulePos} 里，
-     * 并且<b>只在第一次开启居家模式时</b>写入（{@code if (!configured)}），
-     * 之后即使关掉居家模式也不会清空 —— 所以再开指南针仍然能看到「当初设定的那一块」。</p>
+     * <p><b>为什么不再用一个同步的「居家位置」字段：</b>上游的居家模式不是一个点，
+     * 而是三个。日程表在 {@code WORK} / {@code IDLE} / {@code REST} 之间切换时，
+     * 活动范围要跟着挪到对应的点上（{@code SchedulePos#restrictTo}）。早期版本把它们
+     * 压成一个 {@code DATA_HOME_POS}，于是「工作 12 格 / 娱乐 6 格 / 睡觉 6 格」
+     * 三个圈永远同心 —— 河童的罗盘写下的三个点里只有一个能真正生效。</p>
      *
-     * <p>本移植版没有 {@code SchedulePos} 那套 work/idle/sleep 三坐标，
-     * 用一个同步 + 持久化的坐标表达同样的语义：三个环共用這個中心（与上游三者重合时一致）。</p>
+     * <p><b>所以它也不再是同步数据。</b>三个坐标只在服务端参与 AI 判定；
+     * 客户端要看区域时由 {@code network/MaidAreaPacket} 按需发一份
+     * （上游 {@code SyncMaidAreaMessage} 同款），而不是让每只女仆常驻同步三个 BlockPos。</p>
      */
-    private static final EntityDataAccessor<BlockPos> DATA_HOME_POS =
-            SynchedEntityData.defineId(EntityMaid.class, EntityDataSerializers.BLOCK_POS);
-    /**
-     * 「居家位置」的存档键。
-     */
-    public static final String HOME_POS_TAG = "MaidHomePos";
+    private final SchedulePos schedulePos;
 
     private int pickupSoundCount = 5;
     /**
@@ -335,6 +334,9 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         super(type, level);
         this.setTame(false);
         this.setPersistenceRequired();
+        // 上游同款：初始「家」= 当前位置，维度取实体自己的维度。
+        // 这样一只没被罗盘配置过的女仆打开 Home 后仍然有一个有效的工作点。
+        this.schedulePos = new SchedulePos(BlockPos.ZERO, level.dimension().location());
     }
 
     /**
@@ -383,7 +385,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.entityData.define(DATA_FAVORABILITY, 0);
         this.entityData.define(DATA_EXPERIENCE, 0);
         this.entityData.define(DATA_CARRIER_ID, 0);
-        this.entityData.define(DATA_HOME_POS, BlockPos.ZERO);
         this.entityData.define(DATA_PICKUP, false);
         this.entityData.define(DATA_HOME_MODE, false);
         this.entityData.define(DATA_PICKUP_TYPE, PickType.ALL.getId());
@@ -516,30 +517,23 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
-     * 「居家位置」：开启居家模式时所站的那一格（上游 {@code SchedulePos.workPos}）。
+     * 作息坐标（上游 {@code EntityMaid#getSchedulePos}）。
      *
-     * <p>指南针的三色区域环以它为中心；{@code BlockPos.ZERO} 表示「还没设定过」，
-     * 此时上游也不会显示任何区域（{@code MaidAreaClickEvent} 里的
-     * {@code if (!schedulePos.getWorkPos().equals(BlockPos.ZERO))}）。</p>
+     * <p>读它是安全的：字段在构造函数里就初始化了，读档只会覆盖内容。
+     * 写它之前请想清楚 —— 三个点各有各的用途，随手改一个点会让女仆
+     * 在工作时间和睡觉时间跑向同一个位置。</p>
      */
-    public BlockPos getHomePos() {
-        return this.entityData.get(DATA_HOME_POS);
-    }
-
-    public void setHomePos(BlockPos pos) {
-        this.entityData.set(DATA_HOME_POS, pos == null ? BlockPos.ZERO : pos);
-    }
-
-    public boolean hasHomePos() {
-        return !this.getHomePos().equals(BlockPos.ZERO);
+    public SchedulePos getSchedulePos() {
+        return this.schedulePos;
     }
 
     /**
      * 工作范围中心（上游同名字段，见 {@code SchedulePos.restrictTo}）。
      *
-     * <p>与 {@link #getHomePos()} 的区别：工作范围中心可以不在可接触的方块上，
-     * 例如悬空时也能保持有效；而居家位置要求「刚好站在那一格上」，并且与指南针的区域
-     * 绑定（即使中途移动也不影响）。</p>
+     * <p>它就是 vanilla {@code Mob#restrictCenter}，由
+     * {@code SchedulePos#restrictTo} 按当前活动换成工作点 / 娱乐点 / 睡觉点之一。
+     * 注意它<b>随时会变</b>：想读「玩家当初设置的坐标」请去
+     * {@link #getSchedulePos()}，不要读这个缓存出来的活动中心。</p>
      */
     public BlockPos getRestrictCenter() {
         return this.entityData.get(RESTRICT_CENTER);
@@ -550,19 +544,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      */
     public float getRestrictRadius() {
         return this.entityData.get(RESTRICT_RADIUS);
-    }
-
-    /**
-     * 把工作范围收回到自己身边（上游 {@code SchedulePos#restrictTo} 的等价行为）。
-     *
-     * <p>上游的 {@code SchedulePos} 还会记录维度、并区分「白天 / 夜晚的工作点」，
- * 那套坐标记录系统尚未移植。这里按同样的语义简化：女仆走出范围时，
- * 以当前位置为新的工作中心。</p>
-     */
-    public void restrictToHome() {
-        if (!this.isWithinRestriction()) {
-            this.restrictTo(this.blockPosition(), Math.round(this.getRestrictRadius()));
-        }
     }
 
     @Override
@@ -578,7 +559,9 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      */
     @Override
     public void clearRestriction() {
-        this.entityData.set(RESTRICT_RADIUS, defaultRestrictRadius());
+        // 上游同款：清空作息坐标（三个点并回工作点、configured 置回 false），
+        // 于是下一次开启居家模式会以她当时的站位重新锚定。
+        this.schedulePos.clear(this);
     }
 
     @Override
@@ -1912,7 +1895,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         tag.putString("MaidTask", this.getTask().getUid().toString());
         tag.putString("MaidScheduleMode", this.getSchedule().name());
         tag.putBoolean("HomeModeEnable", this.isHomeModeEnable());
-        tag.putLong(HOME_POS_TAG, this.getHomePos().asLong());
+        this.schedulePos.save(tag);
         tag.putLong("MaidRestrictCenter", this.getRestrictCenter().asLong());
         tag.putFloat("MaidRestrictRadius", this.getRestrictRadius());
         // 背包类型（上游同名字段；读档时按注册表反查找不到就退化为空背包）
@@ -1974,22 +1957,16 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             }
         }
         this.setHomeModeEnable(tag.getBoolean("HomeModeEnable"));
-        if (tag.contains(HOME_POS_TAG)) {
-            this.setHomePos(BlockPos.of(tag.getLong(HOME_POS_TAG)));
-        }
         if (tag.contains("MaidRestrictCenter")) {
             this.entityData.set(RESTRICT_CENTER, BlockPos.of(tag.getLong("MaidRestrictCenter")));
         }
         if (tag.contains("MaidRestrictRadius")) {
             this.entityData.set(RESTRICT_RADIUS, tag.getFloat("MaidRestrictRadius"));
         }
-        // 旧存档迁移：这次更新之前没有 HOME_POS_TAG，居家模式的锚点只存在于
-        // RESTRICT_CENTER 里（后者在关闭居家时会被清成 ZERO）。搬过来，免得老女仆的
-        // 指南针从此什么都画不出来。
-        if (!tag.contains(HOME_POS_TAG) && this.isHomeModeEnable() && !this.hasHomePos()
-                && !this.getRestrictCenter().equals(BlockPos.ZERO)) {
-            this.setHomePos(this.getRestrictCenter());
-        }
+        // 作息坐标（上游在同位置调用 SchedulePos#load）。
+        // 老存档没有 MaidSchedulePos 子标签：SchedulePos#load 什么都不做，字段保持
+        // 构造函数里给的「家 = 当前位置」—— 那些女仆本来就没有罗盘坐标，这是正确行为。
+        this.schedulePos.load(tag, this);
         if (tag.contains(MAID_INVENTORY_TAG)) {
             this.maidInv.deserializeNBT(tag.getCompound(MAID_INVENTORY_TAG));
         }
@@ -2105,14 +2082,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             }
         }
 
-        // 居家模式的范围维护（上游 {@code SchedulePos#tick} 的等价实现）：
-        // 每 40 tick 检查一次，一旦走到工作范围之外，就把寻路目标指回工作点。
+        // 作息坐标维护（上游 {@code SchedulePos#tick}）：每 40 tick 把活动范围挪到
+        // 当前活动对应的点上，跑出范围就把寻路目标指回去、跑太远就直接传送。
         // 少了这一段，开/关 Home 按钮只改了标志位，玩家看不到任何行为变化。
-        if (this.tickCount % 40 == 0 && this.isHomeModeEnable() && this.canBrainMoving()
-                && !this.isWithinRestriction()) {
-            net.minecraft.world.entity.ai.behavior.BehaviorUtils.setWalkAndLookTargetMemories(
-                    this, this.getRestrictCenter(), 0.7F, 3);
-        }
+        this.schedulePos.tick(this);
         // 坐姿位的两道保险（上游没有显式写，是因为它的 Brain 行为里会把女仆拉起来）：
         // 1. 落水时收回坐姿，否则「坐下 = 禁止移动」会让女仆永远泡在水里；
         // 2. 指令位与坐姿位不一致时跟随指令位，避免出现「实体已经起身、模型还坐着」。
@@ -2707,10 +2680,19 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             if (player.isShiftKeyDown() && this.tryDismount()) {
                 return InteractionResult.sidedSuccess(this.level.isClientSide);
             }
-            if (player.isShiftKeyDown()) {
+            // 上游 SwitchSittingEvent 明确排除河童的罗盘：那件物品的潜行右击是
+            // 「清空作息点」，不是「坐下 / 起身」。
+            if (player.isShiftKeyDown()
+                    && !stack.is(com.github.tartaricacid.touhoulittlemaid.init.InitItems.KAPPA_COMPASS)) {
                 this.setInSittingPose(!this.isMaidInSittingPose());
                 this.jumping = false;
                 this.getNavigation().stop();
+                // 上游同款：起身 / 坐下后把活动范围重新算一遍，并让她往新中心走。
+                if (!this.level.isClientSide && this.hasRestriction() && this.canBrainMoving()) {
+                    this.schedulePos.restrictTo(this);
+                    net.minecraft.world.entity.ai.behavior.BehaviorUtils
+                            .setWalkAndLookTargetMemories(this, this.getRestrictCenter(), 0.7F, 3);
+                }
                 // 与上游 SwitchSittingEvent 一致：原版拾取音效，音调抬高一个八度
                 this.playSound(SoundEvents.ITEM_PICKUP, 0.2F,
                         ((this.getRandom().nextFloat() - this.getRandom().nextFloat()) * 0.7F + 1.0F) * 2.0F);
@@ -2930,19 +2912,20 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     @Nullable
     private InteractionResult compassOrNameTag(Player player, ItemStack stack) {
         if (stack.is(Items.COMPASS)) {
-            // 潜行右键 = 清空作息点，对应上游 ItemKappaCompass#interactLivingEntity 里的
-            // schedulePos.clear(maid)（它在 configured 置回 false 之后，下一次开启居家模式
-            // 就会以当时的站位重新锚定，指南针画出的圈也跟着搬家）。
-            if (player.isDiscrete() && !this.level.isClientSide) {
-                this.setHomePos(BlockPos.ZERO);
-                this.setHomeModeEnable(false);
-                this.restrictTo(BlockPos.ZERO,
-                        com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.nonHomeRange());
-                this.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
-                player.displayClientMessage(
-                        new TranslatableComponent("message.touhou_little_maid.kappa_compass.maid_clear"), false);
+            // 原版指南针：把她的作息坐标发给这位玩家，客户端据此画三个区域环
+            // （上游 MaidAreaClickEvent）。服务端只负责发数据。
+            //
+            // 清空作息点是**河童的罗盘**的事（ItemKappaCompass#interactLivingEntity），
+            // 不是原版指南针的。早期版本把两者混在一起，于是「潜行右击女仆」在没有
+            // 河童罗盘的情况下也会把作息点清掉，而且关掉了她的居家模式。
+            if (!this.level.isClientSide && player instanceof ServerPlayer serverPlayer
+                    && !this.schedulePos.getWorkPos().equals(BlockPos.ZERO)) {
+                com.github.tartaricacid.touhoulittlemaid.network.MaidAreaPacket
+                        .send(serverPlayer, this);
             }
-            return InteractionResult.SUCCESS;
+            // 潜行时继续往下走：上游 SwitchSittingEvent 是 LOWEST 优先级、且不检查事件
+            // 是否已被取消，所以「潜行 + 原版指南针」在原版里会同时画区域**并**切换坐姿。
+            return player.isShiftKeyDown() ? null : InteractionResult.SUCCESS;
         }
         if (stack.is(Items.NAME_TAG) && !stack.hasCustomHoverName()) {
             return InteractionResult.SUCCESS;

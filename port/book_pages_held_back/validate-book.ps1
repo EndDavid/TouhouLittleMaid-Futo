@@ -38,6 +38,7 @@ $registered = @(
   'touhou_little_maid:servant_bell',
   'touhou_little_maid:red_fox_scroll',
   'touhou_little_maid:white_fox_scroll',
+  'touhou_little_maid:kappa_compass',
   # --- favorability tools (creative-only debug items) ---
   'touhou_little_maid:favorability_tool_add',
   'touhou_little_maid:favorability_tool_reduce',

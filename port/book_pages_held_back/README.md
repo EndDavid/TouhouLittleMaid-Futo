@@ -33,25 +33,18 @@
 
 ## 现在还剩什么缺口
 
-被挪出来的 **12 页**，缺的是**尚未移植的物品 / 方块**：
+被挪出来的 **6 页**，缺的是**尚未移植的物品 / 方块**：
 
 | 词条 | 缺失的物品 ID | 所属子系统 |
 | --- | --- | --- |
 | `maid/gap` | `wireless_io` | 女仆饰品（无线 IO） |
-| `maid/kappa_compass` | `kappa_compass` | 搜索类工具 |
-| `maid/servant_bell` | `servant_bell` | 搜索类工具 |
 | `other/broom` | `broom` | 扫帚 |
-| `other/chisel_and_statues` | `chisel`、`statue` | 手办与雕像 |
-| `other/fox_scroll` | `red_fox_scroll`、`white_fox_scroll` | 搜索类工具 |
-| `other/garage_kit` | `garage_kit` | 手办与雕像 |
 | `other/gomoku` | `gomoku` | 棋类与娱乐方块 |
 | `other/maid_joy` | `keyboard`、`bookshelf`、`computer`、`gomoku` | 棋类与娱乐方块 |
 | `other/model_switcher` | `model_switcher` | 模型切换器 |
 | `other/picnic_basket` | `picnic_basket` | 野餐与娱乐 |
-| `other/trumpet` | `trumpet` | 搜索类工具 |
 
-对应 5 个子系统：**手办与雕像**、**棋类与娱乐方块**、**扫帚**、
-**野餐与娱乐**、**搜索类工具**。
+对应 4 个子系统：**棋类与娱乐方块**、**扫帚**、**野餐与娱乐**、**无线 IO**。
 
 ## 已经还回去的
 
@@ -61,9 +54,14 @@
 - **神社复兴**：`maid/film.json`、`maid/substitute_jizo.json`、`other/maid_bed.json`、
   `other/shrine.json`、`other/granite_inari_fox.json`（稻草人）。
 - **坐垫**：`other/chair.json`、`other/chair_show.json`。
-- **好感度工具**：`other/favorability_tool.json`（本轮）。`favorability_tool_add` /
+- **好感度工具**：`other/favorability_tool.json`。`favorability_tool_add` /
   `_reduce` / `_full` 三个变体一起注册，交互在 `EntityMaid#useFavorabilityTool`
   （上游 `UseFavorabilityToolEvent`），潜行 1 点、否则 64 点。
+- **手办与雕像**：`other/chisel_and_statues.json`、`other/garage_kit.json`。
+- **搜索类工具**：`other/trumpet.json`、`maid/servant_bell.json`、
+  `other/fox_scroll.json`、`maid/kappa_compass.json`。河童的罗盘同时带来了
+  `entity/passive/SchedulePos`（工作 / 娱乐 / 睡觉三坐标），`MaidAreaPacket`
+  与 `CheckSchedulePosPacket` 两个新包，以及 `ItemKappaCompass` 的 UI 提示界面。
 
 `maid/gap.json` 仍留在本目录：它讲的是 `wireless_io`（无线 IO 饰品），
 这件物品要等 IO 配置界面一起移植，所以先不还原。
