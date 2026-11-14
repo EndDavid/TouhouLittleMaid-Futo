@@ -1571,6 +1571,17 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
     现在 `SchedulePos` **不进同步数据**，客户端要看区域时由 `MaidAreaPacket` 按需发一份
     （上游 `SyncMaidAreaMessage` 同款）。`MaidAreaRenderer` 也因此重新变成
     「三个圆心各自独立」，两点不重合时还会画白色连线。
+  - **手持罗盘时就会画出三个圈**（`client/render/CompassAreaRenderer`）。
+    这是**上游 1.20.1 的 `CompassRenderEvent`，1.18.2 没有**，属于按 1.20.1 补齐：
+    设点时坐标还在罗盘的 NBT 里、没有任何女仆牵涉其中，光靠 `MaidAreaRenderer`
+    （入口是「拿原版指南针右击女仆」）什么都看不到 —— 玩家记下工作点后，
+    完全不知道那个圈有多大、会不会把床圈进去。
+    它不需要网络包（手持物品栈本来就同步），但 `ItemKappaCompass#useOn` 写完 NBT 后
+    必须 `inventoryMenu.broadcastChanges()`，否则要等下一次背包全量同步圈才冒出来。
+    画法与 `MaidAreaRenderer` 共用 `renderTripletLines` / `renderTripletTexts`，
+    半径 `+0.1 / 原值 / -0.1`、白线只在两点不重合时画、标签重合时逐级抬高等细节只有一份实现。
+    注意 `getPoint` 有回退链（工作 → 娱乐 → 工作），所以**只设一个点时三个圈是重合的**，
+    这是上游行为，靠标签抬升错开显示。
   - 开 Home 的两个拒绝条件照抄上游：记录在**别的维度**、或离三个点**超过 32 格**。
     两种情况都会弹 `CheckSchedulePosScreen`（上游 `CheckSchedulePosGui`）——
     用界面而不是聊天栏，是因为玩家此刻正开着女仆界面，聊天栏被挡住看不见。

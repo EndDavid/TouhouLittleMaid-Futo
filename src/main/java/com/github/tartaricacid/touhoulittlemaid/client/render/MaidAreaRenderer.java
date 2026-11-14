@@ -144,7 +144,8 @@ public final class MaidAreaRenderer {
 
             // 文字：immediate 源，drawInBatch 之后 endBatch 立刻绘制
             for (Map.Entry<EntityMaid, SchedulePos> target : targets) {
-                renderAreaTexts(target.getValue());
+                SchedulePos pos = target.getValue();
+                renderTripletTexts(pos.getWorkPos(), pos.getIdlePos(), pos.getSleepPos());
             }
         } finally {
             RenderHelper.endCameraSpace(cameraSpace);
@@ -154,9 +155,11 @@ public final class MaidAreaRenderer {
     /**
      * 方块「上表面之上 1 格」的中心点 —— 对应上游每个点开头那句
      * {@code poseStack.translate(0, 1, 0)}。
+     *
+     * <p>包内可见：{@link CompassAreaRenderer} 画罗盘预览时用的是同一套偏移。</p>
      */
     @Nullable
-    private static Vec3 topOf(@Nullable BlockPos pos) {
+    static Vec3 topOf(@Nullable BlockPos pos) {
         if (pos == null) {
             return null;
         }
@@ -176,11 +179,29 @@ public final class MaidAreaRenderer {
         Vec3 maidPos = maid.position().add(0.0D, 1.0D, 0.0D);
         RenderHelper.renderLine(lines, lineStart, maidPos, 1.0F, 0.2F, 0.2F);
 
-        Vec3 work = topOf(pos.getWorkPos());
-        Vec3 idle = topOf(pos.getIdlePos());
-        Vec3 sleep = topOf(pos.getSleepPos());
+        renderTripletLines(lines, pos.getWorkPos(), pos.getIdlePos(), pos.getSleepPos());
+    }
 
-        // 工作红 / 娱乐绿 / 睡觉蓝，半径与上游逐条对应（+0.1 / 原值 / -0.1）
+    /**
+     * 三个圈 + 白色连线，<b>女仆区域与罗盘预览共用</b>。
+     *
+     * <p>抽出来是因为这里的细节抄错一次就白画：半径是 {@code +0.1 / 原值 / -0.1}
+     * （让三个圈在重合时不会 z-fighting，也能一眼看出谁大谁小），
+     * 白线只在两点<b>不重合</b>时才画（否则是一条零长度的线，白白多两个顶点，
+     * 在某些驱动上还会闪）。上游客厅的 {@code MaidAreaRenderEvent} 与
+     * {@code CompassRenderEvent} 也是逐字相同的两段。</p>
+     *
+     * <p>必须先 {@link RenderHelper#endLines()} 才能画文字 —— 文字走的是
+     * {@code MultiBufferSource.immediate}，两批不能混在同一个 buffer 里。</p>
+     */
+    static void renderTripletLines(BufferBuilder lines,
+                                   @Nullable BlockPos workPos,
+                                   @Nullable BlockPos idlePos,
+                                   @Nullable BlockPos sleepPos) {
+        Vec3 work = topOf(workPos);
+        Vec3 idle = topOf(idlePos);
+        Vec3 sleep = topOf(sleepPos);
+
         if (work != null) {
             RenderHelper.renderCylinder(lines, work,
                     MaidConfig.workRange() + 0.1D, CIRCLE_PRECISION, 1.0F, 0.0F, 0.0F);
@@ -188,15 +209,14 @@ public final class MaidAreaRenderer {
         if (idle != null) {
             RenderHelper.renderCylinder(lines, idle,
                     MaidConfig.idleRange(), CIRCLE_PRECISION, 0.0F, 1.0F, 0.0F);
-            // 两点不重合时用白线连起来；重合就不画（否则是一条零长度的线，白白多两个顶点）
-            if (work != null && !pos.getIdlePos().equals(pos.getWorkPos())) {
+            if (work != null && !idlePos.equals(workPos)) {
                 RenderHelper.renderLine(lines, idle, work, 1.0F, 1.0F, 1.0F);
             }
         }
         if (sleep != null) {
             RenderHelper.renderCylinder(lines, sleep,
                     MaidConfig.sleepRange() - 0.1D, CIRCLE_PRECISION, 0.0F, 0.0F, 1.0F);
-            if (idle != null && work != null && !pos.getSleepPos().equals(pos.getIdlePos())) {
+            if (idle != null && work != null && !sleepPos.equals(idlePos)) {
                 RenderHelper.renderLine(lines, sleep, idle, 1.0F, 1.0F, 1.0F);
                 RenderHelper.renderLine(lines, sleep, work, 1.0F, 1.0F, 1.0F);
             }
@@ -204,30 +224,28 @@ public final class MaidAreaRenderer {
     }
 
     /**
-     * 三行标签。
+     * 三行标签，女仆区域与罗盘预览共用。
      *
      * <p>与上游一致：三个点重合时把后一行抬高（{@code idle == work → +1}、
      * {@code sleep == idle → +2}），否则三行字会精确重叠成一行。
      * 颜色与 {@code ▼} 的 {@code yOffset}（∓5）都照抄上游。</p>
      */
-    private static void renderAreaTexts(SchedulePos pos) {
-        BlockPos work = pos.getWorkPos();
-        BlockPos idle = pos.getIdlePos();
-        BlockPos sleep = pos.getSleepPos();
-
-        if (work != null) {
+    static void renderTripletTexts(@Nullable BlockPos workPos,
+                                   @Nullable BlockPos idlePos,
+                                   @Nullable BlockPos sleepPos) {
+        if (workPos != null) {
             // 上游：textPos = workPos + (0.5, 2, 0.5)，再加上那句 translate(0,1,0)
-            drawLabel(work.getX() + 0.5D, work.getY() + 3.0D, work.getZ() + 0.5D,
+            drawLabel(workPos.getX() + 0.5D, workPos.getY() + 3.0D, workPos.getZ() + 0.5D,
                     "message.touhou_little_maid.kappa_compass.work_area", 0xFF1111);
         }
-        if (idle != null) {
-            double lift = idle.equals(work) ? 1.0D : 0.0D;
-            drawLabel(idle.getX() + 0.5D, idle.getY() + 3.0D + lift, idle.getZ() + 0.5D,
+        if (idlePos != null) {
+            double lift = idlePos.equals(workPos) ? 1.0D : 0.0D;
+            drawLabel(idlePos.getX() + 0.5D, idlePos.getY() + 3.0D + lift, idlePos.getZ() + 0.5D,
                     "message.touhou_little_maid.kappa_compass.idle_area", 0x11FF11);
         }
-        if (sleep != null) {
-            double lift = sleep.equals(idle) ? 2.0D : 0.0D;
-            drawLabel(sleep.getX() + 0.5D, sleep.getY() + 3.0D + lift, sleep.getZ() + 0.5D,
+        if (sleepPos != null) {
+            double lift = sleepPos.equals(idlePos) ? 2.0D : 0.0D;
+            drawLabel(sleepPos.getX() + 0.5D, sleepPos.getY() + 3.0D + lift, sleepPos.getZ() + 0.5D,
                     "message.touhou_little_maid.kappa_compass.sleep_area", 0x1111FF);
         }
     }

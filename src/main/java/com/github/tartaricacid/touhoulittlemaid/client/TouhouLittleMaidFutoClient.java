@@ -112,6 +112,10 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.client.event.AddInformationEvent.init();
         // 指南针：右击女仆后在世界里画她的工作区域（上游 client/event/MaidAreaRenderEvent）
         com.github.tartaricacid.touhoulittlemaid.client.render.MaidAreaRenderer.init();
+        // 河童的罗盘：手持时预览它自己记下的三个区域（上游 1.20.1 CompassRenderEvent；
+        // 1.18.2 没有这个功能，属于按 1.20.1 补齐）
+        com.github.tartaricacid.touhoulittlemaid.client.render.CompassAreaRenderer.init();
+
         // 指南针 / 命名牌的客户端行为（上游 UseNameTagEvent 的客户端那一半 + 区域显示入口）
         com.github.tartaricacid.touhoulittlemaid.client.event.MaidClientInteractEvents.init();
         // 仆从铃：她所在区块没加载时，在世界上画「距离 + 红色倒三角」浮标

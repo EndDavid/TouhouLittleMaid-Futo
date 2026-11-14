@@ -258,6 +258,10 @@ public class ItemKappaCompass extends Item {
             }
             addDimension(player.level.dimension().location(), compass);
         }
+        // 物品 NBT 变了要主动同步：否则客户端手里那件罗盘要等下一次背包全量同步
+        // 才更新，表现是「点完方块，预览圈要愣几秒才冒出来」。
+        // 仆从铃写字标时也是同一处理（见 ItemServantBell）。
+        player.inventoryMenu.broadcastChanges();
         playCompassSound(player);
         return InteractionResult.SUCCESS;
     }
