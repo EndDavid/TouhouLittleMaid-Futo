@@ -2603,8 +2603,26 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      */
     @Override
     public boolean startRiding(Entity vehicle, boolean force) {
-        if (!this.level.isClientSide && !force && !this.isRideable()) {
-            return false;
+        if (!this.level.isClientSide && !force) {
+            // 对齐上游 {@code MaidMountEvent}，两条规则都不能漏：
+            //
+            // 1. 座位（{@code EntitySit}）不受「女仆骑乘」开关影响。上游写的就是
+            //    {@code !(entityBeingMounted instanceof EntitySit)}。这个开关管的是「抱着她走」，
+            //    而棋盘 / 坐垫的座位是她自己走过去坐下的——关掉骑乘不该让她
+            //    连下棋都做不到。漏了这一条，棋盘会「看起来能坐、实际坐不下」。
+            // 2. 船上已经放了坐垫、而坐垫还空着时，优先去坐坐垫。否则她会直接
+            //    坐进船里，坐垫永远空着。
+            if (!(vehicle instanceof com.github.tartaricacid.touhoulittlemaid.entity.item.EntitySit)) {
+                if (!this.isRideable()) {
+                    return false;
+                }
+                if (vehicle instanceof net.minecraft.world.entity.vehicle.Boat boat
+                        && boat.getControllingPassenger()
+                        instanceof com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair chair
+                        && chair.getPassengers().isEmpty()) {
+                    return false;
+                }
+            }
         }
         return super.startRiding(vehicle, force);
     }
