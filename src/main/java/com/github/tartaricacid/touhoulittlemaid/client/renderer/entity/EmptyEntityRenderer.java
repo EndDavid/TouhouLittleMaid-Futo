@@ -1,6 +1,5 @@
 package com.github.tartaricacid.touhoulittlemaid.client.renderer.entity;
 
-import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
@@ -19,8 +18,15 @@ import net.minecraft.world.entity.Entity;
  * 方式处理：注册一个空实现。</p>
  */
 public class EmptyEntityRenderer extends EntityRenderer<Entity> {
+    /**
+     * 一定存在的原版贴图。
+     *
+     * <p>不能指向本模组自己的 {@code textures/entity/empty.png}——那个文件并不存在。
+     * 空渲染器从不调 {@code getTextureLocation}（{@code render} 什么也不画），所以当下不会出问题；
+     * 但一旦有人把它当普通渲染器用，缺失贴图就会变成黑紫格子。</p>
+     */
     private static final ResourceLocation EMPTY =
-            new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/empty.png");
+            new ResourceLocation("minecraft", "textures/misc/white.png");
 
     public EmptyEntityRenderer(EntityRendererProvider.Context context) {
         super(context);

@@ -389,8 +389,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.entityData.define(DATA_HOME_MODE, false);
         this.entityData.define(DATA_PICKUP_TYPE, PickType.ALL.getId());
         MaidSubConfig.define(this.entityData);
-        // 对局记录的两个同步位：五子棋胜场数据与这一局的胜负
-        this.gameRecordManager.defineSynchedData(this.entityData);
+        // 对局记录的两个同步位：五子棋胜场数据与这一局的胜负。
+        // 必须走静态方法：本方法在 Entity 的构造器里就会被调到，
+        // 那时候本类的实例字段（包括 gameRecordManager）全都还是 null。
+        MaidGameRecordManager.defineSynchedData(this.entityData);
 
         this.entityData.define(DATA_TASK, TaskIdle.UID.toString());
         this.entityData.define(DATA_BEGGING, false);

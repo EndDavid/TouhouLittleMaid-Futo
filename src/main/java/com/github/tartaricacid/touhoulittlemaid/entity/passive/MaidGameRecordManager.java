@@ -19,7 +19,8 @@ import net.minecraft.network.syncher.SynchedEntityData;
  * <p>上游把两个 {@code EntityDataAccessor} 声明在 {@code EntityMaid} 里，这里放在本类内 ——
  * {@code SynchedEntityData.defineId} 是静态方法，声明在哪里都一样，但放在一起能少改一次
  * {@code EntityMaid}（那个文件太大，历史上被误截断过两次）。同步数据的 {@code define}
- * 仍然必须由 {@code EntityMaid#defineSynchedData} 调 {@link #defineSynchedData(SynchedEntityData)} 完成。</p>
+ * 仍然必须由 {@code EntityMaid#defineSynchedData} 调 {@link #defineSynchedData(SynchedEntityData)} 完成，
+ * 而且那个方法必须是<b>静态</b>的（原因见该方法自身的注释）。</p>
  */
 public class MaidGameRecordManager {
     private static final String GAME_SKILL_TAG = "MaidGameSkillData";
@@ -37,7 +38,19 @@ public class MaidGameRecordManager {
         this.maid = maid;
     }
 
-    void defineSynchedData(SynchedEntityData data) {
+    /**
+     * 注册两个同步位。
+     *
+     * <p><b>必须是静态方法。</b>{@code Entity} 的构造器里就会调 {@code defineSynchedData()}，
+     * 而那时候子类的实例字段还没初始化 —— {@code EntityMaid} 的 {@code gameRecordManager}
+     * 字段赋值发生在 {@code super()} 之后，所以在 {@code defineSynchedData} 里读它必然是
+     * {@code null}。</p>
+     *
+     * <p>这不是理论风险：一座雕像的渲染路径会去构造一只临时 {@code EntityMaid}
+     * （见 {@code EntityCacheUtil}），于是进世界的第一帧就 NPE 崩在
+     * {@code Rendering Block Entity}。改成静态后不依赖任何实例状态。</p>
+     */
+    static void defineSynchedData(SynchedEntityData data) {
         data.define(GAME_SKILL, new CompoundTag());
         data.define(GAME_STATUE, NONE);
     }
