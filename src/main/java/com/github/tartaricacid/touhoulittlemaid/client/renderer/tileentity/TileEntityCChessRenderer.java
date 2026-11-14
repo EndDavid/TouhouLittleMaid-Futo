@@ -58,6 +58,20 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
     private static final String SELECTED_BONE = "Selected";
 
     /**
+     * 棋盘本地网格的间距（格）。与 {@code CChessUtil#getClickPosition} 里的 0.304 是同一个数。
+     */
+    private static final float GRID_STEP = 0.304F;
+
+    /**
+     * 第一个交叉点（{@code FILE_LEFT} / {@code RANK_TOP}）在方块中心的本地偏移。
+     *
+     * <p>同样取自点击数学：它把点击点 {@code x} 映射成 {@code (x + 1.365) / 0.304}，
+     * 所以 {@code x = -1.365} 正好是第一条线。两者必须同源，否则棋子会整体偏移。</p>
+     */
+    private static final float GRID_ORIGIN_X = -1.365F;
+    private static final float GRID_ORIGIN_Z = -1.370F;
+
+    /**
      * 引擎棋子编码 → 骨骼名。红方在 8~14、黑方在 16~22（见 {@code Position} 的棋子常量）。
      */
     private static final String[] PIECE_BONES = new String[23];
@@ -108,20 +122,19 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
     private void renderChessboard(PoseStack poseStack, MultiBufferSource bufferIn,
                                   int combinedLightIn, int combinedOverlayIn, Direction facing) {
         poseStack.pushPose();
-        // 竖直位置必须量出来，不能照抄上游的 1.5。
+        // 竖直位置与朝向都必须从模型自身量出来。
         //
-        // 上游 1.18.2 画的是原版 EntityModel（顶点空间 Y 向下），1.5 是配合它算的；
-        // 本移植版改用基岩几何（Y 向上）后，那句 ZN(180) 把模型上下翻过来，
-        // 包围盒变成 [-maxY, -minY]，于是「底面贴地」的正确位移是 +maxY。
-        // 照抄 1.5 的结果就是整张桌子悬空 1.5 - maxY = 1.372 格 ——
-        // 正是「高了一格又六个像素」的来源（6 像素 = 0.375 格）。
-        float boardLift = boardMaxY();
-        poseStack.translate(0.5, boardLift, 0.5);
-        poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
-        poseStack.mulPose(Vector3f.YN.rotationDegrees(facing.get2DDataValue() * 90));
-        if (facing == Direction.SOUTH || facing == Direction.NORTH) {
-            poseStack.mulPose(Vector3f.YN.rotationDegrees(180));
-        }
+        // 上游这两行是给原版 EntityModel（顶点空间 Y 向下）写的，
+        // 其中 ZN(180) 正是为了把 Y 向下翻成 Y 向上。本移植版画的是基岩几何，
+        // 它本来就是 Y 向上 —— 再翻一次就变成「整张桌子底面朝上」：
+        // 从上方看到的是模型的底面 UV 区域，那里几乎是空白，
+        // 于是格线消失、棋子文字朝下、颜色偏暗。这与 {@code BedrockBlockModels}
+        // 类注释里早已记录过的同一课完全相同（祭坛 / 神社都去掉了这句）。
+        poseStack.translate(0.5, boardLift(), 0.5);
+        // 朝向与点击数学共用同一组角度：EntityMaid 那边用 facing.toYRot() 把
+        // 点击点转进棋盘本地坐标，这里必须用同一个角度转回去，否则
+        // 「画出来的棋子」与「点得到的格子」会错位。
+        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot()));
         GeoBlockRenderer.render(BedrockBlockModels.get("cchess"), TEXTURE, poseStack, bufferIn,
                 combinedLightIn, combinedOverlayIn, boardRenderType);
         poseStack.popPose();
@@ -146,63 +159,56 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         // 棋子中心（用于把棋子摆到交叉点上）
         float pieceCenterX = (pb[0] + pb[3]) * 0.5F;
         float pieceCenterZ = (pb[2] + pb[5]) * 0.5F;
-        // 翻转后棋子底面在 -maxY，抬 maxY 即可贴合当前原点平面（= 棋盘表面）
-        float pieceLift = pb[4];
-        // 棋盘表面离方块底面的高度：翻转后包围盒是 [0, maxY - minY]
+        // 不做翻转，所以棋子底面就在 minY，抬 -minY 让底面落在原点平面上
+        float pieceLift = -pb[1];
+        // 棋盘表面离方块底面的高度
         float surface = boardTopY();
         if (!logged) {
             logged = true;
             float[] bb = BedrockBlockModels.bounds("cchess");
             TouhouLittleMaid.LOGGER.info(
                     "[Futo] chess layout: board bbox={} lift={} surface={} | piece bbox={} center=({}, {}) lift={}",
-                    bb == null ? "null" : java.util.Arrays.toString(bb), boardMaxY(), surface,
+                    bb == null ? "null" : java.util.Arrays.toString(bb), boardLift(), surface,
                     java.util.Arrays.toString(pb), pieceCenterX, pieceCenterZ, pieceLift);
         }
         int selectX = Position.FILE_X(cchess.getSelectChessPoint());
         int selectY = Position.RANK_Y(cchess.getSelectChessPoint());
         byte[] data = cchess.getChessData().squares;
 
+        // 不再从某个角开始逐个步进：那样需要 1.365 / 1.370 / 0.304 三个魔数
+        // 同时对上棋盘朝向，任何一个偏了整盘棋子都会整体歪掉。
+        // 改成「每个交叉点直接算出它在方块内的本地坐标」，坐标公式与
+        // {@code CChessUtil#getClickPosition} 完全互为逆运算：
+        //     clickPos.x -> raw = (x + 1.365) / 0.304 -> file = raw + FILE_LEFT
+        // 反过来就是下面的 localX / localZ。这样棋子永远落在「点得到」的位置上。
         poseStack.pushPose();
-        // 1.625 与 1.5 是同一套上游数字（棋子比棋盘基准高 0.125），
-        // 棋盘基准修正后棋子必须一起改，否则棋子会单独悬空。
-        switch (facing) {
-            case NORTH -> poseStack.translate(1.365 + 0.5, surface, 1.370 + 0.5);
-            case EAST -> poseStack.translate(-1.365 + 0.5, surface, 1.370 + 0.5);
-            case WEST -> poseStack.translate(1.365 + 0.5, surface, -1.370 + 0.5);
-            default -> poseStack.translate(-1.365 + 0.5, surface, -1.370 + 0.5);
-        }
-        poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
-        poseStack.mulPose(Vector3f.YN.rotationDegrees(facing.get2DDataValue() * 90));
-        if (facing == Direction.SOUTH || facing == Direction.NORTH) {
-            poseStack.mulPose(Vector3f.YN.rotationDegrees(180));
-        }
+        poseStack.translate(0.5, surface, 0.5);
+        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot()));
         for (int y = Position.RANK_TOP; y <= Position.RANK_BOTTOM; y++) {
             for (int x = Position.FILE_LEFT; x <= Position.FILE_RIGHT; x++) {
                 int index = Position.COORD_XY(x, y);
                 byte piecesIndex = data[index];
                 boolean hasPiece = index < data.length && (CChessUtil.isRed(piecesIndex) || CChessUtil.isBlack(piecesIndex));
                 if (hasPiece && piecesIndex >= 0 && piecesIndex < PIECE_BONES.length) {
+                    float localX = GRID_ORIGIN_X + (x - Position.FILE_LEFT) * GRID_STEP;
+                    float localZ = GRID_ORIGIN_Z + (y - Position.RANK_TOP) * GRID_STEP;
                     String bone = PIECE_BONES[piecesIndex];
                     if (bone != null) {
-                        // 每个棋子单独 push：居中偏移与抬升是「这一个棋子」的，
-                        // 但交叉点的步进必须在外面，否则偏移会被累加。
                         poseStack.pushPose();
-                        poseStack.translate(-pieceCenterX, pieceLift, -pieceCenterZ);
+                        poseStack.translate(localX - pieceCenterX, pieceLift, localZ - pieceCenterZ);
                         GeoBlockRenderer.renderBone(pieces, bone, PIECES_TEXTURE, poseStack, bufferIn,
                                 combinedLightIn, combinedOverlayIn, piecesRenderType);
                         poseStack.popPose();
                     }
                     if (selectX == x && selectY == y) {
                         poseStack.pushPose();
-                        poseStack.translate(-pieceCenterX, pieceLift, -pieceCenterZ);
+                        poseStack.translate(localX - pieceCenterX, pieceLift, localZ - pieceCenterZ);
                         GeoBlockRenderer.renderBone(pieces, SELECTED_BONE, PIECES_TEXTURE, poseStack, bufferIn,
                                 combinedLightIn, combinedOverlayIn, piecesRenderType);
                         poseStack.popPose();
                     }
                 }
-                poseStack.translate(0.304, 0, 0);
             }
-            poseStack.translate(-0.304 * 9, 0, -0.304);
         }
         poseStack.popPose();
     }
@@ -266,15 +272,18 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
     }
 
     /**
-     * 棋盘模型在方块空间里的最高点（翻转后用于「底面贴地」）。
+     * 棋盘「底面贴地」所需的竖直位移。
+     *
+     * <p>基岩几何 Y 向上、不做翻转，所以底面在 {@code minY}：
+     * 抬 {@code -minY} 就把它放到 {@code y = 0}（方块底面）。</p>
      */
-    private static float boardMaxY() {
+    private static float boardLift() {
         float[] b = BedrockBlockModels.bounds("cchess");
-        return b == null ? 0.0F : b[4];
+        return b == null ? 0.0F : -b[1];
     }
 
     /**
-     * 棋盘表面离方块底面的高度：包围盒在 ZN(180) 之后是 {@code [0, maxY - minY]}。
+     * 棋盘表面离方块底面的高度（棋子要贴在这个高度上）。
      */
     private static float boardTopY() {
         float[] b = BedrockBlockModels.bounds("cchess");
