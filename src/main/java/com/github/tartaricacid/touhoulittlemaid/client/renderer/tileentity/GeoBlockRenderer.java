@@ -97,6 +97,29 @@ public final class GeoBlockRenderer implements IGeoRenderer<ResourceLocation> {
         return consumer.toArray();
     }
 
+    /**
+     * 只量一个命名骨骼（含子树）的包围盒，单位：格。
+     *
+     * <p>{@code cchess_pieces.json} 把 15 个棋子塞进同一个模型，而它们的
+     * {@code origin} / {@code inflate} 写法非常反直觉（半径靠一个 {@code size} 为 0 的
+     * 平面 + 负 {@code inflate} 撑出来），所以直接读 JSON 算不出它到底有多高、
+     * 底面在哪。这里走一遍真实渲染路径取真实值，而不是猜。</p>
+     *
+     * @return {@code [minX, minY, minZ, maxX, maxY, maxZ]}，骨骼不存在或没有几何时返回 {@code null}
+     */
+    public static float[] measureBone(@Nullable AnimatedGeoModel model, String boneName) {
+        if (model == null) {
+            return null;
+        }
+        AnimatedGeoBone bone = model.bones().get(boneName);
+        if (bone == null) {
+            return null;
+        }
+        BoundsConsumer consumer = new BoundsConsumer();
+        INSTANCE.renderRecursively(bone, new PoseStack(), consumer, 0, 0, 1, 1, 1, 1);
+        return consumer.anyVertex() ? consumer.toArray() : null;
+    }
+
     @Override
     public MultiBufferSource getCurrentRTB() {
         // 默认的 render() 先 setCurrentRTB(bufferSource)，再从 bufferSource 取 buffer，
@@ -172,6 +195,10 @@ public final class GeoBlockRenderer implements IGeoRenderer<ResourceLocation> {
 
         @Override
         public void unsetDefaultColor() {
+        }
+
+        boolean anyVertex() {
+            return this.any;
         }
 
         float[] toArray() {

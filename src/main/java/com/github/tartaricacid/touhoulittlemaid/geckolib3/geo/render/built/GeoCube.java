@@ -29,6 +29,23 @@ public class GeoCube {
         boolean isBoxUV = uvUnion.isBoxUV;
         double inflate = cubeIn.getInflate() == null ? (boneInflate == null ? 0 : boneInflate) : cubeIn.getInflate() / 16;
 
+        // 负 inflate 作用在厚度为 0 的轴上会把区间<b>翻转</b>：
+        // 下面用的是 「origin - inflate」到「origin + size + inflate」，
+        // 当 inflate < 0 且 size == 0 时，下界反而大于上界。
+        //
+        // 结果就是一个本应不可见的平面被拉成一根细长杆：
+        // {@code cchess_pieces.json} 里每个棋子都有一个
+        // {@code origin [-32, 31.9, -32], size [64, 0, 64], inflate -30.75} 的 cube，
+        // 在本渲染器里会变成 y 从 0.07 到 3.92 格的竖直柱子。
+        //
+        // 全库只有 cchess_pieces.json 的 14 个 cube 命中这个条件
+        // （祭坛 / 神社 / 坐垫等模型都是 0 个），而且上游渲染它们时另一套解析器
+        // 也看不到任何东西。所以这里直接把它当退化处理：不生成任何 quad。
+        double[] rawSize = cubeIn.getSize();
+        if (inflate < 0 && rawSize != null && rawSize.length >= 3
+                && (rawSize[0] == 0 || rawSize[1] == 0 || rawSize[2] == 0)) {
+            return cube;
+        }
         float textureHeight = properties.getTextureHeight().floatValue();
         float textureWidth = properties.getTextureWidth().floatValue();
 

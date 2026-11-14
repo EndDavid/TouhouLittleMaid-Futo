@@ -23,6 +23,7 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
+import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 
 /**
  * 象棋棋盘的渲染器，移植自上游 1.20.1 的 {@code TileEntityCChessRenderer}。
@@ -78,6 +79,11 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         PIECE_BONES[22] = "ZuBlack";
     }
 
+    /**
+     * 只打印一次实测数值，方便核对摆放（诊断用，不影响行为）。
+     */
+    private static boolean logged = false;
+
     private final Font font;
     private final BlockEntityRenderDispatcher dispatcher;
     private final RenderType boardRenderType;
@@ -102,8 +108,15 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
     private void renderChessboard(PoseStack poseStack, MultiBufferSource bufferIn,
                                   int combinedLightIn, int combinedOverlayIn, Direction facing) {
         poseStack.pushPose();
-        poseStack.translate(0.5, 1.5, 0.5);
-        // 基岩模型的 Y 轴朝上、原版实体模型的 Y 轴朝下，所以这里要比原版多翻一次
+        // 竖直位置必须量出来，不能照抄上游的 1.5。
+        //
+        // 上游 1.18.2 画的是原版 EntityModel（顶点空间 Y 向下），1.5 是配合它算的；
+        // 本移植版改用基岩几何（Y 向上）后，那句 ZN(180) 把模型上下翻过来，
+        // 包围盒变成 [-maxY, -minY]，于是「底面贴地」的正确位移是 +maxY。
+        // 照抄 1.5 的结果就是整张桌子悬空 1.5 - maxY = 1.372 格 ——
+        // 正是「高了一格又六个像素」的来源（6 像素 = 0.375 格）。
+        float boardLift = boardMaxY();
+        poseStack.translate(0.5, boardLift, 0.5);
         poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
         poseStack.mulPose(Vector3f.YN.rotationDegrees(facing.get2DDataValue() * 90));
         if (facing == Direction.SOUTH || facing == Direction.NORTH) {
@@ -123,16 +136,40 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         if (pieces == null) {
             return;
         }
+        // 棋子的摆法同样必须量出来：cchess_pieces.json 把 15 个棋子塞进一个模型，
+        // 而且它的「柱身」是靠一个 size 为 0 的平面加负 inflate 撑出来的，
+        // 直接读 origin 根本算不出底面在哪。见 GeoBlockRenderer#measureBone。
+        float[] pb = GeoBlockRenderer.measureBone(pieces, "ShuaiRed");
+        if (pb == null) {
+            return;
+        }
+        // 棋子中心（用于把棋子摆到交叉点上）
+        float pieceCenterX = (pb[0] + pb[3]) * 0.5F;
+        float pieceCenterZ = (pb[2] + pb[5]) * 0.5F;
+        // 翻转后棋子底面在 -maxY，抬 maxY 即可贴合当前原点平面（= 棋盘表面）
+        float pieceLift = pb[4];
+        // 棋盘表面离方块底面的高度：翻转后包围盒是 [0, maxY - minY]
+        float surface = boardTopY();
+        if (!logged) {
+            logged = true;
+            float[] bb = BedrockBlockModels.bounds("cchess");
+            TouhouLittleMaid.LOGGER.info(
+                    "[Futo] chess layout: board bbox={} lift={} surface={} | piece bbox={} center=({}, {}) lift={}",
+                    bb == null ? "null" : java.util.Arrays.toString(bb), boardMaxY(), surface,
+                    java.util.Arrays.toString(pb), pieceCenterX, pieceCenterZ, pieceLift);
+        }
         int selectX = Position.FILE_X(cchess.getSelectChessPoint());
         int selectY = Position.RANK_Y(cchess.getSelectChessPoint());
         byte[] data = cchess.getChessData().squares;
 
         poseStack.pushPose();
+        // 1.625 与 1.5 是同一套上游数字（棋子比棋盘基准高 0.125），
+        // 棋盘基准修正后棋子必须一起改，否则棋子会单独悬空。
         switch (facing) {
-            case NORTH -> poseStack.translate(1.365 + 0.5, 1.625, 1.370 + 0.5);
-            case EAST -> poseStack.translate(-1.365 + 0.5, 1.625, 1.370 + 0.5);
-            case WEST -> poseStack.translate(1.365 + 0.5, 1.625, -1.370 + 0.5);
-            default -> poseStack.translate(-1.365 + 0.5, 1.625, -1.370 + 0.5);
+            case NORTH -> poseStack.translate(1.365 + 0.5, surface, 1.370 + 0.5);
+            case EAST -> poseStack.translate(-1.365 + 0.5, surface, 1.370 + 0.5);
+            case WEST -> poseStack.translate(1.365 + 0.5, surface, -1.370 + 0.5);
+            default -> poseStack.translate(-1.365 + 0.5, surface, -1.370 + 0.5);
         }
         poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
         poseStack.mulPose(Vector3f.YN.rotationDegrees(facing.get2DDataValue() * 90));
@@ -147,12 +184,20 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
                 if (hasPiece && piecesIndex >= 0 && piecesIndex < PIECE_BONES.length) {
                     String bone = PIECE_BONES[piecesIndex];
                     if (bone != null) {
+                        // 每个棋子单独 push：居中偏移与抬升是「这一个棋子」的，
+                        // 但交叉点的步进必须在外面，否则偏移会被累加。
+                        poseStack.pushPose();
+                        poseStack.translate(-pieceCenterX, pieceLift, -pieceCenterZ);
                         GeoBlockRenderer.renderBone(pieces, bone, PIECES_TEXTURE, poseStack, bufferIn,
                                 combinedLightIn, combinedOverlayIn, piecesRenderType);
+                        poseStack.popPose();
                     }
                     if (selectX == x && selectY == y) {
+                        poseStack.pushPose();
+                        poseStack.translate(-pieceCenterX, pieceLift, -pieceCenterZ);
                         GeoBlockRenderer.renderBone(pieces, SELECTED_BONE, PIECES_TEXTURE, poseStack, bufferIn,
                                 combinedLightIn, combinedOverlayIn, piecesRenderType);
+                        poseStack.popPose();
                     }
                 }
                 poseStack.translate(0.304, 0, 0);
@@ -218,6 +263,22 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         this.font.drawInBatch(resetTips, resetTipsWidth, 0, 0xFFFFFF, true,
                 poseStack.last().pose(), bufferIn, false, 0, combinedLightIn);
         poseStack.popPose();
+    }
+
+    /**
+     * 棋盘模型在方块空间里的最高点（翻转后用于「底面贴地」）。
+     */
+    private static float boardMaxY() {
+        float[] b = BedrockBlockModels.bounds("cchess");
+        return b == null ? 0.0F : b[4];
+    }
+
+    /**
+     * 棋盘表面离方块底面的高度：包围盒在 ZN(180) 之后是 {@code [0, maxY - minY]}。
+     */
+    private static float boardTopY() {
+        float[] b = BedrockBlockModels.bounds("cchess");
+        return b == null ? 0.0F : b[4] - b[1];
     }
 
     private boolean inRenderDistance(TileEntityCChess chess, int distance) {
