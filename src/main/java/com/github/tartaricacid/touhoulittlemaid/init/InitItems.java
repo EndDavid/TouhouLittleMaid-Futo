@@ -296,6 +296,25 @@ public final class InitItems {
             TouhouLittleMaid.rl("servant_bell"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemServantBell());
 
+    /**
+     * 红狐狸卷轴（上游 {@code InitItems.RED_FOX_SCROLL}）与白狐狸卷轴
+     * （{@code InitItems.WHITE_FOX_SCROLL}）。
+     *
+     * <p>两枚是同一个类，只有数据来源与进度判据不同：红卷轴查「活着的女仆」，
+     * 白卷轴查「女仆墓碑」。它们解决的是小号 / 仆从铃都碰不到的那一半 ——
+     * <b>未加载区块里的实体不在内存里，只能照着记录找过去</b>。
+     * 见 {@code item/ItemFoxScroll} 与 {@code client/screen/FoxScrollScreen}。</p>
+     *
+     * <p>堆叠数为 1：卷轴自己带「钉住的坐标」这一份 NBT，堆叠会让同一叠里
+     * 不同位置的坐标互相覆盖。</p>
+     */
+    public static final Item RED_FOX_SCROLL = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("red_fox_scroll"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemFoxScroll());
+
+    public static final Item WHITE_FOX_SCROLL = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("white_fox_scroll"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemFoxScroll());
 
 
     // ------------------------------------------------------------------ 女仆饰品

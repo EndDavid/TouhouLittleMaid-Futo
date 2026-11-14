@@ -115,9 +115,23 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 指南针 / 命名牌的客户端行为（上游 UseNameTagEvent 的客户端那一半 + 区域显示入口）
         com.github.tartaricacid.touhoulittlemaid.client.event.MaidClientInteractEvents.init();
         // 仆从铃：她所在区块没加载时，在世界上画「距离 + 红色倒三角」浮标
-        // （上游 client/event/ScrollRenderEvent 的铃那一半；红狐狸卷轴移植后共用这个方法）
+        // （上游 client/event/ScrollRenderEvent 的铃那一半；红狐狸卷轴共用这个方法）
         com.github.tartaricacid.touhoulittlemaid.client.render.ServantBellTracker.init();
 
+        // 狐狸卷轴记录（S2C）：服务端在物品 use 里打包发来，这里开界面。
+        // 记录先读完再 execute —— 出回调后缓冲区就失效了。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.FoxScrollPacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    byte action = buf.readByte();
+                    if (action != com.github.tartaricacid.touhoulittlemaid.network.FoxScrollPacket.SHOW_DATA) {
+                        return;
+                    }
+                    java.util.Map<String, java.util.List<com.github.tartaricacid.touhoulittlemaid.network.FoxScrollPacket.FoxScrollData>>
+                            data = com.github.tartaricacid.touhoulittlemaid.network.FoxScrollPacket.readData(buf);
+                    client.execute(() -> com.github.tartaricacid.touhoulittlemaid.client.screen.FoxScrollScreen
+                            .open(data));
+                });
 
         // 灵力同步包（S2C）：客户端只负责写入本地玩家再喂给 HUD
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
@@ -233,4 +247,3 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 });
     }
 }
-

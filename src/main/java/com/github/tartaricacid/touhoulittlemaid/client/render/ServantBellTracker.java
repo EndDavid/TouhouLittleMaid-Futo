@@ -2,6 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.client.render;
 
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemServantBell;
+import com.github.tartaricacid.touhoulittlemaid.item.ItemFoxScroll;
 import com.mojang.datafixers.util.Pair;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -14,12 +15,18 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * 主手拿着已绑定的仆从铃、而她又在未加载区块里时，在世界上画出
- * 「距离 + 红色倒三角」的浮标（上游 {@code client/event/ScrollRenderEvent}）。
+ * 主手拿着「指过路的物品」时，在世界上画出「距离 + 红色倒三角」的浮标
+ * （上游 {@code client/event/ScrollRenderEvent}）。
  *
- * <p>没有这个浮标，仆从铃在「她在未加载区块」时的表现就只剩一句
- * 「请跟着位置提示去找」—— 而<b>根本没有提示可跟</b>。所以它不是一个
- * 可有可无的装饰，是这个物品那一半唯一有用的输出。</p>
+ * <p>三种物品共用这一套浮标：</p>
+ * <ul>
+ *     <li>已绑定的<b>仆从铃</b> —— 她所在的区块没加载时，NBT 里存着区块坐标；</li>
+ *     <li><b>红 / 白狐狸卷轴</b> —— 玩家在卷轴界面里点了「追踪」的那条记录。</li>
+ * </ul>
+ *
+ * <p>没有这个浮标，「她在未加载区块」这件事就只剩一句「请跟着位置提示去找」——
+ * 而<b>根本没有提示可跟</b>。所以它不是一个可有可无的装饰，
+ * 是这些物品那一半唯一有用的输出。</p>
  *
  * <h2>与上游的差异</h2>
  * <ul>
@@ -109,14 +116,16 @@ public final class ServantBellTracker {
     }
 
     /**
-     * 主手物品 → 追踪信息。当前只认仆从铃；红狐狸卷轴移植后在这里加一条分支
-     * （上游就是把这三种物品并排写在这一个方法里的）。
+     * 主手物品 → 追踪信息。三种物品共用这一套浮标（上游也是把它们并排写在一个方法里）：
+     * 已绑定的仆从铃、红狐狸卷轴、白狐狸卷轴。
      */
     private static Pair<String, BlockPos> getInfo(Player player, ItemStack stack) {
         if (stack.is(InitItems.SERVANT_BELL)) {
             return ItemServantBell.getMaidShow(stack);
         }
+        if (stack.getItem() instanceof ItemFoxScroll) {
+            return ItemFoxScroll.getTrackInfo(stack);
+        }
         return null;
     }
 }
-
