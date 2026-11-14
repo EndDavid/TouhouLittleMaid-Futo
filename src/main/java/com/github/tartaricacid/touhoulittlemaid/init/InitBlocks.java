@@ -120,6 +120,22 @@ public final class InitBlocks {
             Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("garage_kit"),
             FabricBlockEntityTypeBuilder.create(TileEntityGarageKit::new, GARAGE_KIT).build());
 
+    // ------------------------------------------------------------------ 棋类
+
+    /**
+     * 中国象棋棋盘（上游 {@code InitBlocks.CCHESS}）。3×3 多方块，只有中心格带方块实体。
+     *
+     * <p>{@code getRenderShape} 是 {@code ENTITYBLOCK_ANIMATED}，所以 {@code models/block/cchess.json}
+     * 里只有一个 {@code particle} 贴图 —— 真正的模型由 {@code TileEntityCChessRenderer} 画。</p>
+     */
+    public static final Block CCHESS = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("cchess"), new com.github.tartaricacid.touhoulittlemaid.block.BlockCChess());
+
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityCChess> CCHESS_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("cchess"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityCChess::new, CCHESS).build());
+
     private InitBlocks() {
     }
 

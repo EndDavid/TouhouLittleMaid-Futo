@@ -28,6 +28,11 @@ public final class InitPoi {
      */
     public static PoiType SCARECROW;
 
+    /**
+     * 娱乐方块（棋类 / 将来的键盘、书架、电脑）。{@code MaidBoardGameTask} 就是靠它找棋盘。
+     */
+    public static PoiType JOY_BLOCK;
+
     private InitPoi() {
     }
 
@@ -37,6 +42,7 @@ public final class InitPoi {
                 MaidPoiManager.getBedStates(), 0, 1);
         SCARECROW = PoiTypeAccessor.invokeRegister(TouhouLittleMaid.MOD_ID + ":scarecrow",
                 MaidPoiManager.getScarecrowStates(), 0, 1);
+        JOY_BLOCK = PoiTypeAccessor.invokeRegister(TouhouLittleMaid.MOD_ID + ":joy_block",
+                MaidPoiManager.getJoyBlockStates(), 0, 1);
     }
 }
-

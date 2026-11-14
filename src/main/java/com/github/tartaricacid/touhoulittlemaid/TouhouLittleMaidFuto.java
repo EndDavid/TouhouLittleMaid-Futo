@@ -75,6 +75,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.ServantBellSetPacket.initServer();
         // 网络包：狐狸卷轴（S2C 发记录列表，C2S 把某条坐标钉到主手卷轴上）
         com.github.tartaricacid.touhoulittlemaid.network.FoxScrollPacket.initServer();
+        // 网络包：棋盘（S2C 把局面交给客户端算女仆的走法，C2S 把结果交回服务端执行）
+        com.github.tartaricacid.touhoulittlemaid.network.CChessToServerPacket.initServer();
 
         // 女仆位置留档：周期性记录，供仆从铃 / 小号处理「她在未加载区块」那一半。
         // 原版 1.18.2 没有实体卸载钩子，Fabric API 0.77 也没有对应事件，说明见该类注释。

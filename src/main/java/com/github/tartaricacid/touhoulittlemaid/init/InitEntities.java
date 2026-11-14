@@ -64,15 +64,26 @@ public final class InitEntities {
                     .clientTrackingRange(10)
                     .build(TouhouLittleMaid.MOD_ID + ":extinguishing_agent"));
 
-
     public static final Activity RIDE_IDLE = Registry.register(Registry.ACTIVITY,
             TouhouLittleMaid.rl("ride_idle"), MaidReflection.newActivity("tlm_ride_idle"));
     public static final Activity RIDE_WORK = Registry.register(Registry.ACTIVITY,
             TouhouLittleMaid.rl("ride_work"), MaidReflection.newActivity("tlm_ride_work"));
     public static final Activity RIDE_REST = Registry.register(Registry.ACTIVITY,
             TouhouLittleMaid.rl("ride_rest"), MaidReflection.newActivity("tlm_ride_rest"));
-
-    // ------------------------------------------------------------------ 女仆鱼钩
+    /**
+     * 座位实体（上游 {@code EntitySit.TYPE}）。
+     *
+     * <p>{@code MobCategory.MISC} + 0.5×0.1 的碰撞箱：它不是生物，只是给人「坐」的锚点。
+     * {@code clientTrackingRange(10)} 与上游一致 —— 坐下的动画只在近距离可见。</p>
+     */
+    public static final EntityType<com.github.tartaricacid.touhoulittlemaid.entity.item.EntitySit> SIT =
+            Registry.register(Registry.ENTITY_TYPE,
+                    TouhouLittleMaid.rl("sit"),
+                    EntityType.Builder.<com.github.tartaricacid.touhoulittlemaid.entity.item.EntitySit>of(
+                                    com.github.tartaricacid.touhoulittlemaid.entity.item.EntitySit::new, MobCategory.MISC)
+                            .sized(0.5F, 0.1F)
+                            .clientTrackingRange(10)
+                            .build(TouhouLittleMaid.MOD_ID + ":sit"));
 
     /**
      * 女仆鱼钩（上游 {@code MaidFishingHook.TYPE}）。

@@ -200,6 +200,18 @@ public final class InitItems {
                     new FabricItemSettings().tab(MAIN_TAB)));
 
     /**
+     * 中国象棋棋盘（上游 {@code InitItems.CCHESS}）。
+     *
+     * <p>普通 {@code BlockItem}：放置时 {@code BlockCChess#getStateForPlacement} 会检查周围八格，
+     * 放不下就返回 {@code null}（物品不会被消耗），所以不需要自定义物品类。</p>
+     */
+    public static final Item CCHESS = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("cchess"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.CCHESS,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    /**
      * 替身地藏（上游 {@code InitItems.SUBSTITUTE_JIZO}）：给女仆永久无敌。
      */
     public static final Item SUBSTITUTE_JIZO = Registry.register(Registry.ITEM,

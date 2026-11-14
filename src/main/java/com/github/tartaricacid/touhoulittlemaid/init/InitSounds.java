@@ -101,6 +101,27 @@ public final class InitSounds {
     public static final SoundEvent FAIRY_HURT = register("entity.fairy.hurt");
     public static final SoundEvent FAIRY_DEATH = register("entity.fairy.death");
 
+    // ------------------------------------------------------------------ 棋类
+
+    /**
+     * 落子音（{@code block/piece.ogg}）。上游注册名是 {@code block.gomoku}，
+     * 象棋 / 国际象棋 / 五子棋三张桌子都用它。
+     */
+    public static final SoundEvent GOMOKU = register("block.gomoku");
+
+    /**
+     * 重开棋盘音（{@code block/gomoku_reset.ogg}）。
+     */
+    public static final SoundEvent GOMOKU_RESET = register("block.gomoku_reset");
+
+    /**
+     * 赢棋 / 输棋语音。资源包里指向 {@code maid/empty.ogg}（原模组就没录这两句），
+     * 注册它们是为了让 {@code MaidGameRecordManager} 的播放调用与上游保持一致 ——
+     * 将来换成真实语音时不用改代码。
+     */
+    public static final SoundEvent GAME_WIN = register("maid.ai.game_win");
+    public static final SoundEvent GAME_LOST = register("maid.ai.game_lost");
+
     private InitSounds() {
     }
 

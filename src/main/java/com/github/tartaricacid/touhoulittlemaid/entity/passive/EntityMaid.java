@@ -389,6 +389,8 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.entityData.define(DATA_HOME_MODE, false);
         this.entityData.define(DATA_PICKUP_TYPE, PickType.ALL.getId());
         MaidSubConfig.define(this.entityData);
+        // 对局记录的两个同步位：五子棋胜场数据与这一局的胜负
+        this.gameRecordManager.defineSynchedData(this.entityData);
 
         this.entityData.define(DATA_TASK, TaskIdle.UID.toString());
         this.entityData.define(DATA_BEGGING, false);
@@ -1160,6 +1162,37 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
     /**
+     * 对局记录（五子棋胜场 + 这一局的胜负表情），
+     * 对应上游 {@code entity/passive/MaidGameRecordManager}。
+     *
+     * <p>两个 {@code EntityDataAccessor} 声明在那个类里而不是本文件，
+     * 只是为了少改一次这个很长的文件；同步数据的 {@code define}
+     * 仍然在 {@code defineSynchedData()} 里完成。</p>
+     */
+    private final MaidGameRecordManager gameRecordManager = new MaidGameRecordManager(this);
+
+    public MaidGameRecordManager getGameRecordManager() {
+        return this.gameRecordManager;
+    }
+
+    /**
+     * 写入同步数据。
+     *
+     * <p><b>为什么不能原地修改再写回：</b>反编译确认 1.18.2 的
+     * {@code SynchedEntityData#set} 用 {@code ObjectUtils.notEqual(新值, 旧值)} 判定要不要标脏，
+     * 而 {@code CompoundTag} 的 {@code equals} 比的是<b>内容</b>。若取出同一个实例、改完再塞回去，
+     * 「新值」和「旧值」是同一个对象，内容也就相等 → 不标脏 → 客户端永远收不到更新。</p>
+     *
+     * <p>上游为此直接操络 {@code DataItem} 绕过判定；1.18.2 的 {@code DataItem} 与
+     * {@code getItem} 都是 private，没有等价入口，{@code set} 也没有接受 {@code force} 的重载。
+     * 这里改为<b>调用方传副本</b>（见 {@code MaidGameRecordManager#getGameSkill}），
+     * 内容差异就能被正确识别。方法名保留与上游一致，便于对照。</p>
+     */
+    public <T> void forceSyncData(net.minecraft.network.syncher.EntityDataAccessor<T> key, T value, boolean force) {
+        this.entityData.set(key, value);
+    }
+
+    /**
      * 头顶冒爱心（上游发 {@code SpawnParticleMessage} 让附近客户端播放，这里用原版服务端粒子）。
      *
      * @param amount 粒子数量，会被夹到 1~8，避免一次刷出一大片
@@ -1904,6 +1937,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         tag.put(MAID_HIDE_INVENTORY_TAG, this.hideInv.serializeNBT());
         tag.put(MAID_BAUBLE_INVENTORY_TAG, this.maidBauble.serializeNBT());
         this.favorabilityManager.save(tag);
+        this.gameRecordManager.addAdditionalSaveData(tag);
 
         MaidSubConfig.save(tag, this);
         this.attackList.save(tag);
@@ -1977,6 +2011,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             this.maidBauble.deserializeNBT(tag.getCompound(MAID_BAUBLE_INVENTORY_TAG));
         }
         this.favorabilityManager.load(tag);
+        this.gameRecordManager.readAdditionalSaveData(tag);
         // 好感度决定最大生命与攻击力，读档后必须按当前好感度重建一次属性，
         // 否则会出现「好感度 300 但生命還是 20」
         this.favorabilityManager.refreshAttributes();
@@ -2060,6 +2095,8 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         if (this.level.isClientSide) {
             return;
         }
+        // 离开座位（棋盘 / 坐垫）后清掉上一局的胜负表情
+        this.gameRecordManager.tick();
         if (this.backpackDelay > 0) {
             this.backpackDelay--;
         }
@@ -2306,7 +2343,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      * 被主人抱着（鞍）时，每 tick 把位置贴到「玩家身前 0.75 格、抬高 0.15 格」，
      * 朝向对齐玩家<b>上半身骨骼</b>的偏航角（{@code yBodyRot}）。
      *
-     * <h2>为什么这里也要算一遍位置</h2>
+     * <h2>为什么需要</h2>
      *
      * <p>乘客的坐标<b>不由服务端同步</b>：服务端只发「谁骑谁」
      * （{@code ClientboundSetPassengersPacket}），具体坐标由客户端自己算。
@@ -2432,7 +2469,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      * {@code isAlive() && !isSpectator() && !onClimbable()} —— <b>一点都不含糊地返回 true</b>。
      * 于是 {@code Entity#pushEntities()} 里那个
      * {@code getEntities(this, getBoundingBox(), Entity::isPushable)} 会同时命中
-     * 「玩家推女仆」和「女仆推玩家」。她正好卡在玩家身前 0.75 格、包围盒与玩家的重叠，
+     * 「玩家推女仆」和「女仆推玩家」。她正好卡在玩家身前 0.75 格，包围盒与玩家的重叠，
      * 表现就是「抱着的时候女仆还在推着玩家走」。</p>
      *
      * <p>原版 {@code Entity#pushEntities} 里那条 {@code isPassengerOfSameVehicle} 的豁免
@@ -2473,12 +2510,12 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      *     return hasPlayer ? false : super.isPickable();
      * }
      * </pre>
-     * 上游 {@code EntityMaid} 本身没有这个重写，但它的抱持位置同样是身前 0.75 格，
+     * 上游 {@code EntityMaid} 本身没有这个重写，但它的抱持位置同樣是身前 0.75 格，
      * 遇到的是同一个坑。</p>
      *
      * <p>放下她仍然有路可走，且都不经过实体射线：拿鞍右键空气 / 方块
      * （{@code MaidSaddleEvents} 挂在 {@code UseItemCallback} 上）。
-     * 射线穿透她之后，被挡在后面的箱子、门、拉杆都会正常响应。</p>
+     * 射线穿透她之后，被挡在后面的箱子、门、拉杆都有正常响应。</p>
      */
     @Override
     public boolean isPickable() {
@@ -2517,33 +2554,30 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      * </pre>
      *
      * <p><b>为什么少了这一段就会「固定看向一侧」：</b>反编译 {@code Entity#rideTick} 可以看到它是
-     * {@code setDeltaMovement(ZERO) → tick() → positionRider(this)} —— 也就是说乘客的
-     * <b>tick() 照常执行</b>（所以 {@code yBodyRotO}/{@code yHeadRotO} 会被刷新，插值是平滑的），
-     * 但 {@code tick()} 里**没有任何一步**把「载具的朝向」写给乘客：</p>
+     * {@code setOldPosAndRot → tickCount++ → rideTick} 最后那一句
+     * {@code getVehicle().positionRider(this)}，而 {@code rideTick()} 只会在
+     * {@code Level#tickPassenger} 里被调到。</p>
      *
-     * <ul>
-     *     <li>{@code yBodyRot} 只有 {@code Mob#aiStep} 那条「跟随移动方向 / 看向控制」的路径会改写，
-     *         而乘客的寻路与看向控制都不工作（{@code canBrainMoving()} 已经把 AI 停掉）；</li>
-     *     <li>船的 {@code Boat#clampRotation} 只给乘客写 {@code yRot}，不碰 {@code yBodyRot} /
-     *         {@code yHeadRot}。</li>
-     * </ul>
+     * <p>反编译 {@code ClientLevel} 确认这条路径<b>会</b>执行（字节码顺序是
+     * {@code setOldPosAndRot → tickCount++ → rideTick}，且只对
+     * {@code tickingEntities} 里的实体执行 —— 女仆在表里）。
+     * 但它依赖「客户端确实复现了乘客关系」，一旦哪个环节没对上，画面就会永远停在
+     * 抱起那一刻。所以在 {@link #tick()} 里再算一遍作为兜底：两端结果完全一致，
+     * 不需要任何额外网络包。</p>
      *
-     * <p>而模型整体的偏航角取自 {@code Mth.rotLerp(partialTick, yBodyRotO, yBodyRot)}
-     * （见 {@code GeoReplacedEntityRenderer#render} 里的 {@code lerpBodyRot} 与
-     * {@code LivingEntityRenderer#setupRotations}），头部再加一个 {@code yHeadRot - yBodyRot}。
-     * 于是这两个值一旦冻在「上船那一刻」，女仆就会永远朝着那个方向 ——
-     * 船怎么转都不跟着动。</p>
+     * <h2>为什么绝不能在这里调 setOldPosAndRot()</h2>
      *
-     * <p>上游为此重写了 {@code rideTick}；本移植版之前只在这里调了
-     * {@code updateCarriedPosition()}，漏掉了这段同步。</p>
-     *
-     * <p><b>与「被玩家抱着」的关系：</b>抱着她时载具是玩家，此时她必须跟随玩家的
-     * <b>上半身骨骼</b>（{@code yBodyRot}）而不是 {@code yRot}，所以
-     * {@link #updateCarriedPosition()} 放在后面调用 —— 它在能解析出载运者时会把三个角度
-     * 覆盖成 {@code carrier.yBodyRot}，正好把这里的 {@code vehicle.getYRot()} 顶掉；
-     * 解析不到载运者（船 / 矿车 / 其他模组坐骑）时它直接返回，只保留上面这段同步。</p>
+     * <p>理由就是上一段：{@code tickPassenger} 已经替我们调过了。渲染器画的是
+     * {@code lerp(partialTick, xo, getX())}，而 {@code xo} 的语义是「上一 tick 的位置」。
+     * 反编译 ClientLevel 确认：乘客每次 tick 之前，tickPassenger() 已经替她调过一次
+     * setOldPosAndRot()（字节码顺序：setOldPosAndRot → tickCount++ → rideTick）。
+     * 所以「旧位置 → 新位置」之间本来就有插值。
+     * 这里再调一次会把 xo 覆盖成新位置，插值区间长度变成 0 ——
+     * 表现正是「每 tick 瞬移到玩家身前一次」，看起来只有 20 帧。
+     * 这是之前「女仆跟随不平滑」的根因。</p>
      */
-    @Override
+
+
     public void rideTick() {
         super.rideTick();
         if (this.getVehicle() != null) {

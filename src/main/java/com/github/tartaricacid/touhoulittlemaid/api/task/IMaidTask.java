@@ -199,5 +199,18 @@ public interface IMaidTask {
         // 默认依据女仆的工作范围划定搜索范围
         return maid.getRestrictRadius();
     }
-}
 
+    /**
+     * 处于该工作模式时，女仆是否允许坐在娱乐方块上？
+     *
+     * <p>默认 {@code false}：任何工作模式的女仆坐到棋盘 / 键盘 / 书架旁都会被
+     * {@code EntitySit} 立刻赶下来，只有真正以「娱乐」为工作的模式（{@code board_games}）
+     * 覆盖成 {@code true}。空闲状态下不看这个开关，随便坐。</p>
+     *
+     * @param maid    女仆
+     * @param joyType 娱乐方块类型（{@code entity/favorability/Type} 的类型名）
+     */
+    default boolean canSitInJoy(EntityMaid maid, String joyType) {
+        return false;
+    }
+}

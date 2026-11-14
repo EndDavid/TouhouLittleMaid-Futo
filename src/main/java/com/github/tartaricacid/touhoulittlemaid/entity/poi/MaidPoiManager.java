@@ -46,6 +46,13 @@ public final class MaidPoiManager {
             .filter(blockState -> blockState.getValue(BlockScarecrow.HALF) == DoubleBlockHalf.LOWER)
             .collect(ImmutableSet.toImmutableSet());
 
+    /**
+     * 娱乐方块：目前只有中国象棋棋盘。上游这里还有五子棋 / 国际象棋 / 键盘 / 书架 / 电脑。
+     */
+    private static final Set<BlockState> JOYS = ImmutableList.of(InitBlocks.CCHESS)
+            .stream().flatMap(block -> block.getStateDefinition().getPossibleStates().stream())
+            .collect(ImmutableSet.toImmutableSet());
+
     private MaidPoiManager() {
     }
 
@@ -55,5 +62,18 @@ public final class MaidPoiManager {
 
     public static Set<BlockState> getScarecrowStates() {
         return SCARECROW;
+    }
+
+    /**
+     * 娱乐方块（棋类）的全部状态。
+     *
+     * <p>和上游一样把 3×3 的<b>九格全收进来</b>，不只收中心格。多收了不会出错：
+     * {@code MaidBoardGameTask#isOccupied} 在查不到方块实体时返回 {@code true}（当作已被占用），
+     * 所以边角格会被自动过滤掉，女仆只会走向真正的棋盘中心。</p>
+     *
+     * <p>将来加五子棋 / 国际象棋 / 键盘 / 书架 / 电脑时，把它们也放进这个列表即可。</p>
+     */
+    public static Set<BlockState> getJoyBlockStates() {
+        return JOYS;
     }
 }

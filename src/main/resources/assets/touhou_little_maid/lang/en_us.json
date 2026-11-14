@@ -936,6 +936,8 @@
   "patchouli.touhou_little_maid.book.entries.other.fox_scroll.pages.0.text": "Use to find a maid or their tombstone.",
   "patchouli.touhou_little_maid.book.entries.other.granite_inari_fox.name": "Granite Inari Fox",
   "patchouli.touhou_little_maid.book.entries.other.granite_inari_fox.pages.0.text": "Granite Inari Fox can prevent the spawning of maid fairies.$(br2)The prevent range is a square range, and the Y direction covers everything from the lowest point to the highest point!",
+  "patchouli.touhou_little_maid.book.entries.other.cchess.name": "Chinese Chess",
+  "patchouli.touhou_little_maid.book.entries.other.cchess.pages.0.text": "You can play Chinese chess with the maid, and winning will increase her favorability.\r\n$(br2)The board covers a 3x3 area. Right-click it with an empty hand to pick up and put down a piece; clicking the marked area on the side restarts the game.",
   "patchouli.touhou_little_maid.book.entries.other.gomoku.name": "Gomoku",
   "patchouli.touhou_little_maid.book.entries.other.gomoku.pages.0.text": "You can play gomoku with the maid, and winning will increase the maid's favorability.$(br2)After the player wins multiple times, the maid's gomoku skills will also increase.",
   "patchouli.touhou_little_maid.book.entries.other.maid_joy.name": "Maid's Joy",

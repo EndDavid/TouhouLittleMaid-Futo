@@ -60,6 +60,30 @@ public final class GeoBlockRenderer implements IGeoRenderer<ResourceLocation> {
     }
 
     /**
+     * 只渲染一个命名骨骼（含其子树）。
+     *
+     * <p>棋盘棋子就是这么画的：一整个 {@code cchess_pieces} 模型里放了 15 个互不相干的
+     * 骨骼（{@code ShuaiRed} / {@code JuBlack} … {@code Selected}），每格挑一个画。
+     * 拆成 15 个独立模型文件也行，但那要多维护 14 份几何与贴图坐标。</p>
+     *
+     * @return 骨骼不存在时返回 {@code false}（调用方可以直接跳过这一格）
+     */
+    public static boolean renderBone(@Nullable AnimatedGeoModel model, String boneName, ResourceLocation texture,
+                                     PoseStack poseStack, MultiBufferSource bufferSource,
+                                     int packedLight, int packedOverlay, RenderType type) {
+        if (model == null) {
+            return false;
+        }
+        AnimatedGeoBone bone = model.bones().get(boneName);
+        if (bone == null) {
+            return false;
+        }
+        INSTANCE.renderRecursively(bone, poseStack, bufferSource.getBuffer(type),
+                packedLight, packedOverlay, 1, 1, 1, 1);
+        return true;
+    }
+
+    /**
      * 量出模型在方块空间里的包围盒（单位：格）。
      *
      * @return {@code [minX, minY, minZ, maxX, maxY, maxZ]}；模型为空时返回全 0

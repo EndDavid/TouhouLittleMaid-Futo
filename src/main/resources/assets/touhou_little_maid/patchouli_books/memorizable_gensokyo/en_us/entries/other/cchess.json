@@ -1,0 +1,24 @@
+{
+  "sortnum": 12,
+  "name": "patchouli.touhou_little_maid.book.entries.other.cchess.name",
+  "icon": "touhou_little_maid:cchess",
+  "category": "touhou_little_maid:other",
+  "pages": [
+    {
+      "type": "spotlight",
+      "item": "touhou_little_maid:cchess",
+      "text": "patchouli.touhou_little_maid.book.entries.other.cchess.pages.0.text"
+    },
+    {
+      "type": "image",
+      "images": [
+        "touhou_little_maid:textures/book/gomoku.png"
+      ]
+    },
+    {
+      "type": "altar_recipe",
+      "recipe_id": "touhou_little_maid:altar/craft_cchess"
+    }
+  ]
+}
+

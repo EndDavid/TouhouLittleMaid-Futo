@@ -64,6 +64,8 @@ public final class TaskManager {
         manager.add(new TaskGrass());
         manager.add(new TaskSnow());
         manager.add(new TaskFishing());
+        // 下棋：唯一一个「允许坐在娱乐方块上」的工作模式（见 IMaidTask#canSitInJoy）
+        manager.add(new TaskBoardGames());
 
         TASK_MAP = ImmutableMap.copyOf(TASK_MAP);
         TASK_INDEX = ImmutableList.copyOf(TASK_INDEX);

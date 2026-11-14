@@ -72,6 +72,17 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SHRINE_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityShrineRenderer::new);
+        // 中国象棋棋盘：也是 ENTITYBLOCK_ANIMATED，棋子与棋盘
+        // 全靠基岩模型画（见 TileEntityCChessRenderer）
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.CCHESS_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityCChessRenderer::new);
+
+        // 座位实体不该被看见，但必须有渲染器：未注册类型的
+        // getRenderer 返回 null，渲染循环不处处判空（同 P 点实体那个坑）。
+        net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitEntities.SIT,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EmptyEntityRenderer::new);
         // 神社庭灯与稻草人的模型来自 1.20.1，字段里写的是 "render_type": "cutout"。
         // 1.18.2 的 BlockModel 不认这个字段（它是 1.19.4 才进原版的），
         // 所以必须在这里显式把方块登记成 cutout，否则透明区域会渲染成黑色实心。
@@ -174,6 +185,16 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                             .show(area));
                 });
 
+        // 象棋：服务端把局面交过来，由本机在后台线程算女仆的下一步
+        // （S2C，上游 CChessToClientMessage）。必须先把字段读完再 execute。
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                com.github.tartaricacid.touhoulittlemaid.network.CChessToClientPacket.CHANNEL,
+                (client, handler, buf, responseSender) -> {
+                    com.github.tartaricacid.touhoulittlemaid.network.CChessToClientPacket.Payload payload =
+                            com.github.tartaricacid.touhoulittlemaid.network.CChessToClientPacket.read(buf);
+                    client.execute(() -> com.github.tartaricacid.touhoulittlemaid.client.event.CChessClientHandler
+                            .handle(client, payload.getPos(), payload.getFen()));
+                });
         // 「这次开不了居家模式」的说明（S2C，上游 CheckSchedulePosMessage）。
         // 只在女仆界面开着的时候弹 —— 否则玩家根本不知道自己点过那个开关。
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(

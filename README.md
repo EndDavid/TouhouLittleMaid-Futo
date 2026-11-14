@@ -93,10 +93,50 @@ loom_version=1.15.5
 | **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器）** | **完成**（换肤 GUI 待 `AbstractModelGui` 泛型化） |
 | **帕秋莉手册（书内容 + 侧边页签）** | **完成**（46 条目 / 3 分类） |
 | **搜索 / 定位（小号 / 仆从铃 / 狐狸卷轴 / 河童罗盘）** | **完成**（含 `SchedulePos` 三坐标作息） |
+| **棋类（中国象棋：3×3 多方块 + 对局 AI）** | **完成**（只有象棋，五子棋 / 国际象棋未移植） |
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | 未开始 |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
 | **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
+
+---
+
+## 棋类（中国象棋）
+
+`BlockCChess` + `TileEntityCChess` + `BlockJoy` / `TileEntityJoy`（基类）+
+`MaidGameRecordManager` 效果见下。
+
+### 三层结构
+
+1. **`BlockJoy` / `TileEntityJoy`**：娱乐方块的共同部分——
+   空手右击 = 坐下（坐下的不是玩家本体，而是专门的哑实体 `EntitySit`）；
+   方块实体只记一个 `SitId`。将来的键盘 / 书架 / 电脑都按这一层接。
+2. **`BlockCChess`**：3×3 多方块，只有中心格带方块实体。空手右击选子 /
+   落子，点棋盘侧面的标记区重开。
+3. **`TileEntityCChess`**：整盘棋就是一个 FEN 字符串，加回合数与三个终局标记。
+
+### 谁在算棋（为什么放在客户端）
+
+玩家落子→服务端把 FEN 发给该玩家→客户端在**后台线程**跑
+`Search#searchMain(1000)`（建议标准：纯 CPU 活，放服务端会卡整个世界的 tick）→
+结果用 `CChessToServerPacket` 交回。代价是两个布尔值可被伪造，
+服务端在 `BlockCChess#maidMove` 里把「女仆输」那一支重新验一遍（上游同款）。
+
+### 三个 1.18.2 才有的坑
+
+| 现象 | 原因 |
+| --- | --- |
+| `Component.translatable` / `literal` 编译不过 | 那是 1.19+ 的工厂方法；1.18.2 只有构造器 |
+| 女仆胜场 sync 不到客户端 | `SynchedEntityData#set` 用 `ObjectUtils.notEqual(新, 旧)` 判脏；`CompoundTag` 比内容，原地改完塞回会被当成没变 |
+| 座位实体必须注册空渲染器 | 未注册类型的 `getRenderer` 返回 `null`，渲染循环不处处判空 |
+
+### 已知限制
+
+- **只移植了中国象棋**。五子棋（`gomoku` + 1712 行 `ZhiZhangAIService`）与
+  国际象棋（`wchess`）未移植，因此手册里只放了一页象棋，
+  `$registered` 里也只登记了 `touhou_little_maid:cchess`。
+- **中心格离开视锥时整张棋盘会消失**：1.18.2 的方块实体没有
+  `getRenderBoundingBox`，与雕像渲染盒是同一个已知限制（要修得 Mixin `LevelRenderer`）。
 
 ---
 
