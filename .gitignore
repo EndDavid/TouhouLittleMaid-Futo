@@ -53,3 +53,8 @@ Desktop.ini
 #   port/               —— 上游参考源码（改代码时的对照物）
 #   src/main/resources  —— 内置模型 / 贴图 / 音效（约 48 MB）
 
+
+# scratch output from port/ helper scripts
+port/_*
+port_check_status.txt
+
