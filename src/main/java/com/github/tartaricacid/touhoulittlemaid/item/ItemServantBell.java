@@ -248,12 +248,9 @@ public class ItemServantBell extends Item {
                     "message.touhou_little_maid.servant_bell.no_result"), false);
             return;
         }
-        List<MaidInfo> infos = data.getPlayerMaidInfos(player);
-        if (infos == null || infos.isEmpty()) {
-            player.displayClientMessage(new TranslatableComponent(
-                    "message.touhou_little_maid.servant_bell.no_result"), false);
-            return;
-        }
+        // 必须是「区块确实没加载」的那些记录：本移植版的记录是周期性刷新的，
+        // 站在眼前的她也有记录，不过滤会指错地方。
+        List<MaidInfo> infos = data.getUnloadedMaidInfos(level, player);
         MaidInfo info = null;
         for (MaidInfo candidate : infos) {
             if (candidate.getEntityId().equals(searchUuid)) {
@@ -271,6 +268,12 @@ public class ItemServantBell extends Item {
         CompoundTag showTag = stack.getOrCreateTagElement(SHOW_TAG);
         showTag.putString(SHOW_DIMENSION_TAG, dimension);
         showTag.put(SHOW_POS_TAG, NbtUtils.writeBlockPos(info.getChunkPos()));
+        // 坐标写进了主手物品的 NBT，必须主动同步一次：物品 NBT 不参与实体同步，
+        // 否则客户端手里那枚铃仍是旧数据，ServantBellTracker 读不到坐标就不画箭头
+        // （上游没这句，所以那边实际上要靠下一次背包同步才生效）。
+        if (player instanceof ServerPlayer serverPlayer) {
+            serverPlayer.inventoryMenu.broadcastChanges();
+        }
         if (dimension.equals(playerDimension)) {
             player.displayClientMessage(new TranslatableComponent(
                     "message.touhou_little_maid.servant_bell.show_pos"), false);

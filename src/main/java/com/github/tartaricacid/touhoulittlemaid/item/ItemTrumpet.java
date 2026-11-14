@@ -88,8 +88,10 @@ public class ItemTrumpet extends Item {
                     .forEach(maid -> this.teleportToOwner(maid, player));
             MaidWorldData data = MaidWorldData.get(level);
             if (data != null) {
-                List<MaidInfo> infos = data.getPlayerMaidInfos(player);
-                if (infos != null && !infos.isEmpty()) {
+                // 只数「区块确实没加载」的那些：本移植版的记录是周期性刷新的，
+                // 刚被传送走的这几只也仍有记录，不过滤就会一直提示「还有 N 只在别处」。
+                List<MaidInfo> infos = data.getUnloadedMaidInfos(level, player);
+                if (!infos.isEmpty()) {
                     player.displayClientMessage(new TranslatableComponent(
                             "message.touhou_little_maid.trumpet.unloaded_maid", infos.size())
                             .withStyle(ChatFormatting.DARK_RED), false);
