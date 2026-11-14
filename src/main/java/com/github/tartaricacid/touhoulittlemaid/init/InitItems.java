@@ -285,6 +285,17 @@ public final class InitItems {
             TouhouLittleMaid.rl("trumpet"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemTrumpet());
 
+    /**
+     * 仆从铃（上游 {@code InitItems.SERVANT_BELL}）。
+     *
+     * <p>用铃右击自己的女仆把她记在这枚铃上，之后蓄力 1 秒松手即可把她召到身边；
+     * 若她所在区块没加载，会给出她的坐标并在世界里画跟踪浮标。
+     * 见 {@code item/ItemServantBell} 与 {@code client/render/ServantBellTracker}。</p>
+     */
+    public static final Item SERVANT_BELL = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("servant_bell"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemServantBell());
+
 
 
     // ------------------------------------------------------------------ 女仆饰品

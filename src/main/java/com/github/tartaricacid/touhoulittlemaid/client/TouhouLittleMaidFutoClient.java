@@ -114,8 +114,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.client.render.MaidAreaRenderer.init();
         // 指南针 / 命名牌的客户端行为（上游 UseNameTagEvent 的客户端那一半 + 区域显示入口）
         com.github.tartaricacid.touhoulittlemaid.client.event.MaidClientInteractEvents.init();
-        // carried maid position (client half): see MaidCarryTicker
-        com.github.tartaricacid.touhoulittlemaid.event.MaidCarryTicker.initClient();
+        // 仆从铃：她所在区块没加载时，在世界上画「距离 + 红色倒三角」浮标
+        // （上游 client/event/ScrollRenderEvent 的铃那一半；红狐狸卷轴移植后共用这个方法）
+        com.github.tartaricacid.touhoulittlemaid.client.render.ServantBellTracker.init();
 
 
         // 灵力同步包（S2C）：客户端只负责写入本地玩家再喂给 HUD

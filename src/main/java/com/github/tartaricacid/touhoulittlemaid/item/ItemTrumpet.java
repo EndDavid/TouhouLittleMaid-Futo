@@ -30,8 +30,9 @@ import java.util.List;
  * 小号，逐字移植自上游 {@code item/ItemTrumpet}。
  *
  * <p>按住右键蓄力（{@link #getUseDuration} 100 tick，蓄力动作 {@link UseAnim#BOW}），
- * 松手时如果蓄了 <b>至少 20 tick</b>（{@link #MIN_USE_DURATION}，即 1 秒），
- * 就把<b>已加载区块里</b>自己所有的女仆传送到身边，并给 200 tick（10 秒）冷却。</p>
+ * 松手时如果<b>还没按满 80 tick</b>，就把<b>已加载区块里</b>自己所有的女仆传送到身边，
+ * 并给 200 tick（10 秒）冷却。注意「按太久反而无效」是上游的原始写法，
+ * 见 {@link #MIN_USE_DURATION} 的说明。</p>
  *
  * <h2>为什么「已加载区块」是硬限制</h2>
  * <p>并非偷懒：未加载区块里的实体根本不存在于内存中，服务端拿不到它们。
@@ -49,7 +50,16 @@ import java.util.List;
  */
 public class ItemTrumpet extends Item {
     /**
-     * 最短蓄力时长（tick）。1 秒 = 20 tick。低于这个时长松手视为「没吹」。
+     * 松手时允许的<b>剩余</b>使用时间下限（tick）。
+     *
+     * <p><b>这个名字容易误导，它不是「最少蓄力时长」。</b>javap 确认 1.18.2 传进来的是
+     * {@code stack.releaseUsing(level, entity, getUseItemRemainingTicks())}，
+     * 也就是「还剩多久用完」，从 {@link #getUseDuration} 递减到 0。因此
+     * {@code timeLeft < 20} 为真意味着<b>已经按了超过 80 tick</b>。</p>
+     *
+     * <p>实际手感：按下后 4 秒内松手有效，按太久反而无效；按满 100 tick 时原版
+     * 根本不调 {@code releaseUsing}（走 {@code finishUsingItem}），同样没反应。
+     * 上游 1.18.2 与 1.20.1 都是这个写法，照抄，不改成直觉版本。</p>
      */
     private static final int MIN_USE_DURATION = 20;
 
@@ -64,10 +74,9 @@ public class ItemTrumpet extends Item {
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entityLiving, int timeLeft) {
-        // 1.18.2 的 timeLeft 是「剩余可用时间」：开始是 getUseDuration()，
-        // 越蓄越小。所以「蓄了多久」= getUseDuration() - timeLeft。
-        // 上游写的是 timeLeft >= MIN_USE_DURATION，含义是「至少蓄了 80 tick」——
-        // 这里保持一致，没有「修正」成更直觉的写法。
+        // timeLeft 是「剩余可用时间」：开始是 getUseDuration()，越蓄越小。
+        // 所以 timeLeft < 20 意味着「已经按了超过 80 tick」，而不是「蓄得不够」。
+        // 详见 MIN_USE_DURATION 的说明；上游就是这个写法，保持一致。
         if (!(entityLiving instanceof Player player) || timeLeft < MIN_USE_DURATION) {
             return;
         }
