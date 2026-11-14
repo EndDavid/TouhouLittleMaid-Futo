@@ -1,7 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.event;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -18,7 +17,17 @@ import net.minecraft.world.phys.AABB;
  * 本地玩家在客户端并不一定走那条 tick 路径，于是女仆的位置可能<b>根本没人更新</b> ——
  * 表现就是「抱起后模型留在原地，放下时才瞬移过来」。</p>
  *
- * <p>所以这里做两件事：</p>
+ * <p>客户端不需要额外的 tick 回调：{@code EntityMaid#tick} 在 {@code isClientSide}
+ * 提前返回之前就调了 {@code updateCarriedPosition()}，两端都跑。
+ * 这个类只剩服务端那一半。</p>
+ *
+ * <p><b>为什么客户端那半被删掉：</b>它用的 {@code ClientTickEvents} 是客户端 API，
+ * 而本类被主入口引用。Fabric 在加载类文件时就会扫常量池，
+ * 一旦看到客户端类就报
+ * {@code Cannot load class ... in environment type SERVER} —— 整个模组在专用服务器上根本启不来。
+ * 而那个方法从未被调用过，属于死代码。</p>
+ *
+ * <p>原本它想做的两件事（都已由 {@code updateCarriedPosition()} 覆盖）：</p>
  * <ol>
  *     <li>遍历本地玩家 / 全服玩家的<b>乘客</b>，正常刷一遍（与上游 {@code positionRider} 同效）；</li>
  *     <li>再扫描玩家附近「{@code carrierId != 0}」的女仆 —— 这条路径
@@ -30,23 +39,6 @@ public final class MaidCarryTicker {
     private MaidCarryTicker() {
     }
 
-    /**
-     * 客户端：本地玩家的乘客 + 附近带 carrierId 的女仆。
-     */
-    public static void initClient() {
-        ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
-            if (minecraft.level == null || minecraft.player == null) {
-                return;
-            }
-            tickPassengers(minecraft.player);
-            // 兜底扫描：半径 8 格足够 —— 她每 tick 都被贴回玩家身前 0.75 格
-            AABB area = minecraft.player.getBoundingBox().inflate(8.0D);
-            for (Entity entity : minecraft.level.getEntities(minecraft.player, area,
-                    e -> e instanceof EntityMaid maid && maid.getCarrierId() != 0)) {
-                ((EntityMaid) entity).updateCarriedPosition();
-            }
-        });
-    }
 
     /**
      * 服务端：全服每个玩家的乘客。
