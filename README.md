@@ -520,15 +520,42 @@ BoardStateAuthor  署名
 一张图与对应的祭坛配方页。配方补了 `craft_gomoku` 与 `craft_wchess`
 （原本只有 `craft_cchess`）。所以三张棋盘都能在祭坛上做出来了。
 
+#### 创造模式的木棍：导出与排残局
+
+上游把它只放在五子棋上（`BlockGomoku#onCreativePlayerClick`），
+本移植版同样只给五子棋 —— 两张象棋棋盘没有这个分支。
+理由也很实在：象棋的局面是一个 FEN，手写就行；
+五子棋的格式是 deflate + base64，人不可能手搓，才需要一个导出器。
+
+两个用法（都需要创造模式，且木棍拿在主手）：
+
+| 点哪里 | 发生什么 |
+|---|---|
+| 棋盒（对角线上那两堆棋子） | 把当前棋局编码成一行字符串发到聊天栏，**点一下就复制** |
+| 交叉点 | 落一颗「轮到谁的颜色」，然后把回合翻给对面 |
+
+导出的那行字符串就是 `board_states/*.json` 里 `data` 字段的内容，
+直接贴进数据包就能变成一条残局。
+
+**排残局是「直接编辑」，不检查落子点是否为空** —— 落在已有棋子上是覆盖。
+这是上游行为：排的时候难免要改一颗子的颜色，反复点同一个点
+就能在黑 / 白之间来回切。代价是 `ChessCounter` 会被超累加（它只是「回合数」的展示）。
+
+1.18.2 差异（两处，都在注释里记了）：
+`ComponentUtils#copyOnClickText` 是 1.19+ 的工厂方法，这里用
+`Style#withClickEvent` + `withHoverEvent` + `withInsertion` 拼出来；
+`Player#sendSystemMessage` 同样是 1.20+，1.18.2 的等价写法是
+`displayClientMessage(x, false)`（actionBar = false 就是 SYSTEM 聊天栏）。
+`COPY_TO_CLIPBOARD` 在 1.18.2 允许服务端下发（`ClickEvent$Action` 枚举初始化里是
+`iconst_1`），否则客户端会把点击事件剔掉。
+
 ### 已知限制
 
-- **「木棍 + 创造模式」那套残局工具没搬**：上游用木棍导出 / 预设棋局
-  （`GomokuCodec.encode` + 聊天栏点击复制），以及「残局导出成物品」。
-  这是给做残局的人用的开发工具，玩家侧不需要它，留在待办里。
+- **木棍工具只有五子棋有**（上游同款），且它只产出
+  `board_states/*.json` 里的 `data` 字符串 —— 不会直接变成一件残局道具。
+  想要得到物品，要把它写进数据包（然后靠战利品或 `/loot` 拿）。
 - **三块棋盘的页面都只有一页**：上游的 `gomoku` 页用四个
   `altar_recipe` 把三张棋盘的配方堆在一起，这里拆成了三页。
-- **中心格离开视锥时整张棋盘会消失**：1.18.2 的方块实体没有
-  `getRenderBoundingBox`，与雕像渲染盒是同一个已知限制（要修得 Mixin `LevelRenderer`）。
 - **中心格离开视锥时整张棋盘会消失**：1.18.2 的方块实体没有
   `getRenderBoundingBox`，与雕像渲染盒是同一个已知限制（要修得 Mixin `LevelRenderer`）。
 

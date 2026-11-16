@@ -2,6 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.block;
 
 import com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType;
 import com.github.tartaricacid.touhoulittlemaid.api.block.IBoardGameBlock;
+import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.GomokuCodec;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Point;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Statue;
 import com.github.tartaricacid.touhoulittlemaid.block.properties.GomokuPart;
@@ -23,6 +24,12 @@ import com.github.tartaricacid.touhoulittlemaid.util.GomokuUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.ComponentUtils;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +41,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -145,6 +153,65 @@ public class BlockGomoku extends BlockJoy implements IBoardGameBlock {
         return false;
     }
 
+    /**
+     * 创造模式下的两种额外用法，移植自上游 {@code BlockGomoku#onCreativePlayerClick}。
+     *
+     * <p>返回 {@code null} 表示「这两个工具我都不认识」，让 {@link #use} 继续按正常流程走 ——
+     * 上游用同一个约定，别改成返回 {@code PASS}，那样会把后面的残局道具分支挡掉。</p>
+     *
+     * <h2>为什么只有五子棋有木棍工具</h2>
+     * <p>上游就是这样：两张象棋棋盘没有这个分支。原因也很实在 —— 象棋的局面是一个 FEN，
+     * 手写就行；五子棋的格式是 deflate + base64，人不可能手搓，才需要一个导出器。</p>
+     */
+    @Nullable
+    private InteractionResult onCreativePlayerClick(Level level, BlockPos pos, Player player,
+                                                    TileEntityGomoku gomoku, BlockPos centerPos,
+                                                    Vec3 location, GomokuPart part, Direction facing) {
+        Item item = player.getMainHandItem().getItem();
+
+        // 御币：铺满棋盘只留三个空位，方便调试 AI 的收尾判断
+        if (item instanceof ItemHakureiGohei) {
+            gomoku.clickWithDebug();
+            gomoku.refresh();
+            level.playSound(null, centerPos, InitSounds.GOMOKU_RESET, SoundSource.BLOCKS, 1.0f, 1.0f);
+            return InteractionResult.SUCCESS;
+        }
+
+        if (item != Items.STICK) {
+            return null;
+        }
+
+        // 点棋盒 = 导出当前棋局（点聊天栏里那条消息就能复制，再贴进数据包的 board_states/*.json）
+        if (isClickChessBox(location.x, location.z, part, facing)) {
+            String result = GomokuCodec.encode(gomoku.getStateData());
+            // 1.20 的 ComponentUtils#copyOnClickText：点一下就把字符串塞进剪贴板。
+            // 1.18.2 没有这个工厂，这里用同样的三件套拼出来（点击 / 悬停提示 / 插入串）。
+            MutableComponent copyable = ComponentUtils.mergeStyles(new TextComponent(result),
+                    Style.EMPTY
+                            .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, result))
+                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                    new TranslatableComponent("chat.copy.click")))
+                            .withInsertion(result));
+            // 1.18.2 的对应物：displayClientMessage(x, false) 就是 SYSTEM 聊天栏（actionBar=false）。
+            player.displayClientMessage(copyable, false);
+            return InteractionResult.SUCCESS;
+        }
+
+        // 点交叉点 = 落一颗「轮到谁的颜色」，并把回合翻给对面，于是下一次点击是另一种颜色。
+        // 这是排残局用的直接编辑：落在已有棋子上是【覆盖】（上游同款），不检查该点是否为空。
+        int[] grid = GomokuUtil.getGridPoint(part, location.x, location.z);
+        if (grid == null) {
+            return InteractionResult.FAIL;
+        }
+        int type = gomoku.isPlayerTurn() ? Point.BLACK : Point.WHITE;
+        gomoku.setChessData(grid[0], grid[1], type);
+        level.playSound(null, pos, InitSounds.GOMOKU, SoundSource.BLOCKS,
+                1.0f, 0.8F + level.random.nextFloat() * 0.4F);
+        gomoku.setPlayerTurn(!gomoku.isPlayerTurn());
+        gomoku.refresh();
+        return InteractionResult.SUCCESS;
+    }
+
     @Override
     protected Vec3 sitPosition() {
         return Vec3.ZERO;
@@ -220,13 +287,14 @@ public class BlockGomoku extends BlockJoy implements IBoardGameBlock {
         Vec3 location = hit.getLocation().subtract(pos.getX(), pos.getY(), pos.getZ());
         Direction facing = state.getValue(FACING);
 
-        // 创造模式下拿御币点一下 = 铺满棋盘只留三个空位（调试 AI 用）
-        Item held = player.getMainHandItem().getItem();
-        if (player.getAbilities().instabuild && held instanceof ItemHakureiGohei) {
-            gomoku.clickWithDebug();
-            gomoku.refresh();
-            level.playSound(null, centerPos, InitSounds.GOMOKU_RESET, SoundSource.BLOCKS, 1.0f, 1.0f);
-            return InteractionResult.SUCCESS;
+        // 创造模式的两个额外用法（御币铺满 / 木棍预设与导出）。
+        // 上游把这两件事收在一个方法里，返回 null 表示「我不管，继续往下走」。
+        if (player.getAbilities().instabuild) {
+            InteractionResult creative = this.onCreativePlayerClick(level, pos, player, gomoku,
+                    centerPos, location, part, facing);
+            if (creative != null) {
+                return creative;
+            }
         }
 
         // 残局道具：把棋局换成它记录的那一局（上游同款，在「只能空手」之前）

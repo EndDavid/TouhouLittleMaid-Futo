@@ -94,6 +94,21 @@ public class TileEntityGomoku extends TileEntityJoy implements IBoardGameEntityB
     }
 
     /**
+     * 把当前棋局打包成可导出的形式（棋盘 + 回合数 + 最后一手）。
+     *
+     * <p>对应上游 {@code TileEntityGomoku#getStateData}。它和 {@link #setStateData}
+     * 是一对：木棍导出走这里，残局道具导入走那边。</p>
+     *
+     * <p><b>注意不要传引用出去。</b>{@code chessData} 是这张棋盘自己的数组，
+     * {@code GomokuCodec#encode} 只读它，拿到的是拷贝出来的字符串，所以这里直接交出数组是安全的；
+     * 但反过来 {@link #setStateData} 必须<b>接管</b>传进来的数组（上游也是这么做的），
+     * 因为解码结果本来就是一次性对象。</p>
+     */
+    public GomokuCodec.StateData getStateData() {
+        return new GomokuCodec.StateData(this.chessData, this.chessCounter, this.latestChessPoint);
+    }
+
+    /**
      * 载入一个残局，对应上游 {@code TileEntityGomoku#setStateData}。
      *
      * <p>五子棋的残局数据里只有棋盘、回合数与最后一手，并不记录
