@@ -27,8 +27,10 @@ import java.util.List;
  * 于是所有其它工作模式（种田、攻击、灭火……）的女仆都会立刻站起来。
  * 只有这里返回 true，下棋的女仆才能一直坐着。</p>
  *
- * <p><b>与上游的差异：</b>上游的图标是五子棋棋子（{@code InitItems.GOMOKU}），
- * 而五子棋棋盘还没移植，所以暂用中国象棋棋盘当图标；等五子棋进来时改一行即可。</p>
+ * <p><b>与上游的差异：</b>上游的图标是五子棋棋盘（{@code InitItems.GOMOKU}）。
+ * 三张棋盘的工作模式名（{@code Type.GOMOKU}）是共用的 —— 上游那三块方块的
+ * {@code getTypeName()} 全都返回 {@code Type.GOMOKU.getTypeName()}，所以
+ * {@link #canSitInJoy} 一份判断就能同时允许三张棋盘。</p>
  */
 public class TaskBoardGames implements IMaidTask {
     public static final ResourceLocation UID = new ResourceLocation(TouhouLittleMaid.MOD_ID, "board_games");
@@ -40,7 +42,7 @@ public class TaskBoardGames implements IMaidTask {
 
     @Override
     public ItemStack getIcon() {
-        return new ItemStack(InitItems.CCHESS);
+        return new ItemStack(InitItems.GOMOKU);
     }
 
     @Nullable
@@ -61,4 +63,3 @@ public class TaskBoardGames implements IMaidTask {
         return Type.GOMOKU.getTypeName().equals(joyType);
     }
 }
-

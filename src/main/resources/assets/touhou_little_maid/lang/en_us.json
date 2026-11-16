@@ -520,6 +520,7 @@
   "message.touhou_little_maid.cchess.reset": "Right click on the right black area to reset",
   "message.touhou_little_maid.wchess.move_limit": "Draw by 50-Move Rule!",
   "message.touhou_little_maid.wchess.reset": "Right click on the light yellow area on either side to reset",
+  "message.touhou_little_maid.gomoku.draw": "Draw",
   "message.touhou_little_maid.entity_id_copy.copy": "The id of the entity has been copied: %s",
   "message.touhou_little_maid.ai_chat.reload_success": "The AI site configuration has been reloaded",
   "commands.touhou_little_maid.pack.reload.start": "Reloading all model packages...",

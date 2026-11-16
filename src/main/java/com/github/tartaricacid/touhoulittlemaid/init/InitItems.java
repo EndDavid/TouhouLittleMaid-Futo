@@ -212,6 +212,24 @@ public final class InitItems {
                     new FabricItemSettings().tab(MAIN_TAB)));
 
     /**
+     * 五子棋棋盘（上游 {@code InitItems.GOMOKU}）。
+     */
+    public static final Item GOMOKU = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("gomoku"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.GOMOKU,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    /**
+     * 国际象棋棋盘（上游 {@code InitItems.WCHESS}）。
+     */
+    public static final Item WCHESS = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("wchess"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.WCHESS,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    /**
      * 替身地藏（上游 {@code InitItems.SUBSTITUTE_JIZO}）：给女仆永久无敌。
      */
     public static final Item SUBSTITUTE_JIZO = Registry.register(Registry.ITEM,

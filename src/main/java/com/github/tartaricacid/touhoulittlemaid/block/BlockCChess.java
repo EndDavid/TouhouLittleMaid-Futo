@@ -173,22 +173,9 @@ public class BlockCChess extends BlockJoy implements IBoardGameBlock {
 
     @Override
     public void startMaidSit(EntityMaid maid, BlockState state, Level worldIn, BlockPos pos) {
-        if (worldIn instanceof ServerLevel serverLevel && worldIn.getBlockEntity(pos) instanceof TileEntityJoy joy) {
-            Entity oldSitEntity = serverLevel.getEntity(joy.getSitId());
-            if (oldSitEntity != null && oldSitEntity.isAlive()) {
-                return;
-            }
-            // 女仆坐在棋盘对面两格处，这样她才能真正「面朝」棋盘
-            Direction face = state.getValue(FACING).getOpposite();
-            Vec3 position = new Vec3(0.5 + face.getStepX() * 2, 0.1, 0.5 + face.getStepZ() * 2);
-            Vec3 sitPos = new Vec3(pos.getX() + position.x, pos.getY() + position.y, pos.getZ() + position.z);
-            EntitySit newSitEntity = new EntitySit(worldIn, sitPos, this.getTypeName(), pos);
-            newSitEntity.setYRot(face.getOpposite().toYRot() + this.sitYRot());
-            worldIn.addFreshEntity(newSitEntity);
-            joy.setSitId(newSitEntity.getUUID());
-            joy.setChanged();
-            maid.startRiding(newSitEntity);
-        }
+        // 女仆坐在棋盘对面两格处，这样她才能真正「面朝」棋盘。
+        // 具体摆放见 BlockJoy#sitMaidAt —— 三张棋盘共用同一段逻辑。
+        this.sitMaidAt(maid, state, worldIn, pos, state.getValue(FACING).getOpposite(), 2.0D);
     }
 
     @Override

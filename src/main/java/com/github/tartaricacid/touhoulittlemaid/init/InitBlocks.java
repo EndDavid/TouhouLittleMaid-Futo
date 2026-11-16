@@ -136,6 +136,28 @@ public final class InitBlocks {
                     FabricBlockEntityTypeBuilder.create(
                             com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityCChess::new, CCHESS).build());
 
+    /**
+     * 五子棋棋盘（上游 {@code InitBlocks.GOMOKU}）。同样是 3×3 多方块，只有中心格带方块实体。
+     */
+    public static final Block GOMOKU = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("gomoku"), new com.github.tartaricacid.touhoulittlemaid.block.BlockGomoku());
+
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityGomoku> GOMOKU_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("gomoku"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityGomoku::new, GOMOKU).build());
+
+    /**
+     * 国际象棋棋盘（上游 {@code InitBlocks.WCHESS}）。同样是 3×3 多方块。
+     */
+    public static final Block WCHESS = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("wchess"), new com.github.tartaricacid.touhoulittlemaid.block.BlockWChess());
+
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityWChess> WCHESS_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("wchess"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityWChess::new, WCHESS).build());
+
     private InitBlocks() {
     }
 

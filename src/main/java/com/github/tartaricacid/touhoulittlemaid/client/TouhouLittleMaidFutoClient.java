@@ -77,6 +77,14 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.CCHESS_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityCChessRenderer::new);
+        // 五子棋 / 国际象棋：同一个套路（ENTITYBLOCK_ANIMATED + 基岩模型），
+        // 见各自的渲染器。三块棋盘共用 BoardRenderUtil 里的姿态。
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.GOMOKU_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityGomokuRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.WCHESS_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityWChessRenderer::new);
 
         // 座位实体不该被看见，但必须有渲染器：未注册类型的
         // getRenderer 返回 null，渲染循环不处处判空（同 P 点实体那个坑）。
@@ -195,84 +203,24 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                     client.execute(() -> com.github.tartaricacid.touhoulittlemaid.client.event.CChessClientHandler
                             .handle(client, payload.getPos(), payload.getFen()));
                 });
-        // 「这次开不了居家模式」的说明（S2C，上游 CheckSchedulePosMessage）。
-        // 只在女仆界面开着的时候弹 —— 否则玩家根本不知道自己点过那个开关。
+        // 国际象棋：同样的 S2C，结构也相同（整盘棋一个 FEN 字符串）
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
-                com.github.tartaricacid.touhoulittlemaid.network.CheckSchedulePosPacket.CHANNEL,
+                com.github.tartaricacid.touhoulittlemaid.network.WChessToClientPacket.CHANNEL,
                 (client, handler, buf, responseSender) -> {
-                    net.minecraft.network.chat.Component tips = buf.readComponent();
-                    client.execute(() -> {
-                        if (client.screen instanceof com.github.tartaricacid.touhoulittlemaid.client.screen
-                                .AbstractMaidScreen<?> parent) {
-                            client.setScreen(new com.github.tartaricacid.touhoulittlemaid.client.screen
-                                    .CheckSchedulePosScreen(parent, tips));
-                        }
-                    });
+                    com.github.tartaricacid.touhoulittlemaid.network.WChessToClientPacket.Payload payload =
+                            com.github.tartaricacid.touhoulittlemaid.network.WChessToClientPacket.read(buf);
+                    client.execute(() -> com.github.tartaricacid.touhoulittlemaid.client.event.WChessClientHandler
+                            .handle(client, payload.getPos(), payload.getFen()));
                 });
-
-        // 女仆界面左侧的状态效果列表（S2C 回传，上游 SendEffectMessage）。
-        // 效果不是同步数据 —— 原版只把玩家自己的效果下发给 LocalPlayer ——
-        // 所以界面每 20 tick 问一次，服务端把那一刻的完整快照发回来。
+        // 五子棋：没有 FEN，直接把 15×15 的棋盘发过来（S2C，上游 GomokuToClientMessage）
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
-                com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.CHANNEL,
+                com.github.tartaricacid.touhoulittlemaid.network.GomokuToClientPacket.CHANNEL,
                 (client, handler, buf, responseSender) -> {
-                    byte action = buf.readByte();
-                    int entityId = buf.readInt();
-                    if (action != com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.SYNC) {
-                        return;
-                    }
-                    int size = buf.readInt();
-                    // 条数是网络来的，先挡住异常值再分配集合，否则伪造的「20 亿条」会直接 OOM
-                    if (size < 0 || size > com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.MAX_EFFECTS) {
-                        return;
-                    }
-                    java.util.List<com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidEffectData> effects =
-                            new java.util.ArrayList<>(size);
-                    for (int i = 0; i < size; i++) {
-                        effects.add(com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidEffectData.fromBuf(buf));
-                    }
-                    client.execute(() -> {
-                        if (client.level == null) {
-                            return;
-                        }
-                        if (client.level.getEntity(entityId)
-                                instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid
-                                && maid.isAlive()) {
-                            maid.setEffects(effects);
-                        }
-                    });
-                });
-
-        // 女仆粒子包（S2C）：饰品触发时让附近客户端播粒子。
-        // 粒子方法本身在 EntityMaid 上，是客户端专用的（上游同款），所以必须走包。
-        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
-                com.github.tartaricacid.touhoulittlemaid.network.MaidParticlePacket.CHANNEL,
-                (client, handler, buf, responseSender) -> {
-                    int entityId = buf.readInt();
-                    int type = buf.readByte();
-                    client.execute(() -> {
-                        if (client.level != null
-                                && client.level.getEntity(entityId)
-                                instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid
-                                && maid.isAlive()) {
-                            com.github.tartaricacid.touhoulittlemaid.network.MaidParticlePacket.handle(maid, type);
-                        }
-                    });
-                });
-
-        // 装备碎裂包（S2C）：LivingEntity#breakItem 是客户端方法，服务端只能通知。
-        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
-                com.github.tartaricacid.touhoulittlemaid.network.ItemBreakPacket.CHANNEL,
-                (client, handler, buf, responseSender) -> {
-                    int entityId = buf.readInt();
-                    net.minecraft.world.item.ItemStack stack = buf.readItem();
-                    client.execute(() -> {
-                        if (client.level != null
-                                && client.level.getEntity(entityId)
-                                instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) {
-                            com.github.tartaricacid.touhoulittlemaid.network.ItemBreakPacket.handle(maid, stack);
-                        }
-                    });
+                    com.github.tartaricacid.touhoulittlemaid.network.GomokuToClientPacket.Payload payload =
+                            com.github.tartaricacid.touhoulittlemaid.network.GomokuToClientPacket.read(buf);
+                    client.execute(() -> com.github.tartaricacid.touhoulittlemaid.client.event.GomokuClientHandler
+                            .handle(client, payload.getPos(), payload.getChessData(), payload.getPoint(),
+                                    payload.getWinCount()));
                 });
 
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(
@@ -291,6 +239,14 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                         // 失败会打 error 日志（BedrockBlockModels#load 里）。
                         com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("altar");
                         com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("shrine");
+                        // 三张棋盘也一起预热：它们的贴图与几何比祭坛还大，
+                        // 而且「看不见棋子」这种症状最怕拖到运行时才暴露。
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("cchess");
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("cchess_pieces");
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("gomoku");
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("gomoku_piece");
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("wchess");
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("wchess_pieces");
                         // 坐垫模型必须【在女仆模型之后】加载：GeckoLibCache 在上面那行被整体清空过
                         com.github.tartaricacid.touhoulittlemaid.client.resource.ChairModelLoader.reload();
                     }

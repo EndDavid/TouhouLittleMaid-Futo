@@ -520,6 +520,7 @@
   "message.touhou_little_maid.cchess.reset": "右击棋盘右侧黑色区域重置",
   "message.touhou_little_maid.wchess.move_limit": "五十回合限制！",
   "message.touhou_little_maid.wchess.reset": "右击任意一侧的淡黄色区域进行重置",
+  "message.touhou_little_maid.gomoku.draw": "平局",
   "message.touhou_little_maid.entity_id_copy.copy": "该实体ID已经被复制：%s",
   "message.touhou_little_maid.ai_chat.reload_success": "AI 站点文件已经重新加载",
   "commands.touhou_little_maid.pack.reload.start": "所有的模型开始重载",

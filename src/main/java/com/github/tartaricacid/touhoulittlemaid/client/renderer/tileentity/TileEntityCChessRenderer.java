@@ -174,10 +174,10 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
      * 出现，就是这个原因。</p>
      */
     private static void applyFacing(PoseStack poseStack, Direction facing) {
-        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot()));
-        if (facing.getAxis() == Direction.Axis.Z) {
-            poseStack.mulPose(Vector3f.YP.rotationDegrees(180.0F));
-        }
+        // 实现在 BoardRenderUtil —— 三块棋盘共用一份，避免某一处悄悄改错。
+        // 那两行各自为什么这么写（为什么是 YP 而不是 YN、为什么正统朝要补半圈），
+        // 全部记在 BoardRenderUtil#applyFacing 的注释里。
+        BoardRenderUtil.applyFacing(poseStack, facing);
     }
 
     private void renderPiece(TileEntityCChess cchess, PoseStack poseStack, MultiBufferSource bufferIn,

@@ -113,6 +113,38 @@ public abstract class BlockJoy extends BaseEntityBlock {
     }
 
     /**
+     * 女仆坐到方块<b>旁边</b>（而不是正中央），三张棋盘共用。
+     *
+     * <p>棋盘类方块不能用 {@link #sitPosition()}：那个偏移是相对方块原点的常量，
+     * 而棋盘要让女仆坐在「棋盘对面」并面朝棋盘，位置得随 {@code FACING} 变。
+     * 上游是把这段代码在三块棋盘里各抄了一遍（{@code BlockCChess} / {@code BlockWChess}
+     * 用 {@code FACING.getOpposite()} 配 2 格，{@code BlockGomoku} 用 {@code getClockWise()} 配 1.5 格），
+     * 这里收成一个方法，省得三处里的某一处悄悄改错。</p>
+     *
+     * @param face     从棋盘中心指向女仆的方向
+     * @param distance 女仆离方块中心几个格
+     */
+    protected final void sitMaidAt(EntityMaid maid, BlockState state, Level level, BlockPos pos,
+                                   Direction face, double distance) {
+        if (!(level instanceof ServerLevel serverLevel) || !(level.getBlockEntity(pos) instanceof TileEntityJoy joy)) {
+            return;
+        }
+        Entity oldSitEntity = serverLevel.getEntity(joy.getSitId());
+        if (oldSitEntity != null && oldSitEntity.isAlive()) {
+            return;
+        }
+        Vec3 sitPos = new Vec3(pos.getX() + 0.5 + face.getStepX() * distance,
+                pos.getY() + 0.1,
+                pos.getZ() + 0.5 + face.getStepZ() * distance);
+        EntitySit newSitEntity = new EntitySit(level, sitPos, this.getTypeName(), pos);
+        newSitEntity.setYRot(face.getOpposite().toYRot() + this.sitYRot());
+        level.addFreshEntity(newSitEntity);
+        joy.setSitId(newSitEntity.getUUID());
+        joy.setChanged();
+        maid.startRiding(newSitEntity);
+    }
+
+    /**
      * 方块被移除时顺手丢掉座位实体。
      *
      * <p>不丢的话座位会留在原地十 tick 之后由 {@code EntitySit} 自己销毁 —— 结果是玩家在空中坐着，

@@ -92,7 +92,7 @@ loom_version=1.15.5
 | **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器）** | **完成**（换肤 GUI 待 `AbstractModelGui` 泛型化） |
 | **帕秋莉手册（书内容 + 侧边页签）** | **完成**（46 条目 / 3 分类） |
 | **搜索 / 定位（小号 / 仆从铃 / 狐狸卷轴 / 河童罗盘）** | **完成**（含 `SchedulePos` 三坐标作息） |
-| **棋类（中国象棋：3×3 多方块 + 对局 AI）** | **完成**（只有象棋，五子棋 / 国际象棋未移植） |
+| **棋类（象棋 / 五子棋 / 国际象棋：各 3×3 多方块 + 对局 AI）** | **完成**（三块棋盘全部可玩） |
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | 未开始 |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
@@ -100,7 +100,7 @@ loom_version=1.15.5
 
 ---
 
-## 棋类（中国象棋）
+## 棋类（中国象棋 / 五子棋 / 国际象棋）
 
 `BlockCChess` + `TileEntityCChess` + `BlockJoy` / `TileEntityJoy`（基类）+
 `MaidGameRecordManager` 效果见下。
@@ -300,11 +300,79 @@ Exception table:
 `Entity` 的构造器会调 `defineSynchedData()`（虚方法），那时子类字段全是 `null`；
 一旦抛异常，丢的不是一次渲染而是**存档里的实体**。
 
+### 五子棋与国际象棋：同一套骨架，三份不同的「格线」
+
+两块新棋盘（`BlockGomoku` / `TileEntityGomoku`、`BlockWChess` / `TileEntityWChess`）
+复用了象棋那三层结构，差异只在引擎与盘面几何：
+
+| | 中国象棋 | 五子棋 | 国际象棋 |
+|---|---|---|---|
+| 对战数据 | FEN（`xqwlight.Position`） | `int[15][15]`（无序列化入口） | FEN（`api/game/chess.Position`） |
+| 存档字段 | 1 个字符串 | 15 条 `IntArrayTag` | 1 个字符串 |
+| 谁先手 | 玩家红方 | 玩家黑方 | 玩家白方 |
+| 算棋位置 | 客户端（`Search#searchMain`，1 秒） | 客户端（`ZhiZhangAIService`） | 客户端（`Search#searchMain`，1 秒） |
+| 和局判据 | 六十回合 / 长打 | 棋盘填满 | 五十回合 / 长打 |
+| 桌子尺寸 | 3×3 格（模型 3×3） | **3×3 格（模型只有 2×2）** | 3×3 格（模型 3×3） |
+
+三块棋盘共用 `client/renderer/tileentity/BoardRenderUtil`：`applyFacing` 与
+「终局提示文字」都只有一份。上一轮象棋「右侧棋子不在格线上 / 字是倒的」
+就是这段姿态里少了一句半圈 —— 各写一遍就一定会有一块写错。
+
+#### 格线是量出来的，三块棋盘用的是同一条结论
+
+`port/board_grid_probe.py` 干的事和象棋那支 `chess_grid_probe.py` 一样：
+把棋盘 up 面的 box-UV 矩形解出来，扫竖线与横线的位置，换算成方块坐标，
+再和**点击判定**用的格点对照。两块新盘的结果：
+
+- **国际象棋**：`wchess.json` 的板子 `x/z ±1.5`（3 格）对应贴图 `u 48..96`；
+  8×8 的格子区从 `u 56` 开始、到 `u 88` 结束，正好换算成世界 `-1.0..1.0`。
+  这与 `WChessUtil#getClickPosition` 的 `floor((x + 1) / 0.25)` 完全吻合
+  （第 0 格从 -1 起、中心 -0.875，间距 0.25），所以**不需要任何手调偏移**。
+- **五子棋**：格线不是贴图，而是单独一层 cube（`uv [605,0]`，151×151 texel 铺满 2 格）。
+  按**不透明像素**数一遍，15 条线落在 rect 内第 5、15、25 … 145 个 texel 上 ——
+  间距 10 texel、两端各留 5 texel、关于中心完全对称。折算就是
+  `间距 = 2/151×10 = 0.132450`、`第 0 条 = -1 + 2/151×5.5 = -0.927152`，
+  也就是 `util/GomokuUtil` 里那两个常数。
+
+**为什么不再沿用上游那九个偏移三元组**：上游 `BlockGomoku#getChessPos` 给九宫格
+每一格各写了一套 `(xOffset, xStartOffset, xIndexOffset)`，彼此并不自洽 ——
+同为第 4 号交叉点，从 `CENTER` 算出来是 0.115、从 `LEFT_CENTER` 算出来是 0.1014，
+差 0.0136 格；累到盘面另一头差 **0.042 格 ≈ 0.65 像素**，而一颗棋子裸宽只有 1.5 像素。
+更糟的是判定框只有 0.07 宽、还从格线往一侧偏，**近一半面积是点不到的死区**。
+现在点击与渲染共用 `GomokuUtil` 的同一组常数，把点击点四舍五入到最近的交叉点即可。
+
+#### 竖直方向：`main` 与「整张桌子」不是一回事
+
+| 棋盘 | 竖直基准 | 表面（棋子贴在这个高度） | 实测 |
+|---|---|---|---|
+| 国际象棋 | 模型原点即底面，偏移 0 | `wchess.json` 的 `maxY` | 0.125 |
+| 五子棋 | 偏移 0（桌腿埋在地下 −1.89） | **只量 `main` 骨骼**的 `maxY` | 0.125625 |
+
+五子棋这一条是坑：整张桌子的包围盒 `maxY` 是 **0.292**，因为两个棋盒（`blackBox` /
+`whiteBox` 那 8+8 个 cube）比桌面高出一截。拿它当表面，所有棋子会浮在半空 ——
+`measureBone(model, "main")` 量到的才是桌面 + 那层格线。
+
+棋子本身（`gomoku_piece.json` / `wchess_pieces.json`）同样靠 `measureBone` 量：
+五子棋底面 `0.015625`、国际象棋底面 `0`，抬到表面高度即可；国际象棋额外乘上游
+`WChessPiecesModel` 里的 `scale(0.9)`（棋子裸宽 0.2375 放进 0.25 的格子会顶满）。
+
+#### 两个防作弊上的差异
+
+- **五子棋回包是一个裸坐标**，上游直接 `setChessData(x, y, type)`。改过的客户端能把
+  坐标写成 999（服务端 `ArrayIndexOutOfBounds`，方块实体的存档也被写脏）、能往已有子的
+  点再放一颗、能用 `BLACK` 冒充玩家。`GomokuToServerPacket` 因此逐条验：坐标在
+  15×15 内、该点为空、颜色**强制**为白（女仆永远执白是规则，不是请求）。
+- **`ZhiZhangAIService` 是有状态的**（局面 / 最佳点 / 回合数全在实例字段里）。
+  上游把四档棋力写成四个 `static final` 单例，两个客户端同时开局会互相覆盖。
+  `MaidGomokuAI#getService` 因此每次新建实例 —— 搜索本身是纯 CPU 的，代价可忽略。
+
 ### 已知限制
 
-- **只移植了中国象棋**。五子棋（`gomoku` + 1712 行 `ZhiZhangAIService`）与
-  国际象棋（`wchess`）未移植，因此手册里只放了一页象棋，
-  `$registered` 里也只登记了 `touhou_little_maid:cchess`。
+- **三块棋盘都只有玩法，没有「残局道具」**（`cchess_board_state` / `gomoku_board_state` /
+  `wchess_board_state` 三个物品 + `GomokuCodec` + 木棍导出 / 预设）。三块共用一套，
+  留到后面统一做。
+- **手册里只有象棋一页**（`$registered` 只登记了 `touhou_little_maid:cchess`）。
+  五子棋 / 国际象棋的条目文字在 lang 里已经齐了，差的是 `entries/` 下的页面与注册。
 - **中心格离开视锥时整张棋盘会消失**：1.18.2 的方块实体没有
   `getRenderBoundingBox`，与雕像渲染盒是同一个已知限制（要修得 Mixin `LevelRenderer`）。
 

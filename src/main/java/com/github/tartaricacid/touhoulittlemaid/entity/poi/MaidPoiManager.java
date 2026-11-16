@@ -47,9 +47,10 @@ public final class MaidPoiManager {
             .collect(ImmutableSet.toImmutableSet());
 
     /**
-     * 娱乐方块：目前只有中国象棋棋盘。上游这里还有五子棋 / 国际象棋 / 键盘 / 书架 / 电脑。
+     * 娱乐方块：三张棋盘（中国象棋 / 五子棋 / 国际象棋）。
+     * 上游这里还有键盘 / 书架 / 电脑。
      */
-    private static final Set<BlockState> JOYS = ImmutableList.of(InitBlocks.CCHESS)
+    private static final Set<BlockState> JOYS = ImmutableList.of(InitBlocks.CCHESS, InitBlocks.GOMOKU, InitBlocks.WCHESS)
             .stream().flatMap(block -> block.getStateDefinition().getPossibleStates().stream())
             .collect(ImmutableSet.toImmutableSet());
 
