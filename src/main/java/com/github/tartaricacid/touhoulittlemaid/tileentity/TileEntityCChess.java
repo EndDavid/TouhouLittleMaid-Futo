@@ -79,6 +79,22 @@ public class TileEntityCChess extends TileEntityJoy implements IBoardGameEntityB
         moveNumberLimit = nbt.getBoolean(MOVE_NUMBER_LIMIT);
     }
 
+    /**
+     * 载入一个残局（FEN），对应上游 {@code TileEntityCChess#setEndgame}。
+     *
+     * <p>与上游的差异：这里把三个终局标志一并清掉。它们不属于 FEN，
+     * 而「已经判输赢」的棋盘再载入残局会因为标志没清而永远不能下。</p>
+     */
+    public void setEndgame(String fen) {
+        this.chessCounter = 0;
+        this.selectChessPoint = 0;
+        this.chessData.fromFen(fen);
+        this.checkmate = false;
+        this.repeat = false;
+        this.moveNumberLimit = false;
+        this.refresh();
+    }
+
     public void reset() {
         this.chessCounter = 0;
         this.selectChessPoint = 0;

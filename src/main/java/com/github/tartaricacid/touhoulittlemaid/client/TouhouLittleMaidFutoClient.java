@@ -56,6 +56,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.client.init.InitSpecialItemRender.init();
 
 
+        // 残局道具的棋盘缩略图 tooltip（上游 InitClientTooltip，Fabric 用 TooltipComponentCallback）
+        com.github.tartaricacid.touhoulittlemaid.client.init.InitClientTooltip.init();
+
         // 女仆妖精：模型层必须先烘焙，渲染器的构造函数里会 bakeLayer
         net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
                 com.github.tartaricacid.touhoulittlemaid.client.model.EntityFairyModel.LAYER,

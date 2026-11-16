@@ -14,6 +14,7 @@ import com.github.tartaricacid.touhoulittlemaid.init.InitBlocks;
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
 import com.github.tartaricacid.touhoulittlemaid.init.InitSounds;
 import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
+import com.github.tartaricacid.touhoulittlemaid.item.ItemBoardState;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemHakureiGohei;
 import com.github.tartaricacid.touhoulittlemaid.network.GomokuToClientPacket;
 import com.github.tartaricacid.touhoulittlemaid.network.MaidParticlePacket;
@@ -224,6 +225,25 @@ public class BlockGomoku extends BlockJoy implements IBoardGameBlock {
         if (player.getAbilities().instabuild && held instanceof ItemHakureiGohei) {
             gomoku.clickWithDebug();
             gomoku.refresh();
+            level.playSound(null, centerPos, InitSounds.GOMOKU_RESET, SoundSource.BLOCKS, 1.0f, 1.0f);
+            return InteractionResult.SUCCESS;
+        }
+
+        // 残局道具：把棋局换成它记录的那一局（上游同款，在「只能空手」之前）
+        if (player.getMainHandItem().is(InitItems.GOMOKU_BOARD_STATE)) {
+            String data = ItemBoardState.getState(player.getMainHandItem()) == null
+                    ? null : ItemBoardState.getState(player.getMainHandItem())[0];
+            if (data == null || data.isEmpty()) {
+                return InteractionResult.PASS;
+            }
+            try {
+                gomoku.setStateData(com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.GomokuCodec
+                        .decode(data));
+            } catch (Exception e) {
+                player.displayClientMessage(new TranslatableComponent(
+                        "message.touhou_little_maid.board_state.bad_data"), false);
+                return InteractionResult.FAIL;
+            }
             level.playSound(null, centerPos, InitSounds.GOMOKU_RESET, SoundSource.BLOCKS, 1.0f, 1.0f);
             return InteractionResult.SUCCESS;
         }

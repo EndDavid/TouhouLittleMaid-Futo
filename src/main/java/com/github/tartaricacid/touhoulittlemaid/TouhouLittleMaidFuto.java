@@ -97,6 +97,9 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.event.EnterServerEvent.init();
         // 神社 / P 点塞进原版箱子战利品（上游的两条全局战利品修饰器）
         com.github.tartaricacid.touhoulittlemaid.event.ChestLootEvent.init();
+        // 残局道具：数据包加载 + 塞进要塞图书馆 / 制图师小屋的箱子
+        com.github.tartaricacid.touhoulittlemaid.datapack.BoardStateDataReload.init();
+        com.github.tartaricacid.touhoulittlemaid.event.BoardStateLootEvent.init();
 
         // 合成表：帕秋莉手册的《记忆中的幻想乡》（touhou_little_maid:memorizable_gensokyo）
         com.github.tartaricacid.touhoulittlemaid.init.InitRecipes.init();

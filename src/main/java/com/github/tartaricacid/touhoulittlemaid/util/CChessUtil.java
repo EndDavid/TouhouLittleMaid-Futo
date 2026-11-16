@@ -61,6 +61,16 @@ public final class CChessUtil {
         return -1;
     }
 
+    /**
+     * 取某个交叉点上的棋子编码（{@code 0} = 空）。
+     *
+     * <p>引擎的坐标是 {@code 0x88} 布局，所以必须走 {@code COORD_XY}，
+     * 不能直接用 {@code y * 9 + x} 索引。与上游 1.20.1 同名方法一致。</p>
+     */
+    public static byte piecesIndex(int x, int y, byte[] data) {
+        return data[Position.COORD_XY(x, y)];
+    }
+
     public static boolean isRed(byte piecesIndex) {
         return (piecesIndex & 8) == 8;
     }

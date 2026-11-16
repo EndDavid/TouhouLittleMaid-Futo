@@ -452,13 +452,83 @@ surface=0.125625   stoneBottom=0.126625 (should equal surface)
   上游把四档棋力写成四个 `static final` 单例，两个客户端同时开局会互相覆盖。
   `MaidGomokuAI#getService` 因此每次新建实例 —— 搜索本身是纯 CPU 的，代价可忽略。
 
+### 残局道具（三件）
+
+`gomoku_board_state` / `cchess_board_state` / `wchess_board_state`，共用
+`item/ItemBoardState` 与一块 NBT：
+
+```
+BoardStateData    棋局本身（五子棋是 GomokuCodec 的一行，两种象棋是 FEN）
+BoardStateDesc    描述的语言键（不是明文）
+BoardStateAuthor  署名
+```
+
+与上游一致：**不放进任何创造模式物品栏**，只能从要塞图书馆与
+制图师小屋的箱子里拿到（上游那两条全局战利品修饰器）。
+
+拿着它右击对应的棋盘就把棋局换成它记录的那一局（上游同款，且这一步在
+「只能空手下棋」之前）；按住 Shift 看详情时，它还会在 tooltip 里把棋局画出来。
+
+#### 数据包：`data/<namespace>/board_states/*.json`
+
+```json
+[
+  {
+    "tags": ["library"],
+    "display": { "description": "board_state...moon", "author": "欢乐小游戏" },
+    "data": "eNpjYKAvYMTPZ8SreAgAdP8w0twTAAhFAAk, 8, 8_9",
+    "weight": 1
+  }
+]
+```
+
+逐 pack 读取再合并，所以资源包可以只写自己的几条。模组自带 5+5+5 条。
+
+#### 三个真实踩过的坑
+
+1. **Gson 2.8.9 写不进 `record`。** 上游 1.20.1 的 `BoardStateRecord` 是 record，照抄过来
+   之后服务端直接起不来：
+
+   ```
+   AssertionError (GSON 2.8.9): java.lang.IllegalAccessException:
+       Can not set final java.util.List field BoardStateRecord.tags to java.util.ArrayList
+   ```
+
+   1.18.2 自带 Gson 2.8.9，靠反射设字段填对象，record 的字段是 `final`；
+   Gson 支持 record 是 2.10 才有的。改成普通类（方法名不变）。
+2. **那个异常是 `Error` 不是 `Exception`。** 重载监听器跑在 ForkJoinPool 工作线程上，
+   `catch (Exception)` 接不住 `AssertionError`，于是一个写错的数据包把**整个服务端启动**
+   带走了。现在改成 `catch (Throwable)` 并记日志。
+3. **战利品注入比数据监听器先跑。** Fabric 的 `LootTableEvents.MODIFY` 回调里
+   读到的三张表还是空的（`gomoku=0 xiangqi=0 chess=0`），于是池子根本没加进去 ——
+   现象就是「箱子里永远掉不出残局道具」。所以回调里发现表为空就
+   自己调一次 `BoardStateDataReload.load(resourceManager)`，彻底摆脱顺序。
+
+#### 为什么没用上游那个自定义战利品函数
+
+上游写了 `board_state_randomly` 战利品函数，它要注册一个
+`LootItemFunctionType`；Fabric 没有「注册函数类型」的事件，只能再开一个 Mixin 往
+`LootItemFunctions` 的私有表里塞东西。这里换成**直接用原版的 `SetNbtFunction`**：
+把每条数据编译成一个带固定 NBT 的条目，权重就是数据自己的 `weight`，
+抽签交给原版的战利品池。为了保持上游「先等概率挑物品、再按权重挑残局」
+的分布，每件物品的条目权重都被归一化到同一个总和
+（`NORMALIZER`），否则「条目多的棋」会被抽得更勤。
+
+#### 手册
+
+`entries/other/` 下现在有三页（`cchess` / `gomoku` / `wchess`），各自带
+一张图与对应的祭坛配方页。配方补了 `craft_gomoku` 与 `craft_wchess`
+（原本只有 `craft_cchess`）。所以三张棋盘都能在祭坛上做出来了。
+
 ### 已知限制
 
-- **三块棋盘都只有玩法，没有「残局道具」**（`cchess_board_state` / `gomoku_board_state` /
-  `wchess_board_state` 三个物品 + `GomokuCodec` + 木棍导出 / 预设）。三块共用一套，
-  留到后面统一做。
-- **手册里只有象棋一页**（`$registered` 只登记了 `touhou_little_maid:cchess`）。
-  五子棋 / 国际象棋的条目文字在 lang 里已经齐了，差的是 `entries/` 下的页面与注册。
+- **「木棍 + 创造模式」那套残局工具没搬**：上游用木棍导出 / 预设棋局
+  （`GomokuCodec.encode` + 聊天栏点击复制），以及「残局导出成物品」。
+  这是给做残局的人用的开发工具，玩家侧不需要它，留在待办里。
+- **三块棋盘的页面都只有一页**：上游的 `gomoku` 页用四个
+  `altar_recipe` 把三张棋盘的配方堆在一起，这里拆成了三页。
+- **中心格离开视锥时整张棋盘会消失**：1.18.2 的方块实体没有
+  `getRenderBoundingBox`，与雕像渲染盒是同一个已知限制（要修得 Mixin `LevelRenderer`）。
 - **中心格离开视锥时整张棋盘会消失**：1.18.2 的方块实体没有
   `getRenderBoundingBox`，与雕像渲染盒是同一个已知限制（要修得 Mixin `LevelRenderer`）。
 

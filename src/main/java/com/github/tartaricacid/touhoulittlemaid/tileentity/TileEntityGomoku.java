@@ -1,6 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.tileentity;
 
 import com.github.tartaricacid.touhoulittlemaid.api.block.IBoardGameEntityBlock;
+import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.GomokuCodec;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Point;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Statue;
 import com.github.tartaricacid.touhoulittlemaid.init.InitBlocks;
@@ -90,6 +91,22 @@ public class TileEntityGomoku extends TileEntityJoy implements IBoardGameEntityB
         } else {
             this.latestChessPoint = Point.NULL;
         }
+    }
+
+    /**
+     * 载入一个残局，对应上游 {@code TileEntityGomoku#setStateData}。
+     *
+     * <p>五子棋的残局数据里只有棋盘、回合数与最后一手，并不记录
+     * 「该谁下」，所以这里把回合交给玩家；否则上一局偶然停在女仆回合，
+     * 换上残局后就永远点不动。</p>
+     */
+    public void setStateData(GomokuCodec.StateData stateData) {
+        this.chessData = stateData.board();
+        this.chessCounter = stateData.turnCount();
+        this.latestChessPoint = stateData.latestPoint();
+        this.statue = Statue.IN_PROGRESS.ordinal();
+        this.playerTurn = true;
+        this.refresh();
     }
 
     public void reset() {

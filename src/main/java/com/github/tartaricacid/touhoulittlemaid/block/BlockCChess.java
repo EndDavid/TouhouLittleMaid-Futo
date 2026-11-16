@@ -12,6 +12,7 @@ import com.github.tartaricacid.touhoulittlemaid.init.InitBlocks;
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
 import com.github.tartaricacid.touhoulittlemaid.init.InitSounds;
 import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
+import com.github.tartaricacid.touhoulittlemaid.item.ItemBoardState;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityCChess;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityJoy;
 import com.github.tartaricacid.touhoulittlemaid.util.CChessUtil;
@@ -228,7 +229,7 @@ public class BlockCChess extends BlockJoy implements IBoardGameBlock {
 
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
-        if (!(level instanceof ServerLevel serverLevel) || hand != InteractionHand.MAIN_HAND || !player.getMainHandItem().isEmpty()) {
+        if (!(level instanceof ServerLevel serverLevel) || hand != InteractionHand.MAIN_HAND) {
             return InteractionResult.PASS;
         }
         GomokuPart part = state.getValue(PART);
@@ -236,6 +237,31 @@ public class BlockCChess extends BlockJoy implements IBoardGameBlock {
 
         if (!(level.getBlockEntity(centerPos) instanceof TileEntityCChess chess)) {
             return InteractionResult.FAIL;
+        }
+
+        // 如果手里拿的是残局道具，那么直接把棋局换成它记录的那一局（上游同款，
+        // 并且这一步在「只能空手下棋」之前）。
+        if (player.getMainHandItem().is(InitItems.CCHESS_BOARD_STATE)) {
+            String data = ItemBoardState.getState(player.getMainHandItem()) == null
+                    ? null : ItemBoardState.getState(player.getMainHandItem())[0];
+            if (data == null || data.isEmpty()) {
+                return InteractionResult.PASS;
+            }
+            try {
+                chess.setEndgame(data);
+            } catch (Exception e) {
+                // 物品 NBT 是玩家可写的，坏的 FEN 不能让服务端崩在方块交互里
+                player.displayClientMessage(new net.minecraft.network.chat.TranslatableComponent(
+                        "message.touhou_little_maid.board_state.bad_data"), false);
+                return InteractionResult.FAIL;
+            }
+            level.playSound(null, centerPos, InitSounds.GOMOKU_RESET, SoundSource.BLOCKS, 1.0f, 1.0f);
+            return InteractionResult.SUCCESS;
+        }
+
+        // 下棋必须空手
+        if (!player.getMainHandItem().isEmpty()) {
+            return InteractionResult.PASS;
         }
         if (!chess.isPlayerTurn() && !chess.isCheckmate()) {
             return InteractionResult.FAIL;

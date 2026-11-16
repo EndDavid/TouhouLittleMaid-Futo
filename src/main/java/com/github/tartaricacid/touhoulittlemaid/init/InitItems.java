@@ -229,6 +229,27 @@ public final class InitItems {
                     com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.WCHESS,
                     new FabricItemSettings().tab(MAIN_TAB)));
 
+    // ------------------------------------------------------------------ 残局道具
+
+    /**
+     * 三份残局道具（上游 {@code GOMOKU_BOARD_STATE} / {@code CCHESS_BOARD_STATE} / {@code WCHESS_BOARD_STATE}）。
+     *
+     * <p>与上游一致：<b>不放进任何创造模式物品栏</b>。它们只能从战利品里拿到
+     * （要塞图书馆与制图师小屋的箱子，见 {@code event/BoardStateLootEvent}）。
+     * 不写 {@code tab(...)} 的后果是「搜索」页里能搜到、物品栏里看不到 —— 上游就是这样。</p>
+     */
+    public static final Item GOMOKU_BOARD_STATE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("gomoku_board_state"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemBoardState());
+
+    public static final Item CCHESS_BOARD_STATE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("cchess_board_state"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemBoardState());
+
+    public static final Item WCHESS_BOARD_STATE = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("wchess_board_state"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemBoardState());
+
     /**
      * 替身地藏（上游 {@code InitItems.SUBSTITUTE_JIZO}）：给女仆永久无敌。
      */
