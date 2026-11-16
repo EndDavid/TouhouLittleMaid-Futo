@@ -40,8 +40,20 @@ import net.minecraft.resources.ResourceLocation;
  *     间距   = 10 / 151 * 2 = 0.132450 格
  *     第 0 条 = -1 + 5.5 / 151 * 2 = -0.927152 格
  * </pre>
- * <p>这与 {@link GomokuUtil} 里的两个常数是同一组数字 —— 点击判定和渲染共用它们，
- * 所以「棋子画在哪里」和「点哪里能落子」在纸面上就不可能不一致。</p>
+ * <p>这与 {@link GomokuUtil} 里的两个常数是同一组数字 —— 点击判定和渲染共用它们。</p>
+ *
+ * <h2>为什么棋子不跟着棋盘转</h2>
+ * <p>{@code BlockGomoku#use} 拿到的是<b>原始方块内坐标</b>，没有按朝向旋转过；
+ * 而棋盘本身还要转给玩家看。两边要对上，只需一个事实：
+ * applyFacing 转的是 0/90/180/270 度，而这张 15×15 的格线是
+ * <b>以方块中心为中心的正方形</b>，任何 90 度整数倍旋转都把它映回自己。
+ * 所以棋子在<b>不旋转</b>的坐标系里摆到 {@code lineAt(k)} 上，
+ * 就一定落在画出来的格线上，且就是点击返回的那个 k。</p>
+ *
+ * <p>这与中国象棋那边恰好相反：象棋的点击向量先按朝向转过
+ * （{@code .yRot(facing.toYRot() * DEG)}），姿态相对点击坐标系才是半圈，
+ * 所以它必须取负。两块棋盘度量方式一样、结论相反，
+ * 差别只在「点击有没有先转」这一步。</p>
  */
 public class TileEntityGomokuRenderer implements BlockEntityRenderer<TileEntityGomoku> {
     private static final ResourceLocation BOARD_TEXTURE =
@@ -118,33 +130,43 @@ public class TileEntityGomokuRenderer implements BlockEntityRenderer<TileEntityG
         // 棋盘表面：不能取整张桌子的包围盒（棋盒会把它抬到 0.29），
         // 只量 main 这一支 —— 它才是桌面 + 格线层。
         float surface = boardSurface();
-        float pieceLift = surface - pb[1];
+        // 棋子的 y 是【相对桌面】的：上面那句 translate 已经把原点放到桌面高度，
+        // 所以只要把棋子底面 pb[1] 抬到 0 即可。再减一次 surface 就是抬了两遍，
+        // 表现是棋子悬空 0.11 格 ≈ 1.8 像素（本次报告的现象）。
+        // +0.001 是为了不让棋子底面与格线层共面打架（0.016 像素，看不见）。
+        float pieceLift = -pb[1] + 0.001F;
         if (!logged) {
             logged = true;
             float[] bb = BedrockBlockModels.bounds("gomoku");
             TouhouLittleMaid.LOGGER.info(
                     "[Futo] gomoku layout: board bbox={} surface={} | piece bbox={} center=({}, {}) lift={} "
-                            + "| lattice origin={} step={}",
+                            + "stoneBottom={} (should equal surface) | lattice origin={} step={}",
                     bb == null ? "null" : java.util.Arrays.toString(bb), surface,
                     java.util.Arrays.toString(pb), pieceCenterX, pieceCenterZ, pieceLift,
+                    surface + pieceLift + pb[1],
                     GomokuUtil.GRID_ORIGIN, GomokuUtil.GRID_STEP);
         }
 
         int[][] chessData = gomoku.getChessData();
         poseStack.pushPose();
         poseStack.translate(0.5, surface, 0.5);
-        BoardRenderUtil.applyFacing(poseStack, facing);
+        // 棋子【不】跟着棋盘转，因为点击判定也不跟着转：
+        //   * BlockGomoku#use 拿到的是原始方块内坐标，没有按朝向旋转过；
+        //   * applyFacing 只是把棋盘画给玩家看，转的是 0/90/180/270 度；
+        //   * 这 15×15 的格线是「以方块中心为中心的正方形」，任何 90 度整数倍
+        //     旋转都把它映回自己。
+        // 所以不旋转地摆在 lineAt(k) 上，既落在画出来的格线上，也和点击返回的 k 一致。
+        // （中国象棋那边必须取负 —— 它的点击向量按朝向转过，姿态相对点击坐标系才是半圈，
+        //   见 BoardRenderUtil#applyFacing。）
         for (int x = 0; x < GomokuUtil.GRID_SIZE; x++) {
             for (int y = 0; y < GomokuUtil.GRID_SIZE; y++) {
                 int type = chessData[x][y];
                 if (type != Point.BLACK && type != Point.WHITE) {
                     continue;
                 }
-                float localX = (float) GomokuUtil.lineAt(x);
-                float localZ = (float) GomokuUtil.lineAt(y);
-                // 姿态比点击坐标系多转半圈，所以格线坐标取负（见 BoardRenderUtil#applyFacing）
-                float renderX = pieceCenterX - localX;
-                float renderZ = pieceCenterZ - localZ;
+                // 棋子模型的中心未必正好在原点，所以平移量要减掉它
+                float renderX = (float) GomokuUtil.lineAt(x) - pieceCenterX;
+                float renderZ = (float) GomokuUtil.lineAt(y) - pieceCenterZ;
                 poseStack.pushPose();
                 poseStack.translate(renderX, pieceLift, renderZ);
                 GeoBlockRenderer.render(pieceModel,
@@ -170,18 +192,10 @@ public class TileEntityGomokuRenderer implements BlockEntityRenderer<TileEntityG
             return;
         }
         Camera camera = this.dispatcher.camera;
-        float localX = (float) GomokuUtil.lineAt(point.x);
-        float localZ = (float) GomokuUtil.lineAt(point.y);
-        // 标记必须跟着棋盘转动，否则棋盘朝东 / 朝西时它会跑到另一颗棋子上方。
-        // 这里把「棋子用的那套变换」手算一遍（translate(0.5,·,0.5) + Ry(θ)），
-        // 因为文字的 billboard 旋转必须发生在<b>世界坐标</b>里，不能被棋盘的旋转带着走。
-        float renderX = -localX;
-        float renderZ = -localZ;
-        double yaw = Math.toRadians(facing.toYRot() + (facing.getAxis() == Direction.Axis.Z ? 180.0 : 0.0));
-        double cos = Math.cos(yaw);
-        double sin = Math.sin(yaw);
-        float worldX = (float) (0.5 + renderX * cos + renderZ * sin);
-        float worldZ = (float) (0.5 - renderX * sin + renderZ * cos);
+        // 和棋子同一个坐标系（「不跟着棋盘转」的那一套），但必须用世界坐标：
+        // 文字的 billboard 旋转不能被棋盘的旋转带着走。
+        float worldX = (float) (0.5 + GomokuUtil.lineAt(point.x));
+        float worldZ = (float) (0.5 + GomokuUtil.lineAt(point.y));
         poseStack.pushPose();
         poseStack.translate(worldX, boardSurface() + 0.25F, worldZ);
         poseStack.mulPose(com.mojang.math.Vector3f.YN.rotationDegrees(180 + camera.getYRot()));
