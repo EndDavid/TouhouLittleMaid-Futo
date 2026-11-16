@@ -173,10 +173,18 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         if (!logged) {
             logged = true;
             float[] bb = BedrockBlockModels.bounds("cchess");
+            AnimatedGeoModel board = BedrockBlockModels.get("cchess");
             TouhouLittleMaid.LOGGER.info(
                     "[Futo] chess layout: board bbox={} lift={} surface={} | piece bbox={} center=({}, {}) lift={}",
                     bb == null ? "null" : java.util.Arrays.toString(bb), boardLift(), surface,
                     java.util.Arrays.toString(pb), pieceCenterX, pieceCenterZ, pieceLift);
+            // 两块「重开」竖板的位置：isClickResetArea 认为它们在 x 1.199..1.431、
+            // z 0.464..1.061 与 -1.061..-0.464（关于 z=0 对称）。这里打出来对照。
+            for (String boneName : new String[]{"main", "bone", "bone2"}) {
+                float[] mb = GeoBlockRenderer.measureBone(board, boneName);
+                TouhouLittleMaid.LOGGER.info("[Futo] chess bone {} -> {}", boneName,
+                        mb == null ? "null" : java.util.Arrays.toString(mb));
+            }
         }
         int selectX = Position.FILE_X(cchess.getSelectChessPoint());
         int selectY = Position.RANK_Y(cchess.getSelectChessPoint());
@@ -316,6 +324,8 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         return true;
     }
 }
+
+
 
 
 
