@@ -41,9 +41,15 @@ import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
  *
  * <h2>3×3 的坐标是怎么来的</h2>
  * <p>棋盘占 3×3 格，方块实体只在中心格上，因此渲染器要把自己摆到整张桌子的中心
- * （{@code translate(0.5, 1.5, 0.5)} 里的 1.5 是模型自身的高度），随后每个交叉点间隔
- * 0.304 格 —— 与 {@code CChessUtil#getClickPosition} 里那两个魔数是同一组数字，
+ * （{@code translate(0.5, boardLift(), 0.5)}，见 {@link #boardLift()} 为什么是 0），
+ * 每个交叉点间隔 0.304 格 —— 与 {@code CChessUtil#getClickPosition} 里那两个魔数是同一组数字，
  * 改一个就必须改另一个，否则「看得见的棋子」和「点得到的格子」会错位。</p>
+ *
+ * <h2>棋子上的字</h2>
+ * <p>字不是贴图贴在柱身上，而是每个棋子骨骼里额外带一个 {@code size [64, 0, 64]} 的
+ * <b>平面</b> cube，box-UV 的 up 面正好框住贴图里的一整字。这个 cube 的
+ * {@code inflate} 是负的，套通用公式会把区间算反、变成一根三格多的柱子 —— 
+ * 处理方式见 {@code GeoCube#createFromPojoCube} 的注释。</p>
  *
  * <p><b>已知限制：</b>1.18.2 的方块实体没有 {@code getRenderBoundingBox}，
  * 所以中心格离开视锥时整张桌子会消失（与本移植版雕像渲染盒的问题同源）。</p>
@@ -149,9 +155,10 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         if (pieces == null) {
             return;
         }
-        // 棋子的摆法同样必须量出来：cchess_pieces.json 把 15 个棋子塞进一个模型，
-        // 而且它的「柱身」是靠一个 size 为 0 的平面加负 inflate 撑出来的，
-        // 直接读 origin 根本算不出底面在哪。见 GeoBlockRenderer#measureBone。
+        // 棋子的摆法必须量出来，不能读 JSON 里的 origin：
+        // 一个棋子是 4 圈各 8 个带角度的小方块绕出来的「柱身」，加上顶部一张平贴的字，
+        // 每个 cube 的 origin 都在很歪的位置（还带旋转），
+        // 只有走一遍真实渲染路径才知道它到底多高、底面在哪。见 GeoBlockRenderer#measureBone。
         float[] pb = GeoBlockRenderer.measureBone(pieces, "ShuaiRed");
         if (pb == null) {
             return;
@@ -272,22 +279,30 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
     }
 
     /**
-     * 棋盘「底面贴地」所需的竖直位移。
+     * 棋盘「底面贴地」所需的竖直位移 —— 这里是 0，模型自己就摆在方块底面。
      *
-     * <p>基岩几何 Y 向上、不做翻转，所以底面在 {@code minY}：
-     * 抬 {@code -minY} 就把它放到 {@code y = 0}（方块底面）。</p>
+     * <p>不要照抄祭坛 / 神社那种 {@code -minY} 的写法。{@code cchess.json} 的最低点是
+     * {@code -0.121875}，但那是两侧带字的小挡板（bone / bone2）故意垂到地下的部分 —— 
+     * 上游 1.18.2 的手写模型 {@code CChessModel} 展开后，这两块挡板的世界坐标同样是
+     * {@code -0.128..0.122}，而主棋盘正好是 {@code 0..0.125}。</p>
+     *
+     * <p>也就是说模型的原点已经对齐方块底面，抬 {@code -minY} 会让整张桌子高
+     * {@code 0.121875} 格 ≈ 2 像素 —— 这正是之前看到的「整体高两像素」。</p>
      */
     private static float boardLift() {
-        float[] b = BedrockBlockModels.bounds("cchess");
-        return b == null ? 0.0F : -b[1];
+        return 0.0F;
     }
 
     /**
      * 棋盘表面离方块底面的高度（棋子要贴在这个高度上）。
+     *
+     * <p>取模型自身的 {@code maxY}（= 0.128125）而不是主棋盘盒的 0.125：多出的
+     * 0.003 正是两侧挡板的高出量。让棋子比板面高那么一丝，既看不出（0.05 像素），
+     * 又顺带避开了与板面完全共面的 z-fighting。</p>
      */
     private static float boardTopY() {
         float[] b = BedrockBlockModels.bounds("cchess");
-        return b == null ? 0.0F : b[4] - b[1];
+        return b == null ? 0.0F : b[4];
     }
 
     private boolean inRenderDistance(TileEntityCChess chess, int distance) {
@@ -301,4 +316,6 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         return true;
     }
 }
+
+
 
