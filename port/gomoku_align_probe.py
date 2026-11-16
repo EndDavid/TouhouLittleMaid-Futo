@@ -31,7 +31,8 @@ GRID_ORIGIN = -0.927152
 GRID_STEP = 0.132450
 GRID_SIZE = 15
 
-FACINGS = [('NORTH', 0), ('SOUTH', 180), ('EAST', 270), ('WEST', 90)]
+# Direction#toYRot(): SOUTH=0, WEST=90, NORTH=180, EAST=270.  NORTH is 180, not 0.
+FACINGS = [('NORTH', 180), ('SOUTH', 0), ('EAST', 270), ('WEST', 90)]
 
 
 def line_at(k):

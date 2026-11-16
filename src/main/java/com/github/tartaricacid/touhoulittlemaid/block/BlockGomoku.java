@@ -304,8 +304,12 @@ public class BlockGomoku extends BlockJoy implements IBoardGameBlock {
 
     @Override
     public void startMaidSit(EntityMaid maid, BlockState state, Level worldIn, BlockPos pos) {
-        // 五子棋的盘面是 2×2 格，女仆坐在侧边一格半处刚好面对棋盘
-        this.sitMaidAt(maid, state, worldIn, pos, state.getValue(FACING).getClockWise(), 1.5D);
+        // 五子棋的盘面是 2×2 格，女仆坐在侧边一格半处刚好面对棋盘。
+        //
+        // 方向不能用 getClockWise()（上游是那么写的）：两个棋盒在对角线上，
+        // 「顺时针一格」和「白盒在哪一侧」没有关系，四个朝向全都会坐到黑盒那边，
+        // 而女仆执白。推导与实测见 GomokuUtil#seatDirection 与 port/gomoku_seat_probe.py。
+        this.sitMaidAt(maid, state, worldIn, pos, GomokuUtil.seatDirection(state.getValue(FACING)), 1.5D);
     }
 
     @Override
