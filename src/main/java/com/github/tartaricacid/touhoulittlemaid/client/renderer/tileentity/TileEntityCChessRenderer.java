@@ -23,7 +23,6 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
-import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 
 /**
  * 象棋棋盘的渲染器，移植自上游 1.20.1 的 {@code TileEntityCChessRenderer}。
@@ -128,22 +127,57 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
     private void renderChessboard(PoseStack poseStack, MultiBufferSource bufferIn,
                                   int combinedLightIn, int combinedOverlayIn, Direction facing) {
         poseStack.pushPose();
-        // 竖直位置与朝向都必须从模型自身量出来。
-        //
-        // 上游这两行是给原版 EntityModel（顶点空间 Y 向下）写的，
-        // 其中 ZN(180) 正是为了把 Y 向下翻成 Y 向上。本移植版画的是基岩几何，
-        // 它本来就是 Y 向上 —— 再翻一次就变成「整张桌子底面朝上」：
-        // 从上方看到的是模型的底面 UV 区域，那里几乎是空白，
-        // 于是格线消失、棋子文字朝下、颜色偏暗。这与 {@code BedrockBlockModels}
-        // 类注释里早已记录过的同一课完全相同（祭坛 / 神社都去掉了这句）。
+        // 竖直位置：模型自己的原点就在方块底面上（见 {@link #boardLift()} 为何是 0）。
         poseStack.translate(0.5, boardLift(), 0.5);
-        // 朝向与点击数学共用同一组角度：EntityMaid 那边用 facing.toYRot() 把
-        // 点击点转进棋盘本地坐标，这里必须用同一个角度转回去，否则
-        // 「画出来的棋子」与「点得到的格子」会错位。
-        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot()));
+        // 朝向：必须与上游逐字一致，见 {@link #applyFacing}。
+        applyFacing(poseStack, facing);
         GeoBlockRenderer.render(BedrockBlockModels.get("cchess"), TEXTURE, poseStack, bufferIn,
                 combinedLightIn, combinedOverlayIn, boardRenderType);
         poseStack.popPose();
+    }
+
+    /**
+     * 棋盘与棋子共用的姿态。上游
+     * 1.18.2 与 1.20.1 两份渲染器在这一段上
+     * 是逐字相同的：
+     *
+     * <pre>
+     * mulPose(ZN(180));
+     * mulPose(YN(facing.toYRot()));
+     * if (facing == NORTH || facing == SOUTH) mulPose(YN(180));
+     * </pre>
+     *
+     * <h2>为什么这里写的是 {@code YP}</h2>
+     * <p>那句 {@code ZN(180)} 是为了把原版
+     * {@code ModelPart} 的 <b>Y 向下</b> 翻成 Y 向上
+     * ，而它顺带着把 x 也取了负。
+     * 本移植版画的基岩几何（{@code GeoCube}）
+     * 本来就是 Y 向上，而且
+     * {@code GeoCube#createFromPojoCube}里<b>已经把 x 取过
+     * 一次负</b>。把 {@code M = Z·R(-θ)} 用
+     * {@code Z} 共轭到基岩空间就是
+     * {@code Z·R(-θ)·Z = R(θ)}，所以这里写
+     * {@code YP(θ)}。</p>
+     *
+     * <p>写成 {@code YN(θ)} 在 NORTH / SOUTH 下看不出
+     * 差别（±180° 互为逆），但在
+     * EAST / WEST 会差整整半圈：点击命中的
+     * 格子和看到的棋子就对不上。</p>
+     *
+     * <h2>为什么 NORTH / SOUTH 还要再 180°</h2>
+     * <p>上游就有这一句。贴图里格线在
+     * u 上的单边留白是 5 / 19 像素（不对称
+     * ），少了这半圈整块棋盘就会偏出
+     * <b>整整一格</b>，重开区也会跑到
+     * 另一侧——「右边一列棋子不在
+     * 格线上」与「字也是倒的」能同时
+     * 出现，就是这个原因。</p>
+     */
+    private static void applyFacing(PoseStack poseStack, Direction facing) {
+        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot()));
+        if (facing.getAxis() == Direction.Axis.Z) {
+            poseStack.mulPose(Vector3f.YP.rotationDegrees(180.0F));
+        }
     }
 
     private void renderPiece(TileEntityCChess cchess, PoseStack poseStack, MultiBufferSource bufferIn,
@@ -198,7 +232,8 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         // 反过来就是下面的 localX / localZ。这样棋子永远落在「点得到」的位置上。
         poseStack.pushPose();
         poseStack.translate(0.5, surface, 0.5);
-        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot()));
+        // 和棋盘用同一个姿态，否则字会和格线相差 180°。
+        applyFacing(poseStack, facing);
         for (int y = Position.RANK_TOP; y <= Position.RANK_BOTTOM; y++) {
             for (int x = Position.FILE_LEFT; x <= Position.FILE_RIGHT; x++) {
                 int index = Position.COORD_XY(x, y);
@@ -207,17 +242,22 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
                 if (hasPiece && piecesIndex >= 0 && piecesIndex < PIECE_BONES.length) {
                     float localX = GRID_ORIGIN_X + (x - Position.FILE_LEFT) * GRID_STEP;
                     float localZ = GRID_ORIGIN_Z + (y - Position.RANK_TOP) * GRID_STEP;
+                    // 格点坐标是「点击坐标系」里的数值，而 {@link #applyFacing} 对四个朝向都等于 {@code R(180)·R(-θ)}，
+                    // 比点击坐标系多转了半圈 —— 所以格点坐标取负才是这个姿态下的本地坐标。
+                    // 中心偏移也跟着取负，否则不对称的模型会被推开两倍偏移量。
+                    float renderX = pieceCenterX - localX;
+                    float renderZ = pieceCenterZ - localZ;
                     String bone = PIECE_BONES[piecesIndex];
                     if (bone != null) {
                         poseStack.pushPose();
-                        poseStack.translate(localX - pieceCenterX, pieceLift, localZ - pieceCenterZ);
+                        poseStack.translate(renderX, pieceLift, renderZ);
                         GeoBlockRenderer.renderBone(pieces, bone, PIECES_TEXTURE, poseStack, bufferIn,
                                 combinedLightIn, combinedOverlayIn, piecesRenderType);
                         poseStack.popPose();
                     }
                     if (selectX == x && selectY == y) {
                         poseStack.pushPose();
-                        poseStack.translate(localX - pieceCenterX, pieceLift, localZ - pieceCenterZ);
+                        poseStack.translate(renderX, pieceLift, renderZ);
                         GeoBlockRenderer.renderBone(pieces, SELECTED_BONE, PIECES_TEXTURE, poseStack, bufferIn,
                                 combinedLightIn, combinedOverlayIn, piecesRenderType);
                         poseStack.popPose();
@@ -324,8 +364,3 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
         return true;
     }
 }
-
-
-
-
-

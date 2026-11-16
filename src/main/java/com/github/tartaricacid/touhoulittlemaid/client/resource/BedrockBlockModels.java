@@ -7,13 +7,8 @@ import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.raw.pojo.Converter
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.raw.pojo.RawGeoModel;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.raw.tree.RawGeometryTree;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.GeoBuilder;
-import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.built.GeoBone;
-import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.built.GeoCube;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.built.GeoModel;
-import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.built.GeoQuad;
-import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.built.GeoVertex;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 
@@ -131,7 +126,6 @@ public final class BedrockBlockModels {
             RawGeoModel rawModel = Converter.fromJsonString(json);
             RawGeometryTree tree = RawGeometryTree.parseHierarchy(rawModel);
             GeoModel geo = GeoBuilder.getGeoBuilder().constructGeoModel(tree);
-            flipHorizontalFaces(geo);
             AnimatedGeoModel model = new AnimatedGeoModel(geo);
 
             float[] b = GeoBlockRenderer.measureBounds(model);
@@ -155,63 +149,19 @@ public final class BedrockBlockModels {
         return String.format("%.3f", v);
     }
 
-    /**
-     * 把「水平面」（UP / DOWN）的贴图 <b>v 方向</b>翻过来。
+    /*
+     * 这里<b>不做</b>任何 uv 翻转 —— 这段注释是给下一次想加的人看的。
      *
-     * <h2>为什么必须翻</h2>
-     * <p>这批基岩方块模型（棋盘、棋子、祭坛、神社……）是给上游自己的
-     * {@code simplebedrockmodel} 画的，那套管线的顶点空间是原版 {@code ModelPart} 的
-     * <b>Y 向下</b>；本移植用的是 {@code GeoCube} 的 <b>Y 向上</b>空间。
-     * 两者差一个 {@code ZN(180)} 翻转，几何上本移植已经不需要它（见类注释），
-     * 但<b>贴图方向没有跟着换</b>：{@code GeoCube} 把 box-UV 的 up 面接成
-     * 「贴图 <i>上</i>边 ↔ 世界 +z」，而原版约定是「贴图上边 ↔ 世界 −z」。</p>
+     * 曾经加过一个 flipHorizontalFaces，理由是「GeoCube 的 box-UV 与
+     * simplebedrockmodel 差一个 v 方向」。那个结论是错的，而且只做单轴镜像
+     * 恰好会把字变成镜像（汉字左右翻转），比原来的问题更难看出病因。
      *
-     * <p>棋盘是唯一把这个差异暴露出来的地方：它的木纹格线左右对称，看不出问题，
-     * 但中间「楚河 漢界」两个字是斜着写的，一照面就是上下颠倒的。
-     * 棋子顶面的汉字同理。</p>
-     *
-     * <h2>为什么这样改是安全的</h2>
-     * <p><b>只动贴图坐标，不动任何一个顶点位置</b> —— 所以包围盒、落地位移、
-     * 棋子摆位、{@code isClickResetArea} 全部不受影响，只会让贴图换个方向。
-     * 具体做法是在每张水平面自己的 uv 矩形内做 {@code v -> min+max-v}：
-     * 因为棋盘格线与两块「重开」竖板都关于 v 中轴对称（实测格线 v 5..122、
-     * 竖板 v 17..45 与 81..109），翻过来之后位置一模一样。</p>
-     *
-     * <p>这条路只给 {@code BedrockBlockModels}（方块）用，不碰女仆 —— 女仆模型是
-     * GeckoLib 原生 Y 向上画的，本来就是对的。</p>
+     * 真实情况：两套库的 box-UV 完全一样（GeoQuad 与 BedrockCubeBox#compile 都是
+     * 「第一个顶点拿 (u2,v1)」，up 面取的是同一个 uv 矩形）。差别只在渲染姿态：
+     * 上游在 ZN(180) 之外还对 NORTH / SOUTH 多转 180°，本移植版少了这一句，
+     * 于是这两个朝向下整张贴图转了 180° —— 格线偏一格、重开区跑到另一侧、
+     * 字上下颠倒。修在 TileEntityCChessRenderer 的姿态里，不在贴图坐标里。
      */
-    private static void flipHorizontalFaces(GeoModel model) {
-        for (GeoBone bone : model.topLevelBones()) {
-            flipBone(bone);
-        }
-    }
-
-    private static void flipBone(GeoBone bone) {
-        for (GeoCube cube : bone.cubes()) {
-            for (GeoQuad quad : cube.quads) {
-                if (quad.direction != Direction.UP && quad.direction != Direction.DOWN) {
-                    continue;
-                }
-                float min = Float.MAX_VALUE;
-                float max = -Float.MAX_VALUE;
-                for (GeoVertex vertex : quad.vertices) {
-                    min = Math.min(min, vertex.textureV);
-                    max = Math.max(max, vertex.textureV);
-                }
-                if (max - min < 1.0E-7F) {
-                    // 压成一条线的面（零厚度 cube 的塌陷结果）没有可翻的方向
-                    continue;
-                }
-                for (int i = 0; i < quad.vertices.length; i++) {
-                    GeoVertex vertex = quad.vertices[i];
-                    quad.vertices[i] = vertex.setTextureUV(vertex.textureU, min + max - vertex.textureV);
-                }
-            }
-        }
-        for (GeoBone child : bone.children()) {
-            flipBone(child);
-        }
-    }
 
     @Nullable
     private static InputStream open(ResourceLocation location) {

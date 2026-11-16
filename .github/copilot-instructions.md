@@ -44,3 +44,10 @@
 - `.ps1` 若还要保留：一律纯 ASCII；必须含中文时给文件加 UTF-8 BOM。
   PS 5.1 会把无 BOM 的脚本按 GBK 解析，字面量在执行之前就已经损坏。
 - 收尾自检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./check-encoding.ps1`，输出必须为 0。
+
+## 4. 语言
+一律用中文回复用户。
+
+
+## 5. 进程
+杀死冒烟测试的进程时请勿误伤其他 java.exe 进程。

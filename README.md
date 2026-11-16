@@ -62,7 +62,6 @@ loom_version=1.15.5
   `port/fix-eol.ps1` 统一行尾。注意 `lang/en_us.json`、`lang/zh_cn.json` 的**原始行尾是 mixed**，
   整体转换同样会造出近两千行 diff —— 只有字节级插入才能保住「1 行」的 diff。
 
-
 ---
 
 ## 进度总览
@@ -130,29 +129,77 @@ loom_version=1.15.5
 | 女仆胜场 sync 不到客户端 | `SynchedEntityData#set` 用 `ObjectUtils.notEqual(新, 旧)` 判脏；`CompoundTag` 比内容，原地改完塞回会被当成没变 |
 | 座位实体必须注册空渲染器 | 未注册类型的 `getRenderer` 返回 `null`，渲染循环不处处判空 |
 
-### 棋盘上的字为什么是倒的：水平面的贴图 v 方向
+### 棋盘上的棋子为什么偏一格：不是贴图，是棋子的符号
 
-「楚河 漢界」和棋子上的汉字在游戏里都是上下颠倒的。查下来的原因与摆放无关 ——
-<b>棋盘和棋子的位置都是对的</b>（见下一节的实测），错的是贴图方向。
+现象：格线、河流、九宫都正常，但棋子整体像是「偏了一格」，右边一列明显压在
+格线外面。用户当时补了一句「其实不是偏一格，而是其中一个被转了 180°」——
+这句话是对的，错的是<b>棋子的坐标符号</b>，不是贴图。
 
-这批基岩方块模型（棋盘、棋子、祭坛、神社……）是给上游自己的
-`simplebedrockmodel` 画的，那套管线的顶点空间是原版 `ModelPart` 的 **Y 向下**；
-本移植用的是 `GeoCube` 的 **Y 向上**空间。两者差一个 `ZN(180)` 翻转 ——
-几何上本移植已经不需要它了，但<b>贴图方向没有跟着换</b>：
-`GeoCube` 把 box-UV 的 up 面接成「贴图<b>上</b>边 ↔ 世界 +z」，
-而原版约定是「贴图上边 ↔ 世界 −z」。于是每个水平面都上下镜像，
-左右却正常 —— 所以棋盘格线、河流、九宫、两块「重开」竖板全都看不出来
-（它们本来左右对称），只有汉字会立刻露馅。
+棋盘的姿态（上游 1.18.2 与 1.20.1 两份渲染器在这一段逐字相同）是
 
-修法：`BedrockBlockModels#flipHorizontalFaces` 在模型加载后，
-对每个 cube 的 `UP` / `DOWN` 面在自己的 uv 矩形内做 `v -> min + max - v`。
-**只动贴图坐标，一个顶点都不动**，所以包围盒、落地位移、棋子摆位、
-`isClickResetArea` 全部不受影响 —— 改了之后祭坛 `y[-0.125..5.928]`、
-神社 `y[0.000..1.439]` 与改之前逐位相同。
+```
+mulPose(ZN(180));
+mulPose(YN(facing.toYRot()));
+if (facing == NORTH || facing == SOUTH) mulPose(YN(180));
+```
 
-只给方块模型用，不碰女仆：女仆模型是 GeckoLib 原生 Y 向上画的，本来就是对的。
+而点击那边是 `click = Vec3#yRot(facing.toYRot()) * (hit - 中心)`，
+即从世界转进点击坐标系。把两者复合起来：
 
-### 摆放：先查清模型的原点在哪
+| 朝向 | `2θ + 180°` | `click ∘ pose` |
+| --- | --- | --- |
+| SOUTH 0° | 180° | `R(180)` |
+| WEST 90° | 180° | `R(180)` |
+| NORTH 180° | 540° ≡ 180° | `R(180)` |
+| EAST 270° | 540° ≡ 180° | `R(180)` |
+
+四个朝向恒等。也就是说<b>棋盘是相对点击坐标系转了 180° 的东西</b>，
+所以把格点坐标（`CChessUtil#getClickPosition` 的逆运算结果）直接当本地坐标用，
+棋子会被送到中心对称的另一个交叉点上。
+
+看起来像「偏一格」而不是「明显转了 180°」，是因为贴图里的格线在 uv 矩形里
+并不居中（u 方向一头留 5 像素、另一头留 19 像素）：整片格点转 180° 之后，
+一头正好错开大半格、另一头还压在格线上，于是只有<b>一侧</b>看得出问题。
+
+修法：棋子坐标取负（中心偏移也一起取负，否则不对称的模型会被推开两倍偏移量），
+姿态收进 `applyFacing`：
+
+```java
+poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot()));
+if (facing.getAxis() == Direction.Axis.Z) {
+    poseStack.mulPose(Vector3f.YP.rotationDegrees(180.0F));
+}
+```
+
+写成 `YP` 而不是照拄 `YN`：那句 `ZN(180)` 除了翻 Y，还把 x 取了负，
+而 `GeoCube` 在 `createFromPojoCube` 里<b>已经对 x 取过一次负</b>
+（`origin.x = -(x + sizeX) / 16`）。把 `M = Z·R(-θ)` 用 `Z` 共轭到基岩空间
+就是 `Z·R(-θ)·Z = R(θ)`。
+
+#### 上一版的「v 方向反了」是错药（已撤销）
+
+`BedrockBlockModels#flipHorizontalFaces` 曾把水平面的 v 在各自 uv 矩形内镜像一次，
+理由是「`GeoCube` 的 up 面把贴图上边接到 +z，而 simplebedrockmodel 接到 −z」。
+这个理由是错的，而且<b>单轴镜像得到的必然是镜像字</b> —— 所以那一版改完字反而更难认。
+
+两套库的 box-UV 其实完全一样：`GeoQuad` 的非 mirror 分支与
+`BedrockCubeBox#compile` 都是「第一个顶点拿 (u2, v1)」，up 面取的是同一个 uv 矩形。
+差别只在渲染姿态，也就是上面那一段。`flipHorizontalFaces` 已删除。
+
+#### 怎么核对的（两个脚本，都不靠眼睛）
+
+- `port/chess_piece_align_probe.py`：把两条管线（`GeoCube` + `GeoQuad` /
+  `BedrockCubeBox#compile`）连同各自的姿态都算一遍，量「每个棋子中心到最近一条
+  画出来的格线」的最大距离。四个朝向都是 **0.0219 格**，小于一个贴图像素
+  （0.047 格），即纯粹的量化误差。
+- `port/chess_uv_frame_probe.py`：把「点击坐标系里的同一点采到哪个 texel」
+  在两套管线里逐点比较。四个朝向、格点两角、两条重开竖板中心，
+  `(u, v)` 完全一致 —— 棋盘贴图的朝向与上游等价，不需要动任何 uv。
+
+顺带记下上一轮为什么会得出「格线就在格点上、没偏」的错误结论：
+`port/chess_grid_probe.py` 的 `to_world_x` 假设「u 随 x 增大」，
+而 `GeoQuad` 的 up 面是 <b>u2 在 loX</b>（u 随 x 减小）。
+方向假设反了，一格的偏移就被抵消成了 0.02 格的「误差」。
 
 ### 摆放：先查清模型的原点在哪
 
@@ -1133,7 +1180,6 @@ BlockPos currentCenterPos = posStart.subtract(getCenterPos(direction));
 
 ---
 
-
 ### 神社（胶片复活）
 
 - `BlockShrine` + `TileEntityShrine`，单格、只收 `ItemFilm`。
@@ -1892,7 +1938,6 @@ Fabric 没有。凡直接或间接继承 `LivingEntity` 的类型都要注册，
 `ChairItemRenderer` 因此接一次 `Throwable`、打一条带堆栈的 ERROR、然后把 3D 图标整个关掉 ——
 图标画不出来顶多是「物品栏里少个模型」，不该升级成崩溃；那条日志保证问题不会被静默吞掉。
 
-
 ### 坐在坐垫上比原版高 0.3 格：`ridingPosture` 的位移只接了一半
 
 现象：所有坐垫，女仆坐上去的落点都比上游高一点（约 0.3 格）。
@@ -1933,5 +1978,4 @@ if (!maid.isCarried()) {
 **残留的极小偏差**：地面坐下（`sit` 状态）在 `maid_legacy.animation.json` 里写的是
 `Root.position [0, -3.5, 0]`（0.219 格），而上游是 0.3 格，差 0.081 格（约 1.3 像素）。
 这一处没有动 —— 它已被视觉验证过，而改动的收益低于打乱已验证几何的风险。
-
 
