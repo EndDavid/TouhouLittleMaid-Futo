@@ -187,7 +187,7 @@ public final class MaidTipsOverlay {
      * 读布尔配置，并在配置未加载时回退 {@code true}。
      *
      * <p>提示是纯客户端渲染，可能在配置加载完成之前就被调用；
-     * {@code ForgeConfigSpec.BooleanValue#get()} 在那种情况下会抛异常。</p>
+     * {@code ForgeConfigSpec.BooleanValue#get()} 在那种情况下返回默认值，不会抛异常。</p>
      */
     private static boolean enabled(net.minecraftforge.common.ForgeConfigSpec.BooleanValue value) {
         try {

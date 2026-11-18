@@ -35,14 +35,13 @@ public final class ServerConfig {
     }
 
     /**
-     * 是否记录 AI 耗时（配置未加载时回退 false）。
+     * 是否记录 AI 耗时。
+     *
+     * <p>配置未加载时 {@code get()} 返回默认值 {@code false}，无需 try/catch
+     * （见 {@code MaidConfig} 末尾的说明）。</p>
      */
     public static boolean maidAiTimeDebug() {
-        try {
-            return MAID_AI_TIME_DEBUG != null && MAID_AI_TIME_DEBUG.get();
-        } catch (Exception e) {
-            return false;
-        }
+        return MAID_AI_TIME_DEBUG != null && MAID_AI_TIME_DEBUG.get();
     }
 }
 

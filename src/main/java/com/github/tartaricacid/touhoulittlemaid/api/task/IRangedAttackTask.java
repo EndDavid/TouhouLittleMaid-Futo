@@ -54,8 +54,8 @@ public interface IRangedAttackTask extends IAttackTask {
      *
      * <p>上游签名是 {@code (maid, target, ForgeConfigSpec.IntValue)}，直接
      * {@code configRange.get()}。本移植版额外接收一个 {@code fallbackRange}：
-     * {@code ForgeConfigSpec.Value#get()} 在配置尚未加载时会抛
-     * {@code IllegalStateException}，而可见性判定可能在极早期被调用。</p>
+     * 配置字段可能为 {@code null}（说明 {@code init()} 没调），
+     * 而配置文件尚未加载时 {@code get()} 返回的是定义里的默认值。</p>
      *
      * @param configRange   配置项（可为 {@code null}）
      * @param fallbackRange 配置未加载时的回退值（与上游默认值一致）

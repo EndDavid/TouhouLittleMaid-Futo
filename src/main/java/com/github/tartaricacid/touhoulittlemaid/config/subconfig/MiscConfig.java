@@ -86,14 +86,11 @@ public final class MiscConfig {
         return false;
     }
 
-    // ------------------------------------------------------------------ 安全取值
+    // ------------------------------------------------------------------ 取值
 
+    // 无需 try/catch —— 配置未加载时 ConfigValue#get() 返回默认值（依据见 MaidConfig 文件末尾的说明）。
     private static boolean boolOr(ForgeConfigSpec.BooleanValue value, boolean fallback) {
-        try {
-            return value == null ? fallback : value.get();
-        } catch (Exception e) {
-            return fallback;
-        }
+        return value == null ? fallback : value.get();
     }
 
     /**
@@ -114,7 +111,8 @@ public final class MiscConfig {
      * 首次进入世界时是否寄一本 {@code patchouli:guide_book}（帕秋莉手册）。
      *
      * <p>上游的判据触发器每次登录都会读一次它，必须走空安全入口：
-     * 配置尚未加载（专用服务端刚启动 / 数据包刷新）时 {@code .get()} 会抛异常。</p>
+     * 配置尚未加载（专用服务端刚启动 / 数据包刷新）时 {@code .get()} 返回默认值，
+     * 不会抛异常（依据见 {@code MaidConfig} 文件末尾）。</p>
      */
     public static boolean givePatchouliBook() {
         return boolOr(GIVE_PATCHOULI_BOOK, true);
@@ -136,12 +134,8 @@ public final class MiscConfig {
      * 妖精女仆不生成的维度 id 列表。
      */
     public static List<String> fairyBlacklistDimension() {
-        try {
-            if (MAID_FAIRY_BLACKLIST_DIMENSION != null) {
-                return new ArrayList<>(MAID_FAIRY_BLACKLIST_DIMENSION.get());
-            }
-        } catch (Exception ignored) {
-            // 配置未加载，回退默认值
+        if (MAID_FAIRY_BLACKLIST_DIMENSION != null) {
+            return new ArrayList<>(MAID_FAIRY_BLACKLIST_DIMENSION.get());
         }
         return Lists.newArrayList(Level.NETHER.location().toString(), Level.END.location().toString(),
                 "twilightforest:twilight_forest");
@@ -152,25 +146,17 @@ public final class MiscConfig {
      *
      * <p>这个方法会被 {@code NaturalSpawnerMixin} 每 tick 高频调用，
      * 所以不能直接 {@code MAID_FAIRY_SPAWN_PROBABILITY.get()} ——
-     * 配置未加载时会抛异常，异常从刷怪循环里冒出去会直接崩服。</p>
+     * 配置未加载时 {@code .get()} 返回默认值，所以不需要 try/catch（依据见 {@code MaidConfig} 文件末尾）。</p>
      */
     public static int maidFairySpawnProbability() {
-        try {
-            return MAID_FAIRY_SPAWN_PROBABILITY == null ? 70 : MAID_FAIRY_SPAWN_PROBABILITY.get();
-        } catch (Exception e) {
-            return 70;
-        }
+        return MAID_FAIRY_SPAWN_PROBABILITY == null ? 70 : MAID_FAIRY_SPAWN_PROBABILITY.get();
     }
 
     /**
      * 女仆妖精死亡时掉落的灵力（1.00 灵力 = 100 P 点）。
      */
     public static double maidFairyPowerPoint() {
-        try {
-            return MAID_FAIRY_POWER_POINT == null ? 0.16 : MAID_FAIRY_POWER_POINT.get();
-        } catch (Exception e) {
-            return 0.16;
-        }
+        return MAID_FAIRY_POWER_POINT == null ? 0.16 : MAID_FAIRY_POWER_POINT.get();
     }
 
     /**
@@ -180,22 +166,14 @@ public final class MiscConfig {
      * 上游代码扣的是这个配置值（默认 1.00），不是清空。</p>
      */
     public static double playerDeathLossPowerPoint() {
-        try {
-            return PLAYER_DEATH_LOSS_POWER_POINT == null ? 1.0 : PLAYER_DEATH_LOSS_POWER_POINT.get();
-        } catch (Exception e) {
-            return 1.0;
-        }
+        return PLAYER_DEATH_LOSS_POWER_POINT == null ? 1.0 : PLAYER_DEATH_LOSS_POWER_POINT.get();
     }
 
     /**
      * 稻草人驱散妖精的半径（正方形边长）。
      */
     public static int scarecrowRange() {
-        try {
-            return SCARECROW_RANGE == null ? 48 : SCARECROW_RANGE.get();
-        } catch (Exception e) {
-            return 48;
-        }
+        return SCARECROW_RANGE == null ? 48 : SCARECROW_RANGE.get();
     }
 
     // ------------------------------------------------------------------ 神社庭灯
@@ -204,36 +182,25 @@ public final class MiscConfig {
      * 神社庭灯施加效果时的灵力损耗（单位：灵力 / 小时）。
      *
      * <p>庭灯的 {@code serverTick} 每 80 tick（4 秒）读一次，直接 {@code .get()} 在
-     * 配置尚未加载（专用服务端刚起、客户端刚进世界）时会抛异常，而异常从方块实体 tick
+     * 配置尚未加载（专用服务端刚起、客户端刚进世界）时 {@code .get()} 返回默认值，
+     * 而不是抛异常；这里仍保留 null 检查，因为字段为 null 说明 init() 没调（依据见 {@code MaidConfig} 文件末尾）。
      * 里冒出去会直接崩服，所以统一走这个空安全入口。</p>
      */
     public static double shrineLampEffectCost() {
-        try {
-            return SHRINE_LAMP_EFFECT_COST == null ? 0.9 : SHRINE_LAMP_EFFECT_COST.get();
-        } catch (Exception e) {
-            return 0.9;
-        }
+        return SHRINE_LAMP_EFFECT_COST == null ? 0.9 : SHRINE_LAMP_EFFECT_COST.get();
     }
 
     /**
      * 神社庭灯的灵力储量上限（1.00 灵力 = 100 P）。
      */
     public static double shrineLampMaxStorage() {
-        try {
-            return SHRINE_LAMP_MAX_STORAGE == null ? 100 : SHRINE_LAMP_MAX_STORAGE.get();
-        } catch (Exception e) {
-            return 100;
-        }
+        return SHRINE_LAMP_MAX_STORAGE == null ? 100 : SHRINE_LAMP_MAX_STORAGE.get();
     }
 
     /**
      * 神社庭灯自动吸取 P 点的半径（格）。
      */
     public static int shrineLampMaxRange() {
-        try {
-            return SHRINE_LAMP_MAX_RANGE == null ? 6 : SHRINE_LAMP_MAX_RANGE.get();
-        } catch (Exception e) {
-            return 6;
-        }
+        return SHRINE_LAMP_MAX_RANGE == null ? 6 : SHRINE_LAMP_MAX_RANGE.get();
     }
 }

@@ -13,9 +13,9 @@ import java.util.List;
  * 女仆相关配置，移植自上游 {@code config/subconfig/MaidConfig}。
  *
  * <p><b>取值请用文件末尾的静态辅助方法</b>（如 {@link #workRange()}），不要直接
- * {@code MAID_WORK_RANGE.get()}。原因：{@code ForgeConfigSpec.ConfigValue#get()} 在配置
- * 尚未加载时会抛 {@code IllegalStateException}，而女仆实体的静态初始化、客户端渲染等
- * 都可能早于配置加载。辅助方法在未加载时回退到上游默认值，行为可预期。</p>
+ * {@code MAID_WORK_RANGE.get()}。原因不是「{@code get()} 会抛异常」（它不会：未加载时返回默认值，
+ * 依据见文件末尾），而是上游读的就是这些默认值：
+ * 辅助方法把「默认值」写在调用点上，与上游行为逐处对得上。</p>
  */
 public final class MaidConfig {
     public static final String TAG_PREFIX = "#";
@@ -192,49 +192,38 @@ public final class MaidConfig {
         return key == null ? "minecraft:air" : key.toString();
     }
 
-    // ------------------------------------------------------------------ 安全取值
+    // ------------------------------------------------------------------ 取值
     //
-    // ForgeConfigSpec 的 Value#get() 在配置未加载时会抛异常。下面这些方法在那种情况下
-    // 回退到与上游一致的默认值，因此调用方可以随时安全使用。
+    // 这里<b>不需要</b> try/catch。ForgeConfigSpec.ConfigValue#get() 在配置文件尚未加载时
+    // 返回的是<b>默认值</b>，不会抛异常 —— 反编译 Forge Config API Port 3.2.4 的
+    // ConfigValue#get 可见第一段就是：
+    //     if (spec.childConfig == null) return defaultSupplier.get();
+    // 上游 Forge 1.18.2 的同一方法也是这个结构。
+    //
+    // 早先这一层包了五个 try/catch，注释还写着「未加载时会抛 IllegalStateException」，
+    // 那是错的：除了让读代码的人误解，它还会把<b>真正的</b>异常（值类型不匹配、
+    // 默认值非法）一起吞掉，配置看起来「怎么改都没用」却没有一行日志。
+    //
+    // 现在只保留 null 检查：字段为 null 表示 init() 根本没被调用，那是编程错误。
 
     private static int intOr(ForgeConfigSpec.IntValue value, int fallback) {
-        try {
-            return value == null ? fallback : value.get();
-        } catch (Exception e) {
-            return fallback;
-        }
+        return value == null ? fallback : value.get();
     }
 
     private static boolean boolOr(ForgeConfigSpec.BooleanValue value, boolean fallback) {
-        try {
-            return value == null ? fallback : value.get();
-        } catch (Exception e) {
-            return fallback;
-        }
+        return value == null ? fallback : value.get();
     }
 
     private static String stringOr(ForgeConfigSpec.ConfigValue<String> value, String fallback) {
-        try {
-            return value == null ? fallback : value.get();
-        } catch (Exception e) {
-            return fallback;
-        }
+        return value == null ? fallback : value.get();
     }
 
     private static List<String> listOr(ForgeConfigSpec.ConfigValue<List<String>> value, List<String> fallback) {
-        try {
-            return value == null ? fallback : value.get();
-        } catch (Exception e) {
-            return fallback;
-        }
+        return value == null ? fallback : value.get();
     }
 
     private static double doubleOr(ForgeConfigSpec.DoubleValue value, double fallback) {
-        try {
-            return value == null ? fallback : value.get();
-        } catch (Exception e) {
-            return fallback;
-        }
+        return value == null ? fallback : value.get();
     }
 
 
@@ -363,11 +352,7 @@ public final class MaidConfig {
      * {@code getContainerItem()}，为空时才查这张表。</p>
      */
     public static List<List<String>> eatenReturnContainerList() {
-        try {
-            return MAID_EATEN_RETURN_CONTAINER_LIST == null
-                    ? Lists.newArrayList() : MAID_EATEN_RETURN_CONTAINER_LIST.get();
-        } catch (Exception e) {
-            return Lists.newArrayList();
-        }
+        return MAID_EATEN_RETURN_CONTAINER_LIST == null
+                ? Lists.<List<String>>newArrayList() : MAID_EATEN_RETURN_CONTAINER_LIST.get();
     }
 }

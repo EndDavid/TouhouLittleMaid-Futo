@@ -35,21 +35,15 @@ public final class VanillaConfig {
         builder.pop();
     }
 
-    // ------------------------------------------------------------------ 安全取值
+    // ------------------------------------------------------------------ 取值
+    //
+    // 无需 try/catch：配置未加载时 {@code ConfigValue#get()} 返回默认值（依据见 MaidConfig 文件末尾）。
+    //
+    // 早先这里写的是「未加载会抛 IllegalStateException，首帧渲染会崩客户端」——前提是错的。
+    // 服务端配置在客户端未同步到时读到的就是本地默认值，不会抛。
 
-    /**
-     * 安全读取布尔配置。
-     *
-     * <p>为什么必须包一层：{@link ForgeConfigSpec.BooleanValue#get()} 在配置<b>尚未加载</b>
-     * 时会抛 {@code IllegalStateException}。渲染器是在资源重载 / 首帧就可能被调用的,
-     * 那一刻服务端配置可能还没加载完，直接 get 会崩客户端。</p>
-     */
     private static boolean boolOr(ForgeConfigSpec.BooleanValue value, boolean fallback) {
-        try {
-            return value == null ? fallback : value.get();
-        } catch (Exception e) {
-            return fallback;
-        }
+        return value == null ? fallback : value.get();
     }
 
     /**

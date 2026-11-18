@@ -40,15 +40,19 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.inventory.chest.ChestManager.init();
         InitMenu.init();
 
-// 注册配置（Forge Config API Port 提供与 Forge 完全相同的 API）
-        net.minecraftforge.api.ModLoadingContext.registerConfig(
-                TouhouLittleMaid.MOD_ID,
+        // 注册配置。这两行与上游逐字相同：ModLoadingContext 是本项目的 Forge 兼容层，
+        // 内部直接转发给 Forge Config API Port 的 net.minecraftforge.api.ModLoadingContext。
+        // 不要改回直接调用 FCAP：那样上游文件搬过来时又会出现“两套注册路径”。
+        net.minecraftforge.fml.ModLoadingContext.get().registerConfig(
                 net.minecraftforge.fml.config.ModConfig.Type.COMMON,
                 com.github.tartaricacid.touhoulittlemaid.config.GeneralConfig.init());
-        net.minecraftforge.api.ModLoadingContext.registerConfig(
-                TouhouLittleMaid.MOD_ID,
+        net.minecraftforge.fml.ModLoadingContext.get().registerConfig(
                 net.minecraftforge.fml.config.ModConfig.Type.SERVER,
                 com.github.tartaricacid.touhoulittlemaid.config.ServerConfig.init());
+
+        // 配置加载 / 重载的时刻。Forge Config API Port 把 Forge 的 ModConfigEvent 搬成了
+        // Fabric 事件（LOADING / RELOADING），这里接上它 —— 见 ConfigLifecycleEvents 的类注释。
+        com.github.tartaricacid.touhoulittlemaid.event.ConfigLifecycleEvents.init();
 
         // 判据触发器必须在任何数据包（进度 JSON）被解析之前注册，
         // 否则 grant_book_on_first_join 里的自定义触发器会被当成「未知判据」而整条进度不加载。

@@ -37,8 +37,6 @@ public final class ForgeRegistries {
     public static final FutoForgeRegistry<net.minecraft.world.inventory.MenuType<?>> CONTAINERS =
             new FutoForgeRegistry<>(net.minecraft.core.Registry.MENU, id -> TagKey.create(net.minecraft.core.Registry.MENU_REGISTRY, id));
     public static final FutoForgeRegistry<DataSerializerEntry> DATA_SERIALIZERS = ownRegistry(Keys.DATA_SERIALIZERS);
-    public static final FutoForgeRegistry<net.minecraftforge.common.loot.GlobalLootModifierSerializer<?>> GLOBAL_LOOT_MODIFIER_SERIALIZERS =
-            ownRegistry(Keys.GLOBAL_LOOT_MODIFIER_SERIALIZERS);
 
     private ForgeRegistries() {
     }
@@ -51,8 +49,6 @@ public final class ForgeRegistries {
         public static final ResourceKey<Registry<net.minecraft.world.inventory.MenuType<?>>> CONTAINERS = Registry.MENU_REGISTRY;
         public static final ResourceKey<Registry<DataSerializerEntry>> DATA_SERIALIZERS =
                 ResourceKey.createRegistryKey(new ResourceLocation("futo", "data_serializers"));
-        public static final ResourceKey<Registry<net.minecraftforge.common.loot.GlobalLootModifierSerializer<?>>> GLOBAL_LOOT_MODIFIER_SERIALIZERS =
-                ResourceKey.createRegistryKey(new ResourceLocation("futo", "global_loot_modifier_serializers"));
         public static final ResourceKey<Registry<net.minecraft.world.entity.ai.village.poi.PoiType>> POI_TYPES =
                 Registry.POINT_OF_INTEREST_TYPE_REGISTRY;
 

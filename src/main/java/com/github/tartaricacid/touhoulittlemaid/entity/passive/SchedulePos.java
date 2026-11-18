@@ -39,7 +39,7 @@ import javax.annotation.Nullable;
  * <h2>与上游的差异</h2>
  * <ul>
  *     <li>上游用 {@code MaidConfig.MAID_WORK_RANGE.get()}；Forge Config API Port 的
- *         {@code ConfigValue#get()} 在配置未加载时会抛异常，本移植版统一走
+ *         {@code ConfigValue#get()} 在配置未加载时返回默认值，本移植版统一走
  *         {@link MaidConfig#workRange()} 这类带默认值的包装方法。</li>
  *     <li>上游 1.18.2 的 {@code EntityMaid} 还有 {@code getSchedulePos()} 之外的
  *         「旧存档 RESTRICT_CENTER 迁移」，本移植版从来没有写过那个键，不需要迁移。</li>
