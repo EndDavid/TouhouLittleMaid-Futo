@@ -43,6 +43,7 @@ public final class BaubleManager {
         manager.bind(InitItems.NIMBLE_FABRIC, new NimbleFabricBauble());
         manager.bind(InitItems.PROJECTILE_PROTECT_BAUBLE, new ProjectileProtectBauble());
         manager.bind(InitItems.MUTE_BAUBLE, new MuteBauble());
+        manager.bind(InitItems.WIRELESS_IO, new WirelessIOBauble());
         manager.bind(Items.TOTEM_OF_UNDYING, new UndyingTotemBauble());
         baubles = Map.copyOf(baubles);
     }

@@ -39,6 +39,10 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.screenhandler.v1.ScreenRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitMenu.TASK_CONFIG_ATTACK,
                 com.github.tartaricacid.touhoulittlemaid.client.screen.AttackTaskConfigScreen::new);
+        // 隙间（无线 I/O）：右键空气打开的 9 格过滤清单界面
+        net.fabricmc.fabric.api.client.screenhandler.v1.ScreenRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitMenu.WIRELESS_IO,
+                com.github.tartaricacid.touhoulittlemaid.client.gui.item.WirelessIOContainerGui::new);
         EntityRendererRegistry.register(InitEntities.EXTINGUISHING_AGENT, EntityExtinguishingAgentRenderer::new);
         EntityRendererRegistry.register(InitEntities.MAID_FISHING_HOOK, MaidFishingHookRenderer::new);
         EntityRendererRegistry.register(InitEntities.DANMAKU,
@@ -143,6 +147,8 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 仆从铃：她所在区块没加载时，在世界上画「距离 + 红色倒三角」浮标
         // （上游 client/event/ScrollRenderEvent 的铃那一半；红狐狸卷轴共用这个方法）
         com.github.tartaricacid.touhoulittlemaid.client.render.ServantBellTracker.init();
+        // 隙间：手持时把绑定的箱子框成红色线框（上游 WirelessIORenderEvent）
+        com.github.tartaricacid.touhoulittlemaid.client.render.WirelessIORenderer.init();
 
         // 狐狸卷轴记录（S2C）：服务端在物品 use 里打包发来，这里开界面。
         // 记录先读完再 execute —— 出回调后缓冲区就失效了。

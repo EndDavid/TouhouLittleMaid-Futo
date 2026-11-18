@@ -35,6 +35,9 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // 饰品登记表：必须晚于物品注册（它按物品实例建立「物品 → 行为」映射），
         // 但必须早于任何女仆被创建 —— BaubleItemHandler 在读档 / 换物时会查它。
         com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager.init();
+        // 「什么算箱子」登记表：隙间饰品每 100 tick 会查一次，
+        // 同样必须早于任何女仆 tick（放在这里是为了与 BaubleManager 相邻，便于对照）。
+        com.github.tartaricacid.touhoulittlemaid.inventory.chest.ChestManager.init();
         InitMenu.init();
 
 // 注册配置（Forge Config API Port 提供与 Forge 完全相同的 API）
@@ -73,6 +76,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.initServer();
         // 网络包：仆从铃绑定女仆（C2S，把女仆 UUID + 提示名写进主手那枚铃的 NBT）
         com.github.tartaricacid.touhoulittlemaid.network.ServantBellSetPacket.initServer();
+        // 网络包：隙间（C2S：切换 I/O 方向 / 黑白名单、提交槽位配置后重开界面）
+        com.github.tartaricacid.touhoulittlemaid.network.WirelessIOPacket.initServer();
         // 网络包：狐狸卷轴（S2C 发记录列表，C2S 把某条坐标钉到主手卷轴上）
         com.github.tartaricacid.touhoulittlemaid.network.FoxScrollPacket.initServer();
         // 网络包：棋盘（S2C 把局面交给客户端算女仆的走法，C2S 把结果交回服务端执行）
@@ -110,4 +115,3 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         TouhouLittleMaid.LOGGER.info("[Futo] Touhou Little Maid initialized.");
     }
 }
-

@@ -433,6 +433,17 @@ public final class InitItems {
             TouhouLittleMaid.rl("mute_bauble"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemNormalBauble());
 
+    /**
+     * 隙间（无线 I/O 饰品）。
+     *
+     * <p>它不是 {@code ItemNormalBauble} 的实例：既要当饰品（进女仆饰品栏后由
+     * {@code WirelessIOBauble} 驱动），又要当手持工具（绑定箱子 / 开配置界面），
+     * 所以自带一个类。上游同样如此。</p>
+     */
+    public static final Item WIRELESS_IO = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("wireless_io"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemWirelessIO());
+
     // ------------------------------------------------------------------ 背包
 
     public static final Item MAID_BACKPACK_SMALL = registerBackpack("maid_backpack_small");

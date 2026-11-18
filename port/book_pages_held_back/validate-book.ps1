@@ -22,6 +22,7 @@ $registered = @(
   'touhou_little_maid:nimble_fabric',
   'touhou_little_maid:item_magnet_bauble',
   'touhou_little_maid:mute_bauble',
+  'touhou_little_maid:wireless_io',
   # --- shrine revival milestone: film / shrine / bed / jizo ---
   'touhou_little_maid:film',
   'touhou_little_maid:shrine',

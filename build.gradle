@@ -127,6 +127,35 @@ jar {
 	inputs.property "archivesName", project.base.archivesName
 }
 
+// ---------------------------------------------------------------------------
+// 离线检查：隙间（无线 IO）的搬运规则
+//
+// 为什么需要它：隙间「女仆 -> 箱子」那一半在专用服务器上根本观察不到 —— 没有玩家在线时
+// 区块几秒后就不再 tick，女仆随之停摆，测什么都是「没动」。而搬运本身只是两个
+// IItemHandler 之间的算术，完全可以脱离世界跑。
+//
+// 用法：  gradlew verifyWirelessIo
+//
+// 这套 sourceSet 只把 port/verify-wireless-io 编进 verify 这一路，主 sourceSet 与最终 jar
+// 都不受影响；被检查的 WirelessIOTransfer 用的是 main 的编译产物，也就是真正会打进
+// jar 的那一份。
+// ---------------------------------------------------------------------------
+sourceSets {
+        verify {
+                java.srcDirs = ['port/verify-wireless-io']
+                compileClasspath += sourceSets.main.output + configurations.compileClasspath
+                runtimeClasspath += sourceSets.main.output + configurations.runtimeClasspath
+        }
+}
+
+tasks.register('verifyWirelessIo', JavaExec) {
+        group = 'verification'
+        description = 'Runs the offline gap (wireless I/O) transfer check.'
+        dependsOn tasks.named('verifyClasses')
+        classpath = sourceSets.verify.runtimeClasspath
+        mainClass = 'com.github.tartaricacid.touhoulittlemaid.item.bauble.TransferCheck'
+}
+
 // 说明：这里故意不声明 loom.accessWidenerPath。
 // 上游用 Forge AT 打开了 SensorType/Activity/MemoryModuleType 的私有构造函数与
 // Brain#lastScheduleUpdate，本移植版改为「反射 + 行为自带时间戳」实现（见 MaidReflection），

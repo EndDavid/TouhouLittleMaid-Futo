@@ -6,6 +6,7 @@ import com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidConfigCo
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidMainContainer;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.task.AttackTaskConfigContainer;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.task.DefaultTaskConfigContainer;
+import com.github.tartaricacid.touhoulittlemaid.inventory.container.other.WirelessIOContainer;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
 import net.minecraft.core.Registry;
 import net.minecraft.world.inventory.MenuType;
@@ -52,6 +53,20 @@ public final class InitMenu {
                     new AttackTaskConfigContainer(InitMenu.TASK_CONFIG_ATTACK, syncId, inventory, buf.readInt(),
                             AttackListData.readFromBuf(buf))));
 
+    /**
+     * 隙间（无线 I/O）配置界面。
+     *
+     * <p>打开时下发的是「主手那件物品」的 {@code ItemStack} 拷贝 ——
+     * 界面上的 I/O 方向、过滤模式、9 格过滤清单全从这个拷贝里读。
+     * 上游用 {@code IForgeMenuType.create((id, inv, data) -> data.readItem())}，
+     * 与这里的写法是同一件事。</p>
+     */
+    public static final MenuType<WirelessIOContainer> WIRELESS_IO = Registry.register(
+            Registry.MENU,
+            TouhouLittleMaid.rl("wireless_io"),
+            new ExtendedScreenHandlerType<>((syncId, inventory, buf) ->
+                    new WirelessIOContainer(syncId, inventory, buf.readItem())));
+
     private InitMenu() {
     }
 
@@ -59,4 +74,3 @@ public final class InitMenu {
         // 静态字段即完成注册
     }
 }
-
