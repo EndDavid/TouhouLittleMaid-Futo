@@ -2704,3 +2704,55 @@ summon touhou_little_maid:broom -1 64 -8
 | `port/check-renderers.ps1` | 注册表与渲染器表是否一一对应 |
 | `port/book_pages_held_back/validate-book.ps1` | 手册里引用的物品 / 配方 / 标签是否都真的存在 |
 | `gradlew verifyWirelessIo` | 隙间搬运规则（脱离世界跑） |
+
+---
+## 扫帚：下扫帚的键，以及不再抢走准星
+两处都按上游 1.20.1 补齐。1.18.2 上游在这个子系统的这两块上是缺的（或者说法不一样），
+所以这里以上游 1.20.1 为准。
+### 1. 下扫帚需要一个单独的键（默认 C）
+扫帚上 **空格是上升、Shift 是下降**
+```java
+// EntityBroom#rideControl
+if (keyJump)        vertical = 0.25f;    // 空格
+else if (keySneak)  vertical = -0.2f;    // Shift
+```
+原版那套「按 Shift 下车」正好被下降占用了，于是**必须另给一个键**。
+上游 1.20.1 给的是默认 C、可在「选项 → 控制」里改，走一条 C2S 包到服务端 `stopRiding()`。
+本移植版最初把这一整块漏了，结果骑上去就下不来。
+| 文件 | 作用 |
+| --- | --- |
+| `network/DismountBroomPacket` | C2S：动作 id + 扫帚实体 id；服务端复核「你骑的就是它、它真的是扫帚」再 `stopRiding()` |
+| `client/input/DismountBroomKey` | `KeyMapping`（GLFW_C，分类 `key.category.touhou_little_maid`） |
+**为什么必须发包而不是客户端自己 `stopRiding()`：**乘客表、位置修正都在服务端，
+客户端单方面下车只会让本地模型掉下去、下一 tick 被拉回来。
+**为什么不在 shift 上做「长按下车」：**那会把下降变成不可用，而上游就是这么设计的，
+照抄即可，不要自作聪明。
+与上游的框架差异：注册走 Fabric 的 `KeyBindingHelper`，触发走
+`ClientTickEvents.END_CLIENT_TICK` + `consumeClick()`（上游订阅 `InputEvent.Key` 并在
+**松开**时才发包；`consumeClick()` 本身就是「一次按下只返回一次」，等价且不会长按连发）。
+上游用 `KeyConflictContext.IN_GAME` 限定只在游戏内生效，Fabric 没有这个概念，
+所以自己判「没开界面 + 鼠标被抓取 + 窗口是活动的」—— 少了这一步，在聊天栏打一个带 c
+的单词就会把人从扫帚上甩下来。
+### 2. 骑扫帚时不该抢走准星
+现象：骑着扫帚对着前方的方块，**中键取方块却取到「魔理沙的扫帚」**，
+右击 / 左击也打在扫帚自己身上，够不到前面的东西。
+原因很直接：射线从玩家眼睛出发，而扫帚的碰撞箱 `1.375 × 0.5 × 0.5625`
+就在脚底下、并且向前伸出将近一格，于是它抢在前面的方块之前被命中。
+上游 1.20.1 的修法只有三行，注释写得也很直白（「防止其碰撞箱影响正常交互」）：
+```java
+@Override
+public boolean isPickable() {
+    boolean hasPlayer = this.getPassengers().stream().anyMatch(e -> e instanceof Player);
+    return hasPlayer ? false : super.isPickable();
+}
+```
+**关键是「只在有玩家乘客时为 false」**，不是一直 false —— 没人骑的时候还要能右键它上车、
+Shift + 左键把它打掉（那条路径在 `AbstractEntityFromItem#applyHitEntityLogic`），
+所以那种情况必须交回父类。
+> 注意 1.18.2 上游的 `EntityBroom` **没有**这个覆写。也就是说这个 bug 在 1.18.2 原版里
+> 大概是存在的，1.20.1 才修。本移植版与 1.20.1 对齐。
+### 验证的边界
+能自动验证的部分：构建通过、客户端带新 KeyMapping 正常启动（重复注册会在 init 抛异常，
+这次没有）、两个包的服务端接收器都注册成功。
+**不能自动验证的部分**：实际按键和准星行为都需要真人操作 —— 骑上扫帚、按 C 看掉不掉下来，
+对着方块按中键看取到的是方块还是扫帚。这两条我留给你实测。

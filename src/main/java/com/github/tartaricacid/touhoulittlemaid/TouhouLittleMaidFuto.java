@@ -89,6 +89,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // 五子棋 / 国际象棋：同样是「客户端算、服务端执行」，各有自己的两个包
         com.github.tartaricacid.touhoulittlemaid.network.WChessToServerPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.GomokuToServerPacket.initServer();
+        // 下扫帚：扫帚上 Shift 是下降（对齐 1.20.1），所以下车要单独一个键（默认 C）
+        com.github.tartaricacid.touhoulittlemaid.network.DismountBroomPacket.initServer();
 
         // 女仆位置留档：周期性记录，供仆从铃 / 小号处理「她在未加载区块」那一半。
         // 原版 1.18.2 没有实体卸载钩子，Fabric API 0.77 也没有对应事件，说明见该类注释。

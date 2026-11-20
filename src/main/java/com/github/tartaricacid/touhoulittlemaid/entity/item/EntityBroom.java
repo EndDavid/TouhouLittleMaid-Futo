@@ -294,6 +294,32 @@ public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity
         return this.isAlive();
     }
 
+    /**
+     * 有玩家坐在上面时，扫帚本体<b>不可被准星选中</b>（对齐上游 1.20.1）。
+     *
+     * <p><b>为什么必须有这一条：</b>骑着扫帚时射线从玩家眼睛出发，而扫帚的碰撞箱
+     * （1.375×0.5×0.5625）就在玩家脚下、并且向前伸出将近一格 —— 于是它会抢在
+     * 前方的方块/生物之前被命中。表现就是：</p>
+     * <ul>
+     *     <li>准星对着前面的方块，中键取方块却取到「魔理沙的扫帚」；</li>
+     *     <li>右击 / 左击打在扫帚自己身上，够不到前面的东西；</li>
+     *     <li>对着女仆也点不到她。</li>
+     * </ul>
+     *
+     * <p>上游源码里的注释写得很直白：「当玩家骑在扫帚上时，让扫帚本体不可被选中，
+     * 防止其碰撞箱影响正常交互」。</p>
+     *
+     * <p><b>只在「有玩家乘客」时为 false，不是一直 false：</b>没人骑的时候还要能
+     * 右键它上车、Shift+左键把它打掉（见 {@code AbstractEntityFromItem#applyHitEntityLogic}），
+     * 所以那种情况必须交回父类的默认值。</p>
+     */
+    @Override
+    public boolean isPickable() {
+        boolean hasPlayer = this.getPassengers().stream().anyMatch(e -> e instanceof Player);
+        return hasPlayer ? false : super.isPickable();
+    }
+
+
     @Override
     protected boolean canAddPassenger(Entity entity) {
         return this.getPassengers().size() < 2;
