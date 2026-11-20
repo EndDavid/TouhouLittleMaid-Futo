@@ -12,7 +12,8 @@
     "ServerPlayerPowerMixin",
     "NaturalSpawnerMixin",
     "EntityPositionRiderMixin",
-    "LivingEntityMaidBedMixin"
+    "LivingEntityMaidBedMixin",
+    "LivingEntityAccessor"
   ],
   "client": [
     "client.LivingEntityBreakItemAccessor",

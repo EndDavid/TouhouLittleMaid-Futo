@@ -33,9 +33,9 @@ import net.minecraft.world.entity.player.Inventory;
  * 同时发包让服务端改 NBT；不立刻改本地状态的话，
  * 按钮会在「点下 → 等服务端」之间闪一下（上游也是先改本地再发包）。</p>
  *
- * <p><b>1.18.2 适配：</b>上游 {@code renderBg} 里先调 {@code renderBackground} 再画底图，
- * 而 1.18.2 的 {@code AbstractContainerScreen#render} 已经调过一次 —— 会重复画一遍模糊底。
- * 这里省掉那一句。</p>
+ * <p><b>1.18.2 适配：</b>上游 1.20 的 {@code AbstractContainerScreen#render} 会先调
+ * {@code renderBackground} 自己压暗世界；<b>1.18.2 不会</b>（那次改动在 1.19），
+ * 所以这里必须在 {@code render} 开头手动补一次，否则界面是直接叠在亮着的世界上的。</p>
  */
 public class WirelessIOContainerGui extends AbstractContainerScreen<WirelessIOContainer> {
     private static final ResourceLocation MAIN =
@@ -91,6 +91,9 @@ public class WirelessIOContainerGui extends AbstractContainerScreen<WirelessIOCo
 
     @Override
     public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks) {
+        // 世界压暗层。必须自己来，并且要在 super.render 之前画，
+        // 这样 renderBg 里的界面底图才会盖在压暗层之上。
+        this.renderBackground(poseStack);
         super.render(poseStack, mouseX, mouseY, partialTicks);
         this.renderTooltip(poseStack, mouseX, mouseY);
     }

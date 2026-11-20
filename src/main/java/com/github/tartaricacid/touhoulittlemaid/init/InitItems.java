@@ -229,6 +229,44 @@ public final class InitItems {
                     com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.WCHESS,
                     new FabricItemSettings().tab(MAIN_TAB)));
 
+    // ------------------------------------------------------------------ 娱乐方块
+
+    /**
+     * 键盘 / 书架 / 电脑（上游 {@code InitItems.KEYBOARD} 等）。
+     *
+     * <p>三者都是普通 {@code BlockItem}。上游的放置逻辑全在方块那一侧
+     * （{@code BlockJoy#getStateForPlacement} 按玩家朝向设 {@code FACING}），
+     * 物品这边不需要任何自定义。</p>
+     */
+    public static final Item KEYBOARD = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("keyboard"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.KEYBOARD,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    public static final Item BOOKSHELF = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("bookshelf"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.BOOKSHELF,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    public static final Item COMPUTER = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("computer"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.COMPUTER,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
+    /**
+     * 魔理沙的扫帚（上游 {@code InitItems.BROOM}）。
+     *
+     * <p>不是 {@code BlockItem}：扫帚不是方块，而是一个实体（{@code EntityBroom}）。
+     * 右击方块时 {@code ItemBroom#useOn} 先做一次碰撞检查再生成实体，
+     * 所以它必须 {@code stacksTo(1)} —— 一次右击只生成一把扫帚，堆叠了也只会减 1。</p>
+     */
+    public static final Item BROOM = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("broom"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemBroom());
+
     // ------------------------------------------------------------------ 残局道具
 
     /**

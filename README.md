@@ -2461,3 +2461,157 @@ ClientPackDownloadUrls is set (1 entry, load phase) but the client pack download
 
 > 判据很简单：**零引用 + 方法体是空 / TODO** 才删。有引用的一律保留，
 > 哪怕实现只有一行 —— 它至少是真的在返回某个值。
+
+---
+## 界面的「世界压暗层」：1.18.2 与 1.20 的一个静默差异
+隙间（无线 IO）的界面打开时，世界不压暗 —— 底图直接叠在亮着的世界上。这不是漏画，
+而是**照抄了一句从 1.20 带来的注释**：
+```java
+// 上游 renderBg 里先调 renderBackground 再画底图，
+// 而 1.18.2 的 AbstractContainerScreen#render 已经调过一次 —— 会重复画一遍模糊底。
+// 这里省掉那一句。
+```
+这句是**反的**。`AbstractContainerScreen#render` 里补 `renderBackground` 是 **1.19** 的改动；
+1.18.2 的 `render` 只做 `renderBg` + `renderLabels` + 槽位与物品，**一次压暗都不画**。
+所以「省掉那一句」不是去重，是把它彻底删掉了。
+修法只有一行，放进 `render` 的最前面：
+```java
+@Override
+public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks) {
+    this.renderBackground(poseStack);   // 必须早于 super.render，否则会盖住底图
+    super.render(poseStack, mouseX, mouseY, partialTicks);
+    this.renderTooltip(poseStack, mouseX, mouseY);
+}
+```
+### 为什么这个 bug 值得写进 README
+它属于**「注释里写了错误的前提」**这一类。代码本身没有任何可疑之处（少调一次
+`renderBackground` 看起来很合理），编译不报错，运行不抛异常，测试也测不到 ——
+只有真人打开界面看一眼才发现。同类的还有前几轮的 `Direction#toYRot()` 记错
+（把 NORTH 当成 0 而不是 180）。
+所以这一轮把整个 `client/` 下的容器界面过了一遍：
+```
+grep -rln "extends AbstractContainerScreen" src/main/java   | while read f; do grep -q "renderBackground" "$f" || echo "MISSING: $f"; done
+```
+现在输出为空。`AbstractMaidScreen` 早就手补过（女仆主界面/配置界面都继承它），
+`WirelessIOContainerGui` 是唯一漏的那个 —— 因为只有它是**独立**于
+`AbstractMaidScreen` 的容器界面。
+---
+## 娱乐方块：键盘 / 书架 / 电脑
+这三块是「女仆闲置时会自己跑去坐着涨好感度」的家具，与三张棋盘共用同一套骨架。
+### 复用而不是新写
+| 层 | 棋盘 | 娱乐方块 |
+| --- | --- | --- |
+| 方块基类 | `BlockJoy` | `BlockJoy`（同） |
+| 方块实体基类 | `TileEntityJoy`（记 `SitId`） | `TileEntityJoy`（同） |
+| 座位实体 | `EntitySit` | `EntitySit`（同） |
+| 兴趣点 | `joy_block` | `joy_block`（同） |
+| 渲染形状 | `ENTITYBLOCK_ANIMATED` | `ENTITYBLOCK_ANIMATED`（同） |
+差别只有三处，全都是**方块那一侧**的常量：
+| 方块 | 碰撞箱 | 座位偏移 | 座位额外朝向 | 好感度类型 |
+| --- | --- | --- | --- | --- |
+| 键盘 | `4,0,4 → 12,10,12` | `(0.5, 0.625, 0.5)` | `0` | `Keyboard` |
+| 书架 | `1,0,1 → 15,5,15` | `(0.5, 0.375, 0.5)` | `-90` | `BookShelf` |
+| 电脑 | 四段拼合（显示器 + 键盘托） | `(0.5, 1, 0.5)` | `180` | `Computer` |
+### `MaidJoyTask` 与 `MaidBoardGameTask` 的分工
+两者代码几乎一样，上游也是两份。区别只有两点，**都不能合并**：
+1. **挂在哪个活动上。** `MaidJoyTask` 挂在 **IDLE**（权重 7，在「撒娇 5」之后、
+   「四处漫步 20」之前）——「没事干的时候去玩玩」。
+   `MaidBoardGameTask` 由 `board_games` 任务挂在 **WORK** 上 ——「这是她的工作」。
+2. **认哪个基类。** `MaidJoyTask` 接受任意 `BlockJoy`；`MaidBoardGameTask` 只认
+   `IBoardGameBlock`。反过来合并的话，女仆会在**工作模式下跑去坐键盘**。
+还有一处**不能照抄**的地方：`isOccupied` 在查不到方块实体时必须返回 `true`。
+棋盘是 3×3 多方块，八个边角格也带着同一个 `joy_block` 兴趣点，但它们没有方块实体 ——
+返回 `false` 的话女仆会挑中一个边角、走过去、坐下失败，然后永远坐不到棋盘上。
+娱乐方块全是单格，这条逻辑对它们没有副作用，所以继续共用。
+### 顺手补的资源
+- 三份战利品表（`loot_tables/blocks/{keyboard,bookshelf,computer}.json`）
+- 三个祭坛配方（`4×木板 + note_block/book/lever + c:diamonds`，`power 0.1`）
+上游写的是 `forge:gems/diamond`，这里按本移植版的约定换成 `c:diamonds`
+（原因见前面「祭坛配方」那节：`c:` 在本环境里完全由我们自己维护）。
+---
+## 魔理沙的扫帚
+一件物品 + 一个实体：右击方块摆出扫帚，玩家骑上去，然后**必须再有一只女仆也坐上来**
+才能飞。少了女仆扫帚就只是往下掉 —— 这条判定就是「女仆是灵力的来源」这个设定
+在代码里的样子，也是 HUD 那句提示存在的原因。
+### 「双端都读得到按键」这一点，决定了整个实现的形状
+**1.18.2 上游**的做法是在 `travel` 里直接读客户端：
+```java
+if (level.isClientSide) {
+    // 不要问我为什么客户端数据能跑到服务端来
+    // 一定是玄学
+    keyForward = keyForward();   // Minecraft.getInstance().options.keyUp.isDown()
+    ...
+}
+```
+服务端永远读到 `false`，于是只能靠客户端自己飞、服务端被动跟着「玩家上报的坐骑坐标」走。
+上游自己也知道这不干净，所以留了那句「一定是玄学」。
+**1.20.1 上游**换成了读 `player.zza` / `player.xxa` / 跳跃键。这一套**在 1.18.2 同样成立**，
+而且完全不需要客户端类。证据链（对着映射后的 jar 逐条读字节码，不是推断）：
+1. 客户端每 tick 发 `ServerboundPlayerInputPacket`，字段是
+   `xxa` / `zza` / `isJumping` / `isShiftKeyDown`；
+2. `ServerGamePacketListenerImpl#handlePlayerInput` 把四个值交给
+   `ServerPlayer#setPlayerInput(xxa, zza, jumping, shift)`；
+3. `setPlayerInput` 的函数体是
+   ```
+   0: aload_0
+   1: invokevirtual  isPassenger:()Z
+   4: ifeq  56          ← 不是乘客就直接 return
+   ...
+   23: putfield  xxa:F
+   42: putfield  zza:F
+   47: putfield  jumping:Z
+   53: invokevirtual  setShiftKeyDown:(Z)V
+   ```
+   也就是**「骑着的时候才写入」**——而骑扫帚恰好就是 `isPassenger()`。
+结论：骑着的时候双端都能读到真实按键，于是控制逻辑可以放在服务端算。
+本移植版直接采用这个方案，`travel` 里不再出现任何 `net.minecraft.client.*`。
+> 这条同时解释了为什么 1.18.2 上游那四行客户端引用「看起来能工作」：
+> 不是玄学，是**客户端在算、服务端没算**，而原版允许玩家上报自己坐骑的坐标。
+### 跳跃键要一个 Mixin 访问器
+`player.zza` / `xxa` / `isShiftKeyDown()` 都是公开的，但**跳跃状态不是**：
+1.18.2 里它是 `LivingEntity` 的 `protected boolean jumping`，没有任何公开读取方法
+（1.20.1 上游也是靠自己的 `LivingEntityAccessor` 才拿到的）。所以本移植版加了
+```java
+@Mixin(LivingEntity.class)
+public interface LivingEntityAccessor {
+    @Accessor("jumping")
+    boolean tlmIsJumping();
+}
+```
+只是绕开访问修饰符，不改变任何行为。它注册在 `mixins`（双端）而不是 `client` 下 ——
+服务端也要读这个字段。
+### 与 1.20.1 的两处差异
+1. **没有 `IBroomControl` 接口层。** 它在上游存在的意义是让附属模组用
+   `ILittleMaid.registerBroomControl` 插入自己的飞行方式。本移植版还没有
+   `ILittleMaid` 扩展注册表，写一个「只有内置实现、永远只有一个元素」的扩展点只会是假的。
+   行为本身与 `PlayerBroomControl` 一致。
+2. **没有 `HasCustomInventoryScreen` / `getRiddenSpeed` / `onGround()` 重写。**
+   这三个 API 在 1.18.2 都不存在（前一个是 1.19.4+ 的接口，后两个分别是 1.19 与 1.20 才有）。
+   速度乘子直接在 `travel` 里算，效果一致。
+另外 `positionRider` 在 1.18.2 是**单参**的（带 `MoveFunction` 的那个重载是 private），
+所以覆写点写 `positionRider(Entity)` 并在里面直接 `setPos`。
+### 两处容易漏的细节
+- **无敌的落体伤害。** 扫帚继承 `AbstractEntityFromItem`（即 `LivingEntity`），
+  所以必须重写 `causeFallDamage` 返回 `false`，并在 `tickRidden` 里把
+  `fallDistance` 清零 —— 否则一落地就摔死。
+- **两个乘客时碰撞箱要长高。** `makeBoundingBox` 在有第二个乘客时把 `maxY` 加 1，
+  否则「人 + 女仆」叠在一起的真实高度远超 0.5625 格，飞过单格空隙时上半身会穿过去。
+  和上游一样只影响实体碰撞，不影响选框。
+### 实体类型注册的两个坑
+- **必须注册属性表。** `LivingEntity` 的构造函数里就有 `setHealth(getMaxHealth())`，
+  没注册 `FabricDefaultAttributeRegistry` 就是 NPE。坐垫当年就是这么崩的
+  （表现是「一切到坐垫页签就崩」，因为页签图标会构造一个假实体）。
+- **`EntityType.Builder#build(String)` 要写全名。** 上游写的是 `.build("broom")`，
+  于是原版那条 `No data fixer registered for broom` 日志里只有 `broom` 而没有命名空间
+  （本移植版其它实体都是 `touhou_little_maid:xxx`）。这里改成全名，日志就一致了。
+---
+## 手册进度：52 词条 / 3 分类，只剩两页
+`validate-book.ps1` 现在输出 `entries=52 categories=3 problems=0`。
+这一轮还原了两页：`other/maid_joy.json`（键盘/书架/电脑）与 `other/broom.json`。
+还留在 `port/book_pages_held_back/` 的是：
+| 词条 | 缺什么 | 为什么还没还回去 |
+| --- | --- | --- |
+| `other/model_switcher` | `model_switcher` 方块与物品 | 它的模型选择界面 `ModelSwitcherModelGui` 继承 `AbstractModelGui<EntityMaid, MaidModelInfo>`（**两个**类型参数），而本移植版的 `AbstractModelGui` 只有一个；还依赖 `MaidModelDetailsGui`、彩蛋模型 `EASTER_EGG_MODEL` 与图标缓存。这三样都是「女仆皮肤界面」那套基础设施，得先泛型化 `AbstractModelGui` |
+| `other/picnic_basket` | `picnic_basket` 物品 + 5×5 野餐垫 | 自成一个子系统（方块 275 行 + 方块实体 + 容器 + 界面 + 3 个渲染器 + 528 行垫子模型），没有外部阻塞，可直接开工 |
+**所以「手册相关缺失」还不能说全部补完**：一词条被图形基础设施挡住，
+另一词条是自己一大块，两类原因完全不同，不能混成一句「都已补完」。

@@ -10,6 +10,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidHealSel
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidWorkMealTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidClearSleepTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidInteractWithDoor;
+import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidJoyTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidFollowOwnerTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidPanicTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidPickupEntitiesTask;
@@ -61,8 +62,10 @@ import java.util.function.Predicate;
  *     <li>{@code MaidInteractWithDoor}：需要门记忆与路径交互，M3-寻路。</li>
  *     <li>{@code MaidHealSelfTask} / {@code MaidHomeMealTask} / {@code MaidWorkMealTask}：
  *         需要「饮食系统 + 背包」，M2-背包。</li>
- *     <li>{@code MaidJoyTask} / {@code MaidBedTask}：需要娱乐方块 / 床的搜索，M3-方块交互。</li>
+ *     <li>{@code MaidBedTask}：需要床的搜索，M3-方块交互。</li>
  * </ul>
+ * <p>已接上的：{@code MaidJoyTask}（键盘 / 书架 / 电脑，IDLE 权重 7）、
+ * {@code MaidBoardGameTask}（三张棋盘，由 {@code board_games} 任务挂在工作模式上）。</p>
  */
 public final class MaidBrain {
     private MaidBrain() {
@@ -148,10 +151,12 @@ public final class MaidBrain {
 
     private static void registerIdleGoals(Brain<EntityMaid> brain) {
         Pair<Integer, Behavior<? super EntityMaid>> beg = Pair.of(5, new MaidBegTask());
+        // 娱乐方块（键盘 / 书架 / 电脑）：闲置时去坐着涨好感度（上游权重 7）
+        Pair<Integer, Behavior<? super EntityMaid>> joy = Pair.of(7, new MaidJoyTask(0.6f, 2));
         Pair<Integer, Behavior<? super EntityMaid>> supplemented = Pair.of(20, getLookAndRandomWalk(maid -> true));
         Pair<Integer, Behavior<? super EntityMaid>> updateActivity = Pair.of(99, new MaidUpdateActivityFromSchedule());
 
-        brain.addActivity(Activity.IDLE, ImmutableList.of(beg, supplemented, updateActivity));
+        brain.addActivity(Activity.IDLE, ImmutableList.of(beg, joy, supplemented, updateActivity));
     }
 
     private static void registerWorkGoals(Brain<EntityMaid> brain, EntityMaid maid) {

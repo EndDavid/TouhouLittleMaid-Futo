@@ -46,6 +46,10 @@ $registered = @(
   'touhou_little_maid:gomoku_board_state',
   'touhou_little_maid:cchess_board_state',
   'touhou_little_maid:wchess_board_state',
+  'touhou_little_maid:keyboard',
+  'touhou_little_maid:bookshelf',
+  'touhou_little_maid:computer',
+  'touhou_little_maid:broom',
   # --- favorability tools (creative-only debug items) ---
   'touhou_little_maid:favorability_tool_add',
   'touhou_little_maid:favorability_tool_reduce',

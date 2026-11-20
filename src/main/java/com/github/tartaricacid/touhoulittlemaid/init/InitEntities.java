@@ -86,6 +86,23 @@ public final class InitEntities {
                             .build(TouhouLittleMaid.MOD_ID + ":sit"));
 
     /**
+     * 魔理沙的扫帚（上游 {@code EntityBroom.TYPE}）。
+     *
+     * <p>1.375×0.5625 的碰撞箱就是它蓝图上的真实体积：横着比一个方块还宽。
+     * 放置时 {@code ItemBroom#useOn} 会先按这个体积算包围盒做碰撞检查，
+     * 所以尺寸改了就得连那里一起看。</p>
+     *
+     * <p>它继承 {@code AbstractEntityFromItem}（即 {@code LivingEntity}），
+     * 因此必须在 {@link #init()} 里注册属性表 ——
+     * 不注册的话 {@code LivingEntity} 构造函数里那句
+     * {@code setHealth(getMaxHealth())} 会直接 NPE。坐垫当年就是这么崩的。</p>
+     */
+    public static final EntityType<com.github.tartaricacid.touhoulittlemaid.entity.item.EntityBroom> BROOM =
+            Registry.register(Registry.ENTITY_TYPE,
+                    TouhouLittleMaid.rl("broom"),
+                    com.github.tartaricacid.touhoulittlemaid.entity.item.EntityBroom.createType());
+
+    /**
      * 女仆鱼钩（上游 {@code MaidFishingHook.TYPE}）。
      *
      * <p>{@code noSave()} 与 {@code noSummon()}：鱼钩不存档、也不能被 /summon，
@@ -264,6 +281,11 @@ public final class InitEntities {
         // 表现是「一切到坐垫页签就崩」，因为页签图标会把坐垫物品渲染一次、从而构造一个假实体。
         FabricDefaultAttributeRegistry.register(CHAIR,
                 com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair.createAttributes());
+        // 扫帚同样继承 LivingEntity，道理与坐垫一模一样。
+        // 属性表就用 LivingEntity 的默认那一套：上游也没给扫帚定义任何自定义属性，
+        // Forge 会自动套 DefaultAttributes，这里显式交出来即可（与坐垫同一行写法）。
+        FabricDefaultAttributeRegistry.register(BROOM,
+                net.minecraft.world.entity.LivingEntity.createLivingAttributes());
         // 女仆不自然生成，因此无需注册 SpawnPlacements（1.18.2 中该方法为 private）。
         FabricDefaultAttributeRegistry.register(FAIRY,
                 com.github.tartaricacid.touhoulittlemaid.entity.monster.EntityFairy.createFairyAttributes());

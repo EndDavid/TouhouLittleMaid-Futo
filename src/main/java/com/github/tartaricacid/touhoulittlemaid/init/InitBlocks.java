@@ -158,6 +158,49 @@ public final class InitBlocks {
                     FabricBlockEntityTypeBuilder.create(
                             com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityWChess::new, WCHESS).build());
 
+    // ------------------------------------------------------------------ 娱乐方块（女仆的「娱乐」行为）
+
+    /**
+     * 键盘（上游 {@code InitBlocks.KEYBOARD}）。
+     *
+     * <p>这三块（键盘 / 书架 / 电脑）与三张棋盘共用 {@code BlockJoy} + {@code TileEntityJoy}：
+     * 空手右击会生成一个 {@code EntitySit} 让人坐下，女仆的 {@code MaidJoyTask}
+     * 则通过 {@code joy_block} 兴趣点找到没人坐的那一个。区别只在碰撞箱、坐姿与好感度类型。</p>
+     *
+     * <p>{@code getRenderShape} 是 {@code ENTITYBLOCK_ANIMATED}，所以
+     * {@code models/block/keyboard.json} 里只有一个 {@code particle} 贴图 ——
+     * 真正的模型由 {@code TileEntityKeyboardRenderer} 用 {@code KeyboardModel} 画。</p>
+     */
+    public static final Block KEYBOARD = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("keyboard"), new com.github.tartaricacid.touhoulittlemaid.block.BlockKeyboard());
+
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityKeyboard> KEYBOARD_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("keyboard"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityKeyboard::new, KEYBOARD).build());
+
+    /**
+     * 书架（上游 {@code InitBlocks.BOOKSHELF}）。碰撞箱很矮（5/16 格），女仆是跪坐在上面前看书。
+     */
+    public static final Block BOOKSHELF = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("bookshelf"), new com.github.tartaricacid.touhoulittlemaid.block.BlockBookshelf());
+
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityBookshelf> BOOKSHELF_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("bookshelf"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityBookshelf::new, BOOKSHELF).build());
+
+    /**
+     * 电脑（上游 {@code InitBlocks.COMPUTER}）。座位在方块顶面（y=1）。
+     */
+    public static final Block COMPUTER = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("computer"), new com.github.tartaricacid.touhoulittlemaid.block.BlockComputer());
+
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityComputer> COMPUTER_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("computer"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityComputer::new, COMPUTER).build());
+
     private InitBlocks() {
     }
 

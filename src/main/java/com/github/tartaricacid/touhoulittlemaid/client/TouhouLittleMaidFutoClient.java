@@ -93,6 +93,27 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.WCHESS_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityWChessRenderer::new);
 
+        // 娱乐方块（键盘 / 书架 / 电脑）：与棋盘同一套路（ENTITYBLOCK_ANIMATED + 方块实体渲染器），
+        // 但它们是普通静态模型，需要先把模型层烘焙好（渲染器构造函数里会 bakeLayer）。
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.KeyboardModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.KeyboardModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.BookshelfModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.BookshelfModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.ComputerModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.ComputerModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.KEYBOARD_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityKeyboardRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.BOOKSHELF_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityBookshelfRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.COMPUTER_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityComputerRenderer::new);
+
         // 座位实体不该被看见，但必须有渲染器：未注册类型的
         // getRenderer 返回 null，渲染循环不处处判空（同 P 点实体那个坑）。
         net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
