@@ -104,6 +104,20 @@ loom {
 	runs {
 		client {
 			programArgs "--username", "Dev"
+			// 可选：让 runClient 直接连到本仓库的 runServer。
+			//
+			// 用来端到端验证「客户端真的画得出来」。缺渲染器这类 bug 服务端完全看不到
+			// （实体能生成、能 tick，/summon 一切正常），只有客户端渲染循环才会炸，
+			// 而且崩在 LevelRenderer 里，堆栈跟出问题的实体毫无关系。
+			//
+			// 用法：
+			//   gradlew runServer            （另开一个终端）
+			//   gradlew runClient -PjoinServer
+			// 然后用 RCON 在玩家脚边 /summon 目标实体。
+			// 不带这个属性时行为与以前完全一致。
+			if (project.hasProperty('joinServer')) {
+				programArgs "--server", "127.0.0.1", "--port", "25565"
+			}
 		}
 	}
 }

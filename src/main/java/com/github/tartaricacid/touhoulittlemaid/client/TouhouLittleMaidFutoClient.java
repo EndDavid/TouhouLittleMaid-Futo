@@ -114,6 +114,23 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.COMPUTER_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityComputerRenderer::new);
 
+        // 魔理沙的扫帚：和女仆一样是 LivingEntityRenderer + 普通模型层。
+        //
+        // 【必须在这里注册渲染器】。少了这一行，实体本身仍然能正常生成、正常 tick
+        // （服务端 /summon 一切正常），但客户端在 LevelRenderer 里会走到
+        //     EntityRenderer<? super T> r = dispatcher.getRenderer(entity);   // → null
+        //     r.shouldRender(...)                                              // → NPE
+        // 于是「一放置就崩」，且崩溃点在渲染循环里，跟扫帚这个类看起来毫无关系。
+        // 下面座位实体那段注释说的就是同一个坑。
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.BroomModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.BroomModel::createBodyLayer);
+        EntityRendererRegistry.register(InitEntities.BROOM,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityBroomRenderer::new);
+        // 「你一个人骑扫帚是飞不起来的」提示（上游 BroomTipsOverlay）
+        com.github.tartaricacid.touhoulittlemaid.client.overlay.BroomTipsOverlay.init();
+
+
         // 座位实体不该被看见，但必须有渲染器：未注册类型的
         // getRenderer 返回 null，渲染循环不处处判空（同 P 点实体那个坑）。
         net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(

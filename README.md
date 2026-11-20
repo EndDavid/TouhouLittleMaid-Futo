@@ -2615,3 +2615,92 @@ public interface LivingEntityAccessor {
 | `other/picnic_basket` | `picnic_basket` 物品 + 5×5 野餐垫 | 自成一个子系统（方块 275 行 + 方块实体 + 容器 + 界面 + 3 个渲染器 + 528 行垫子模型），没有外部阻塞，可直接开工 |
 **所以「手册相关缺失」还不能说全部补完**：一词条被图形基础设施挡住，
 另一词条是自己一大块，两类原因完全不同，不能混成一句「都已补完」。
+
+---
+## 「一放置就崩溃」：渲染器注册丢了，但服务端毫无异常
+### 现象
+扫帚放下去客户端立刻崩：
+```
+java.lang.NullPointerException: Cannot invoke
+"net.minecraft.client.renderer.entity.EntityRenderer.shouldRender(...)"
+because "entityRenderer" is null
+    at EntityRenderDispatcher.shouldRender(EntityRenderDispatcher.java:121)
+    at LevelRenderer.renderLevel(LevelRenderer.java:1276)
+    at GameRenderer.renderLevel(GameRenderer.java:1034)
+```
+堆栈里既没有 `EntityBroom` 也没有 `ItemBroom` —— 实际原因就藏在第一行：
+`renderers.get(entity.getType())` 返回了 **null**，也就是这个实体类型**没有客户端渲染器**。
+### 为什么服务端查不出来
+这是这次最值得记的一点。我当时的排查顺序是错的：
+1. 起 `runServer`，RCON `summon touhou_little_maid:broom` → **一切正常**，
+   实体生成了，也 tick 了，`OwnerUUID` 读得出来，没有任何异常。
+2. 于是判断「服务端没问题，崩在客户端」。
+这个判断本身没错，但结论是「客户端渲染器有问题」，而真正的原因更简单：
+**渲染器那一行根本没写进文件**。
+`EntityBroom.createType()` 的注册在 `InitEntities`，`EntityRendererRegistry.register(...)`
+那一行本该在 `TouhouLittleMaidFutoClient`。后者在一次脚本化编辑里被静默回滚了，
+而**少了它不会有任何编译错误、没有任何日志**：`EntityType` 与渲染器是两张完全独立的表，
+只在一处相交 ——
+```java
+// EntityRenderDispatcher#getRenderer
+return (EntityRenderer<? super T>) this.renderers.get(pEntity.getType());   // 缺了就是 null
+// EntityRenderDispatcher#shouldRender
+return entityrenderer.shouldRender(pEntity, pCamera, pCamX, pCamY, pCamZ);  // 这里才 NPE
+```
+而且这次不是「服务端没暴露」，而是**所有离线/服务端检查都天生看不到它**：
+实体注册、属性表、AI、网络同步、掉落物，全都不碰渲染器表。
+> 顺带一个反讽：同一份文件里，座位实体那一段的注释早就写着
+> 「未注册类型的 `getRenderer` 返回 null，渲染循环不处处判空」——
+> 我把这条规律写下来了，却没给自己加一道检查。
+> **「知道某个坑」和「为它设一道闸」是两件事。**
+### 闸：`port/check-renderers.ps1`
+不依赖任何运行环境，直接扫全树比对两张表：
+| 来源 | 匹配 |
+| --- | --- |
+| `public static final EntityType<...> NAME =` | 实体类型声明 |
+| `public static final BlockEntityType<...> NAME =` | 方块实体类型声明 |
+| `EntityRendererRegistry.register(... InitEntities.NAME` | 实体渲染器 |
+| `BlockEntityRendererRegistry.register(... InitBlocks.NAME` | 方块实体渲染器 |
+三条判据：
+1. 每个实体类型都必须有渲染器；
+2. 每个方块实体类型都必须有渲染器 —— **除非**它的方块 `getRenderShape()` 返回 `MODEL`
+   （目前只有神社庭灯：它靠 `blockstates/maid_beacon.json` 画，方块实体只存数据）；
+3. 反向也要查：渲染器指向一个**不存在**的字段就是「悬空注册」，
+   说明字段被重命名或删掉了、客户端还指着旧名字。
+当前输出：
+```
+entity types = 11  renderers = 11
+block entity types = 11  renderers = 10
+ALL OK
+```
+（11 个方块实体类型里 10 个要渲染器，第 11 个是 `MAID_BEACON_TE`，在白名单里并注明了原因。）
+### 端到端验证：让 `runClient` 自己连上来
+静态检查只能证明「注册语句存在」，不能证明「真的画得出来」。
+所以 `build.gradle` 里加了一个可选开关：
+```
+gradlew runServer                # 一个终端
+gradlew runClient -PjoinServer   # 另一个终端，自动连 127.0.0.1:25565
+```
+`--server` / `--port` 是原版启动参数，1.18.2 的 `Main` 认它，进服后会自动连接
+（不是 1.20 才有的 `--quickPlayMultiplayer`）。不带 `-PjoinServer` 时行为与以前完全一致。
+然后用 RCON 在玩家脚边生成实体，看客户端会不会崩：
+```
+summon touhou_little_maid:broom -1 64 -8
+```
+> 第一次试的时候我把扫帚生成在 `y=-60`（以为世界是超平坦），结果那是个正常世界，
+> 玩家在 `y=63`，扫帚在深地下 —— 这时**不能**因为「没崩」就下结论。
+> 后来确认了：`shouldRender` 是 `LevelRenderer` 对**每个被追踪实体**都会调的，
+> 与是否在视锥内、是否朝着它无关，所以即使看不见也会走到崩溃点。
+> 但为了不留疑问，还是把它挪到了脚边重测了一遍。
+结果：客户端带着扫帚正常渲染，`run/crash-reports` 为空。
+### 这条经验的一般化
+一个崩溃点离原因越远，就越需要**结构性检查**而不是「再仔细看一遍代码」。
+这一轮之前我已经栽过两次同类问题（`Direction#toYRot()` 记错、
+`renderBackground` 的注释前提写反），三次的共同点是：
+**代码本身看起来完全正常，错误在「某处少了一行」或「某处的前提是假的」。**
+所以现在的闸是这三道，改动后一起跑：
+| 闸 | 查什么 |
+| --- | --- |
+| `port/check-renderers.ps1` | 注册表与渲染器表是否一一对应 |
+| `port/book_pages_held_back/validate-book.ps1` | 手册里引用的物品 / 配方 / 标签是否都真的存在 |
+| `gradlew verifyWirelessIo` | 隙间搬运规则（脱离世界跑） |
