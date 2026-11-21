@@ -150,6 +150,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 下扫帚按键（默认 C）：扫帚上 Shift 是下降，所以下车必须是单独的键。
         // 上游 1.20.1 有它，本移植版最初整块漏掉了，结果骑上去下不来。
         com.github.tartaricacid.touhoulittlemaid.client.input.DismountBroomKey.init();
+        // 模型切换器界面：服务端发坐标、客户端找到方块实体后开 Screen。
+        // 它是纯 Screen（没有物品槽），所以不走 MenuType 那一套。
+        com.github.tartaricacid.touhoulittlemaid.network.OpenSwitcherGuiPacket.initClient();
 
 
         // 座位实体不该被看见，但必须有渲染器：未注册类型的

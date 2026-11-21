@@ -58,10 +58,12 @@ $entityAllow = @()
 # Block entity types with no renderer: these blocks are ENTITYBLOCK_ANIMATED only
 # through a renderer, so they all need one too.
 #
-# The one exception is the beacon: BlockMaidBeacon#getRenderShape returns
-# RenderShape.MODEL, so the block is drawn from blockstates/maid_beacon.json and
-# the block entity carries data only (storage power, effect). No renderer wanted.
-$beAllow = @('MAID_BEACON_TE')
+# Two exceptions, both because the block draws itself from blockstates/ and the
+# block entity carries data only:
+#   MAID_BEACON_TE  - BlockMaidBeacon#getRenderShape is MODEL (storage power / effect)
+#   MODEL_SWITCHER_TE - BlockModelSwitcher#getRenderShape is MODEL (six-sided texture;
+#                       the block entity only holds the bound maid UUID + mode list)
+$beAllow = @('MAID_BEACON_TE', 'MODEL_SWITCHER_TE')
 
 $problems = 0
 

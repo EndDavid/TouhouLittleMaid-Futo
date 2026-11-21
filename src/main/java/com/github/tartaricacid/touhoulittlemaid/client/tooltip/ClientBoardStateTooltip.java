@@ -97,7 +97,7 @@ public class ClientBoardStateTooltip implements ClientTooltipComponent {
                 }
             }
         } catch (Exception e) {
-            // 数据包写坏 / 物品 NBT 被改过：当��「这张道具没有棋局」，只显示文字
+            // 数据包写坏 / 物品 NBT 被改过：当作「这张道具没有棋局」，只显示文字
             board = null;
         }
         cachedType = type;

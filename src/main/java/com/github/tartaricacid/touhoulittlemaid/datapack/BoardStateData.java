@@ -13,7 +13,7 @@ import java.util.List;
  * 三种棋的残局数据表，移植自上游 1.20.1 的 {@code datapack/BoardStateData}。
  *
  * <p>数据来自数据包（{@code data/<namespace>/board_states/{gomoku,xiangqi,chess}.json}），
- * 由 {@link BoardStateDataReload} 在资源重载时填进来。三条列表分��存，
+ * 由 {@link BoardStateDataReload} 在资源重载时填进来。三条列表分开存，
  * 因为战利品与道具是「按物品类型」取用同一批数据的。</p>
  *
  * <h2>为什么返回不可变空表而不是 {@code null}</h2>

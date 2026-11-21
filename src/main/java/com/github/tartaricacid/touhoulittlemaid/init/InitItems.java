@@ -282,6 +282,16 @@ public final class InitItems {
             new com.github.tartaricacid.touhoulittlemaid.item.ItemPicnicBasket(
                     com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.PICNIC_MAT));
 
+    // ------------------------------------------------------------------ 模型切换器
+    /**
+     * 模型切换器（上游 {@code InitItems.MODEL_SWITCHER}）。
+     *
+     * <p>不是普通 {@code BlockItem}：手持它右击女仆要写入她的 UUID，
+     * 拆掉方块时还要把方块实体的 NBT 装回物品（见 {@code ItemModelSwitcher}）。</p>
+     */
+    public static final Item MODEL_SWITCHER = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("model_switcher"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemModelSwitcher());
     // ------------------------------------------------------------------ 魂符
 
     /**

@@ -201,6 +201,22 @@ public final class InitBlocks {
                     FabricBlockEntityTypeBuilder.create(
                             com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityComputer::new, COMPUTER).build());
 
+    // ------------------------------------------------------------------ 模型切换器
+    /**
+     * 模型切换器（上游 {@code InitBlocks.MODEL_SWITCHER}）。
+     *
+     * <p>方块本体是普通 JSON 模型（{@code models/block/model_switcher.json}，六面贴图），
+     * 所以 {@code getRenderShape} 是 {@code MODEL}、也不需要方块实体渲染器 ——
+     * 界面与红石逻辑才在方块实体里。</p>
+     */
+    public static final Block MODEL_SWITCHER = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("model_switcher"),
+            new com.github.tartaricacid.touhoulittlemaid.block.BlockModelSwitcher());
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityModelSwitcher> MODEL_SWITCHER_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("model_switcher"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityModelSwitcher::new,
+                            MODEL_SWITCHER).build());
     // ------------------------------------------------------------------ 野餐垫
 
     /**

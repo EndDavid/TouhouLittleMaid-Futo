@@ -90,7 +90,7 @@ loom_version=1.15.5
 
 | **墓碑（死亡收纳）+ 祭坛召唤箱** | **完成** |
 | **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器）** | **完成**（换肤 GUI 待 `AbstractModelGui` 泛型化） |
-| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（46 条目 / 3 分类） |
+| **帕秋莉手册（书内容 + 侧边页签）** | **完成**（54 条目 / 3 分类） |
 | **搜索 / 定位（小号 / 仆从铃 / 狐狸卷轴 / 河童罗盘）** | **完成**（含 `SchedulePos` 三坐标作息） |
 | **棋类（象棋 / 五子棋 / 国际象棋：各 3×3 多方块 + 对局 AI）** | **完成**（三块棋盘全部可玩） |
 | 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
@@ -2022,7 +2022,8 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 
 ## 已知问题
 
-- **仍未移植**：`MaidModelDetailsGui`（模型切换器界面）、图标缓存、彩蛋模型、声音包 GUI。
+- **仍未移植**：`MaidModelDetailsGui`（女仆自己的换模型界面，与模型切换器无关 ——
+  后者已用独立 Screen 实现，见文末「模型切换器」一节）、图标缓存、彩蛋模型、声音包 GUI。
   完整清单见上方「进度总览」。
 - **祭坛配方渲染（`AltarRecipeComponent`）已可用**：28 个 `altar_recipe` 页会画出真实的
   六个材料槽、灵力消耗、产物槽与产物实体。上游那句「产物是盒子时就改画女仆」的特判
@@ -2731,21 +2732,21 @@ save-all flush -> world/advancements/<uuid>.json 里出现 touhou_little_maid:gi
 宁可拒绝，也不要把别人的女仆放出来。
 
 
-## 手册进度：53 词条 / 3 分类，只剩模型切换器
+## 手册进度：54 词条 / 3 分类，全部补齐
 
 判据是 `port/book_pages_held_back/validate-book.ps1`。它按帕秋莉的失败模式静态检查：
 `spotlight` 的物品、词条与分类图标、`entity` 页、`altar_recipe` 的 `recipe_id`、
 `c:` 标签，以及 ingredients / output 里引用的物品与实体 id：
 
 ```
-entries=53 categories=3 problems=0
+entries=54 categories=3 problems=0
 ```
 
 另外三项**不在**那个脚本的检查范围内，这轮单独核过：
 
 | 项 | 怎么核 | 结果 |
 | --- | --- | --- |
-| 每个页引用的 `text` / `title` / `link_text` 语言键 | 遍历 53 个词条的所有页，比对 `zh_cn` / `en_us` | 0 缺失 |
+| 每个页引用的 `text` / `title` / `link_text` 语言键 | 遍历 54 个词条的所有页，比对 `zh_cn` / `en_us` | 0 缺失 |
 | `image` 页的贴图 | 把 `ns:path` 还原成 `assets/<ns>/<path>` 查文件 | 19 张全在 |
 | `crafting` 页的配方 | 查 `data/touhou_little_maid/recipes/*.json` | 见下 |
 
@@ -2766,10 +2767,12 @@ entries=53 categories=3 problems=0
 它是在代码里注册的（`compat/patchouli/MultiblockRegistry#init`，由 `PatchouliCompat#init` 调），
 本移植版逐字照搬了这段。
 
-唯一还扣着的是 `other/model_switcher.json`：它引用的 `model_switcher` 方块/物品还没移植。
-那是一整块子系统（block 181 行 + TE 192 行 + 物品 + 两个 GUI + 两个包），而且两个 GUI 都建立在
-`AbstractModelGui` 之上，得先把它从一个类型参数泛型化到两个、并接管 `MaidModelDetailsGui`、
-彩蛋模型与图标缓存。原文件在 `port/book_pages_held_back/other/`，做完搬回去即可。
+最后一条 `other/model_switcher.json` 原本扣在 `port/book_pages_held_back/`，
+因为它引用的 `model_switcher` 方块/物品当时还没移植。整块子系统已经补完
+（见下文「模型切换器」一节），词条搬回手册，`entries` 由 53 变 54。
+
+它和其余词条一样只有 `spotlight` + `text` 两页 —— 上游 `data/.../recipes/` 里
+**没有**这个物品的配方，所以没有 `crafting` 页，不是漏了。
 
 
 ## 「一放置就崩溃」：渲染器注册丢了，但服务端毫无异常
@@ -3331,7 +3334,7 @@ public void deserializeNBT(CompoundTag nbt) {
 - `Favorability` 从 0 变成 2（一整个面包的营养折算）；
 - 服务端日志无异常，`crash-reports` 为空。
 
-`port/book_pages_held_back/validate-book.ps1` → `entries=53 categories=3 problems=0`：
+`port/book_pages_held_back/validate-book.ps1` → `entries=54 categories=3 problems=0`：
 野餐篮词条从 `port/book_pages_held_back/` 还原进手册，`altar_recipe` 页引用的
 `craft_picnic_basket` 存在、材料都是已注册物品。
 
@@ -3340,3 +3343,102 @@ public void deserializeNBT(CompoundTag nbt) {
 
 **没验证到的**：界面本身（右键空气打开的 9 格）与 tooltip 需要真人操作。
 两者的注册方式与已经验证过的隙间界面完全同构，所以风险很低，但仍属于「留给你实测」。
+
+## 模型切换器：红石切模型，以及它为什么不需要 `canConnectRedstone`
+
+上游对应 `block/BlockModelSwitcher` + `tileentity/TileEntityModelSwitcher` + `item/ItemModelSwitcher`
++ 两个 Screen + 两个数据包。玩法见手册 `other/model_switcher`：拿物品右击女仆完成绑定 →
+放下方块 → 在界面里配若干「模式」（模型 id + 头顶文字 + 朝向）→ 往它的左右两侧各接一根
+红石线，每来一次脉冲就把女仆换成下一个模式。
+
+### 1. 它是「普通 JSON 模型」的方块
+
+`getRenderShape` 返回 `MODEL`，几何在 `models/block/model_switcher.json`；界面与红石逻辑才在方块实体里。
+所以它**不需要**方块实体渲染器 —— `port/check-renderers.ps1` 的白名单里那条是神社庭灯
+（庭灯有方块实体但靠 blockstate 画），两者不是同一类例外。
+
+### 2. 左右各一根线 = 上一张 / 下一张
+
+```java
+Direction facing = state.getValue(FACING);
+boolean leftSignal  = getSignal(pos.offset(facing.getCounterClockWise().getNormal()),
+                                facing.getCounterClockWise()) > 0;
+boolean rightSignal = getSignal(pos.offset(facing.getClockWise().getNormal()),
+                                facing.getClockWise()) > 0;
+boolean hasSignal = leftSignal || rightSignal;
+if (switcher.isPowered() == hasSignal) return;   // 只认「无 → 有」这条边沿
+switcher.setPowered(hasSignal);
+if (!switcher.isPowered()) return;               // 掉电不换模式
+```
+
+正面留给玩家右击开界面、背面通常贴墙，所以「左右各一根」天然就是两个输入口。
+`calculateIndex` 与上游一致：左侧 `index + 1`（到末尾回绕）、右侧 `index - 1`。
+
+**上游那处「除以零取模」被去掉了。** 上游直接拿 `size` 参与取模，列表为空时是 `% 0`；
+本移植版先判 `size <= 0` 直接返回。
+
+### 3. 上游的 `Block#canConnectRedstone` 是 Forge 补丁，这里不需要
+
+上游重写了它，让两侧的红石线「拐弯指进方块」。这个方法在 1.18.2 原版里**不存在**
+（`javap` 扫过整个 `net/minecraft`，`canConnectRedstone` 一次都没出现），
+它是 Forge 给 `BlockBehaviour` 打的补丁。而它纯粹是外观：红石线要不要把线拉到这一侧。
+
+功能上并不需要 —— `RedStoneWireBlock#getSignal(state, level, pos, dir)` 的实现是
+`return state.getValue(POWER);`，根本不看 `dir`。本类读的是
+`level.getSignal(左/右邻居, 那一侧)`，与线的外观无关。
+
+### 4. NBT 搬运比上游少一层 `ForgeData`
+
+| 位置 | 上游（Forge） | 本移植版 |
+| --- | --- | --- |
+| 方块实体存档 | `getTileData()`，落盘到 `ForgeData` 下 | 直接写 `saveAdditional` 收到的 tag |
+| 物品里的快照 | `StorageData/ForgeData/*` | `StorageData/*` |
+
+键名逐字相同（`info_list` / `entity_uuid` / `list_index`，条目是
+`model_id` / `text` / `direction`），所以两边的读写共用同一套 `load` / `saveWithoutMetadata`。
+`entity_uuid` 是 `NbtUtils.createUUID` 产的 `[I; …]`。
+
+拆方块时 `onRemove` 手动 `popResource`，战利品表里**不再**写一份 —— 否则会掉两个，
+且掉出来的那个是空白方块（绑定信息与模式列表会丢）。
+
+### 5. 验证到什么程度
+
+服务端（`./gradlew runServer` + RCON）跑通全链路，全部命令行断言，没有靠肉眼看。
+`facing=north` 时左 = 西（`-1`）、右 = 东（`+1`）：
+
+```mcfunction
+/fill -5 99 -5 5 99 5 minecraft:stone
+/setblock 0 100 0 touhou_little_maid:model_switcher[facing=north]
+/data merge block 0 100 0 {info_list:[{model_id:"touhou_little_maid:hakurei_reimu",text:"MODE-A",direction:0},
+                                      {model_id:"touhou_little_maid:kirisame_marisa",text:"MODE-B",direction:1}],
+                         entity_uuid:[I;-716640274,-413972909,-2081800275,-1312281669],list_index:0}
+/setblock 1 100 0 minecraft:redstone_block     # 右侧（东）
+```
+
+| 操作 | `list_index` | `ModelId` | `CustomName` | `Rotation` |
+| --- | --- | --- | --- | --- |
+| 初始 | 0 | `hakurei_reimu` | —— | —— |
+| 右侧通电 | 1 | `kirisame_marisa` | `MODE-B` | `[90, 0]` |
+| 两路同时通电、再逐路断电 | 1（不变） | 不变 | 不变 | 不变 |
+| 左侧通电 | 0 | `hakurei_reimu` | `MODE-A` | `[0, 0]` |
+
+**`direction` 存的是 `Direction#get2DDataValue()`，所以 0 = SOUTH（yaw 0）、1 = WEST（yaw 90）**，
+不是「0 = 北」。这与 README 里五子棋那节记的 `toYRot()` 表是同一件事 —— 第一次实测时
+按「1 = 南」去对 180°，结果对不上，就是这个原因。
+
+再补三条边界：
+
+- **空文字的条目**：`CustomName` 与 `CustomNameVisible` 都被移除 ——
+  `setCustomName(null)` 只清自定义名，可见性标志是独立的，必须显式
+  `setCustomNameVisible(false)`，否则上一张模式的名字会一直挂在头顶。
+- **空 `info_list` 给脉冲**：什么都不做，不崩。
+- **拆方块**：`/setblock … air` 后掉出的物品带
+  `tag.StorageData{entity_uuid, info_list, list_index}`，与放进来的那份逐字段相同。
+
+客户端也起过一次（`runClient` 到主菜单）：资源重载没有 `Missing model` / `missing texture`，
+日志里没有 switcher 相关报错，`run/crash-reports` 为空。
+
+**没验证到的**：界面本身（右击方块打开的列表编辑）与「手持物品右击女仆绑定」这两步需要真人操作。
+数据包已按 1.18.2 的线程模型写好：`ClientPlayNetworking` 的回调里**先把 buffer 读完**
+（出回调即失效），再 `client.execute(...)` 切主线程开 Screen；C2S 那侧服务端复核
+`ServerLevel#isLoaded`（避免被伪造坐标强制加载区块）与「该坐标确实是模型切换器」。
