@@ -2,6 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.entity.poi;
 
 import com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockScarecrow;
+import com.github.tartaricacid.touhoulittlemaid.block.BlockPicnicMat;
 import com.github.tartaricacid.touhoulittlemaid.init.InitBlocks;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -47,11 +48,25 @@ public final class MaidPoiManager {
             .collect(ImmutableSet.toImmutableSet());
 
     /**
-     * 娱乐方块：三张棋盘（中国象棋 / 五子棋 / 国际象棋）。
-     * 上游这里还有键盘 / 书架 / 电脑。
+     * 娱乐方块：三张棋盘（中国象棋 / 五子棋 / 国际象棋）与键盘 / 书架 / 电脑。
      */
-    private static final Set<BlockState> JOYS = ImmutableList.of(InitBlocks.CCHESS, InitBlocks.GOMOKU, InitBlocks.WCHESS)
+    private static final Set<BlockState> JOYS = ImmutableList.of(InitBlocks.CCHESS, InitBlocks.GOMOKU, InitBlocks.WCHESS,
+                    InitBlocks.KEYBOARD, InitBlocks.BOOKSHELF, InitBlocks.COMPUTER)
             .stream().flatMap(block -> block.getStateDefinition().getPossibleStates().stream())
+            .collect(ImmutableSet.toImmutableSet());
+
+    /**
+     * 野餐垫<b>只收中心格</b>。
+     *
+     * <p>这与 {@link #JOYS} 的处理相反：棋盘多收边角格无所谓，因为它们查不到方块实体就被当成「已占用」；
+     * 野餐垫这边相反 —— 边角格确实有方块实体（{@code centerPos} 指回中心），
+     * 多收的话 {@code MaidFindHomeMealTask} 会走向同一张垫子的 25 个坐标，
+     * 「四张座位够不够」的判据就不再是「这张垫子还空不空」。
+     * 上游同样只过滤出 {@code PART == CENTER}。</p>
+     */
+    private static final Set<BlockState> HOME_MEAL = ImmutableList.of(InitBlocks.PICNIC_MAT)
+            .stream().flatMap(block -> block.getStateDefinition().getPossibleStates().stream())
+            .filter(blockState -> blockState.getValue(BlockPicnicMat.PART).isCenter())
             .collect(ImmutableSet.toImmutableSet());
 
     private MaidPoiManager() {
@@ -68,13 +83,17 @@ public final class MaidPoiManager {
     /**
      * 娱乐方块（棋类）的全部状态。
      *
-     * <p>和上游一样把 3×3 的<b>九格全收进来</b>，不只收中心格。多收了不会出错：
-     * {@code MaidBoardGameTask#isOccupied} 在查不到方块实体时返回 {@code true}（当作已被占用），
-     * 所以边角格会被自动过滤掉，女仆只会走向真正的棋盘中心。</p>
-     *
-     * <p>将来加五子棋 / 国际象棋 / 键盘 / 书架 / 电脑时，把它们也放进这个列表即可。</p>
+     * <p>和上游一样，女仆也能同时使用多张棋盘（不同类型的象棋）与键盘。
+     * 不过电脑就别指望了，女仆可没那智商。</p>
      */
     public static Set<BlockState> getJoyBlockStates() {
         return JOYS;
+    }
+
+    /**
+     * 野餐垫（只含中心格）的全部状态。{@code MaidFindHomeMealTask} 靠它找「还有空位的垫子」。
+     */
+    public static Set<BlockState> getHomeMealStates() {
+        return HOME_MEAL;
     }
 }

@@ -43,6 +43,11 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.screenhandler.v1.ScreenRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitMenu.WIRELESS_IO,
                 com.github.tartaricacid.touhoulittlemaid.client.gui.item.WirelessIOContainerGui::new);
+        // 野餐篮：右键空气打开的 9 格食物界面（借原版双层箱子底图的上半截）
+        net.fabricmc.fabric.api.client.screenhandler.v1.ScreenRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitMenu.PICNIC_BASKET,
+                com.github.tartaricacid.touhoulittlemaid.client.gui.item.PicnicBasketContainerScreen::new);
+
         EntityRendererRegistry.register(InitEntities.EXTINGUISHING_AGENT, EntityExtinguishingAgentRenderer::new);
         EntityRendererRegistry.register(InitEntities.MAID_FISHING_HOOK, MaidFishingHookRenderer::new);
         EntityRendererRegistry.register(InitEntities.DANMAKU,
@@ -113,6 +118,26 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.COMPUTER_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityComputerRenderer::new);
+
+        // 野餐篮 / 野餐垫。三个模型层都要先烘焙：
+        //   · PicnicBasketModel     —— 物品的 3D 图标（手持 / 掉落 / 展示框）
+        //   · PicnicBasketIconModel —— 物品栏里的扁平图标（一块厚度为 0 的板）
+        //   · PicnicMatModel        —— 放下的那张 5×5 垫子（含装饰件与 hide 组）
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketIconModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketIconModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicMatModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicMatModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.PICNIC_MAT_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityPicnicMatRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.BuiltinItemRendererRegistry.INSTANCE.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitItems.PICNIC_BASKET,
+                new com.github.tartaricacid.touhoulittlemaid.client.renderer.item.PicnicBasketItemRenderer());
 
         // 魔理沙的扫帚：和女仆一样是 LivingEntityRenderer + 普通模型层。
         //

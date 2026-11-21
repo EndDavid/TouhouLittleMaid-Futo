@@ -6,6 +6,8 @@ import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidAwaitTa
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidBedTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidBegTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidClearHurtTask;
+import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidFindHomeMealTask;
+import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidHomeMealTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidHealSelfTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidWorkMealTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidClearSleepTask;
@@ -60,12 +62,13 @@ import java.util.function.Predicate;
  *     <li>游泳相关（{@code MaidSwimJumpTask} / {@code MaidBreathAir(Task|StopTask)} /
  *         {@code MaidClimbTask}）：需要游泳管理器与专门的寻路，M3-游泳。</li>
  *     <li>{@code MaidInteractWithDoor}：需要门记忆与路径交互，M3-寻路。</li>
- *     <li>{@code MaidHealSelfTask} / {@code MaidHomeMealTask} / {@code MaidWorkMealTask}：
- *         需要「饮食系统 + 背包」，M2-背包。</li>
+ *     <li>{@code MaidHealSelfTask}：需要「饮食系统 + 背包」，M2-背包。</li>
  *     <li>{@code MaidBedTask}：需要床的搜索，M3-方块交互。</li>
  * </ul>
  * <p>已接上的：{@code MaidJoyTask}（键盘 / 书架 / 电脑，IDLE 权重 7）、
- * {@code MaidBoardGameTask}（三张棋盘，由 {@code board_games} 任务挂在工作模式上）。</p>
+ * {@code MaidBoardGameTask}（三张棋盘，由 {@code board_games} 任务挂在工作模式上）、
+ * {@code MaidFindHomeMealTask}（IDLE 权重 6，去野餐垫坐着）与 {@code MaidHomeMealTask}
+ * （RIDE_IDLE 权重 5，坐在垫子上吃中心格里的食物）。</p>
  */
 public final class MaidBrain {
     private MaidBrain() {
@@ -151,12 +154,14 @@ public final class MaidBrain {
 
     private static void registerIdleGoals(Brain<EntityMaid> brain) {
         Pair<Integer, Behavior<? super EntityMaid>> beg = Pair.of(5, new MaidBegTask());
+        // 野餐垫：闲置时去坐着（上游权重 6，比乞讨高、比娱乐方块低）
+        Pair<Integer, Behavior<? super EntityMaid>> homeMeal = Pair.of(6, new MaidFindHomeMealTask(0.6f, 2));
         // 娱乐方块（键盘 / 书架 / 电脑）：闲置时去坐着涨好感度（上游权重 7）
         Pair<Integer, Behavior<? super EntityMaid>> joy = Pair.of(7, new MaidJoyTask(0.6f, 2));
         Pair<Integer, Behavior<? super EntityMaid>> supplemented = Pair.of(20, getLookAndRandomWalk(maid -> true));
         Pair<Integer, Behavior<? super EntityMaid>> updateActivity = Pair.of(99, new MaidUpdateActivityFromSchedule());
 
-        brain.addActivity(Activity.IDLE, ImmutableList.of(beg, joy, supplemented, updateActivity));
+        brain.addActivity(Activity.IDLE, ImmutableList.of(beg, homeMeal, joy, supplemented, updateActivity));
     }
 
     private static void registerWorkGoals(Brain<EntityMaid> brain, EntityMaid maid) {
@@ -188,10 +193,12 @@ public final class MaidBrain {
 
     private static void registerRideIdleGoals(Brain<EntityMaid> brain) {
         Pair<Integer, Behavior<? super EntityMaid>> beg = Pair.of(4, new MaidBegTask());
+        // 坐着的时候才可能吃到野餐垫上的东西（上游权重 5）
+        Pair<Integer, Behavior<? super EntityMaid>> homeMeal = Pair.of(5, new MaidHomeMealTask());
         Pair<Integer, Behavior<? super EntityMaid>> look = Pair.of(6, getLook(maid -> true));
         Pair<Integer, Behavior<? super EntityMaid>> updateActivity = Pair.of(99, new MaidUpdateActivityFromSchedule());
 
-        brain.addActivity(InitEntities.RIDE_IDLE, ImmutableList.of(beg, look, updateActivity));
+        brain.addActivity(InitEntities.RIDE_IDLE, ImmutableList.of(beg, homeMeal, look, updateActivity));
     }
 
     private static void registerRideWorkGoals(Brain<EntityMaid> brain, EntityMaid maid) {

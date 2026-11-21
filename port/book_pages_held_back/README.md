@@ -33,7 +33,7 @@
 
 ## 现在还剩什么缺口
 
-被挪出来的 **6 页**，缺的是**尚未移植的物品 / 方块**：
+被挪出来的页面还剩下 **3 页**，缺的是**尚未移植的物品 / 方块**：
 
 | 词条 | 缺失的物品 ID | 所属子系统 |
 | --- | --- | --- |
@@ -42,9 +42,9 @@
 | `other/gomoku` | `gomoku` | 棋类与娱乐方块 |
 | `other/maid_joy` | `keyboard`、`bookshelf`、`computer`、`gomoku` | 棋类与娱乐方块 |
 | `other/model_switcher` | `model_switcher` | 模型切换器 |
-| `other/picnic_basket` | `picnic_basket` | 野餐与娱乐 |
 
-对应 4 个子系统：**棋类与娱乐方块**、**扫帚**、**野餐与娱乐**、**无线 IO**。
+对应 1 个子系统：**模型切换器**（`model_switcher`）。其余三个
+（棋类与娱乐方块 / 扫帚 / 无线 IO）都已经还原回去了。
 
 ## 已经还回去的
 
@@ -58,6 +58,10 @@
   `_reduce` / `_full` 三个变体一起注册，交互在 `EntityMaid#useFavorabilityTool`
   （上游 `UseFavorabilityToolEvent`），潜行 1 点、否则 64 点。
 - **手办与雕像**：`other/chisel_and_statues.json`、`other/garage_kit.json`。
+- **野餐与娱乐**：`other/picnic_basket.json` —— 野餐篮 / 野餐垫 / 家庭餐整块落地后还原。
+  它同时带来了 `MaidFindHomeMealTask`（IDLE 权重 6）、`MaidHomeMealTask`
+  （RIDE_IDLE 权重 5）与 `DefaultMaidHomeMeal`，并把 `home_meal` 兴趣点注册上。
+
 - **搜索类工具**：`other/trumpet.json`、`maid/servant_bell.json`、
   `other/fox_scroll.json`、`maid/kappa_compass.json`。河童的罗盘同时带来了
   `entity/passive/SchedulePos`（工作 / 娱乐 / 睡觉三坐标），`MaidAreaPacket`

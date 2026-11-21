@@ -24,8 +24,12 @@ public final class InitClientTooltip {
             if (data instanceof BoardStateTooltip boardState) {
                 return new ClientBoardStateTooltip(boardState);
             }
+            // 野餐篮（以及将来任何实现了 ItemContainerTooltip 的容器物品）：
+            // 把里面那 9 格画成一排图标，全空时显示一句「空」。
+            if (data instanceof com.github.tartaricacid.touhoulittlemaid.inventory.tooltip.ItemContainerTooltip container) {
+                return new com.github.tartaricacid.touhoulittlemaid.client.tooltip.ClientItemContainerTooltip(container);
+            }
             return null;
         });
     }
 }
-

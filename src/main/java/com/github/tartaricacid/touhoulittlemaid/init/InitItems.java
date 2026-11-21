@@ -267,6 +267,21 @@ public final class InitItems {
             TouhouLittleMaid.rl("broom"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemBroom());
 
+    // ------------------------------------------------------------------ 野餐篮
+
+    /**
+     * 野餐篮（上游 {@code InitItems.PICNIC_BASKET}）。
+     *
+     * <p><b>不是普通的 {@code BlockItem}：</b>它自己就是那个 9 格容器
+     * （{@code ItemPicnicBasket extends BlockItem implements ExtendedScreenHandlerFactory}）——
+     * 右击地面放成野餐垫、右击空气打开界面、悬停时把里面的食物画成一排图标。
+     * 因此它必须 {@code stacksTo(1)}（在 {@code ItemPicnicBasket} 的构造函数里设）。</p>
+     */
+    public static final Item PICNIC_BASKET = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("picnic_basket"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemPicnicBasket(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.PICNIC_MAT));
+
     // ------------------------------------------------------------------ 残局道具
 
     /**

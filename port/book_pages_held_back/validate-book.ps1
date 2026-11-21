@@ -50,6 +50,8 @@ $registered = @(
   'touhou_little_maid:bookshelf',
   'touhou_little_maid:computer',
   'touhou_little_maid:broom',
+  'touhou_little_maid:picnic_basket',
+  'touhou_little_maid:picnic_mat',
   # --- favorability tools (creative-only debug items) ---
   'touhou_little_maid:favorability_tool_add',
   'touhou_little_maid:favorability_tool_reduce',

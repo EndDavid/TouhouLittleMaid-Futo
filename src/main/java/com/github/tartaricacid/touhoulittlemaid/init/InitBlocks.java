@@ -201,6 +201,28 @@ public final class InitBlocks {
                     FabricBlockEntityTypeBuilder.create(
                             com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityComputer::new, COMPUTER).build());
 
+    // ------------------------------------------------------------------ 野餐垫
+
+    /**
+     * 野餐垫（上游 {@code InitBlocks.PICNIC_MAT}）。
+     *
+     * <p>5×5 的多方块结构，<b>只有中心格带方块实体</b>：食物、四张座位、渲染都以中心为准，
+     * 其余 24 格只负责占位与贴地碰撞箱（见 {@link com.github.tartaricacid.touhoulittlemaid.block.BlockPicnicMat}）。</p>
+     *
+     * <p>{@code getRenderShape} 是 {@code ENTITYBLOCK_ANIMATED}，所以
+     * {@code models/block/picnic_mat.json} 里只有一个 {@code particle} 贴图，
+     * 真正的垫子由 {@code TileEntityPicnicMatRenderer} 用 {@code PicnicMatModel} 画。</p>
+     */
+    public static final Block PICNIC_MAT = Registry.register(Registry.BLOCK,
+            TouhouLittleMaid.rl("picnic_mat"),
+            new com.github.tartaricacid.touhoulittlemaid.block.BlockPicnicMat());
+
+    public static final BlockEntityType<com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityPicnicMat> PICNIC_MAT_TE =
+            Registry.register(Registry.BLOCK_ENTITY_TYPE, TouhouLittleMaid.rl("picnic_mat"),
+                    FabricBlockEntityTypeBuilder.create(
+                            com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityPicnicMat::new, PICNIC_MAT).build());
+
+
     private InitBlocks() {
     }
 

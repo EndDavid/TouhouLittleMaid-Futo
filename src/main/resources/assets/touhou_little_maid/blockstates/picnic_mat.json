@@ -1,6 +1,9 @@
 {
   "variants": {
-    "": {
+    "part=center": {
+      "model": "touhou_little_maid:block/picnic_mat"
+    },
+    "part=side": {
       "model": "touhou_little_maid:block/picnic_mat"
     }
   }

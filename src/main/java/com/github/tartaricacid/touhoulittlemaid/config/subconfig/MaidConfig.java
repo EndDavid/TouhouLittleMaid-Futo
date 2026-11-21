@@ -346,6 +346,19 @@ public final class MaidConfig {
     }
 
     /**
+     * 家庭餐（坐在野餐垫上吃）的黑名单。默认与工作餐相同。
+     */
+    public static List<String> homeMealsBlockList() {
+        return listOr(MAID_HOME_MEALS_BLOCK_LIST, Lists.newArrayList(
+                "minecraft:pufferfish", "minecraft:poisonous_potato",
+                "minecraft:rotten_flesh", "minecraft:spider_eye", "minecraft:chorus_fruit"));
+    }
+
+    public static List<String> homeMealsBlockListRegex() {
+        return listOr(MAID_HOME_MEALS_BLOCK_LIST_REGEX, Lists.newArrayList());
+    }
+
+    /**
      * 吃完之后要返还的容器（上游 {@code DefaultEatenEvent}）。
      *
      * <p>形如 {@code [["minecraft:beetroot_soup", "minecraft:bowl"]]}：先看物品自带的

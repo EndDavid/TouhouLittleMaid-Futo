@@ -6,6 +6,7 @@ import com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidConfigCo
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidMainContainer;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.task.AttackTaskConfigContainer;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.task.DefaultTaskConfigContainer;
+import com.github.tartaricacid.touhoulittlemaid.inventory.container.other.PicnicBasketContainer;
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.other.WirelessIOContainer;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
 import net.minecraft.core.Registry;
@@ -66,6 +67,20 @@ public final class InitMenu {
             TouhouLittleMaid.rl("wireless_io"),
             new ExtendedScreenHandlerType<>((syncId, inventory, buf) ->
                     new WirelessIOContainer(syncId, inventory, buf.readItem())));
+
+    /**
+     * 野餐篮的 9 格界面。
+     *
+     * <p>与隙间同款：打开时下发「主手那件物品」的 {@code ItemStack} 拷贝 ——
+     * 界面里那 9 格就是这个拷贝上的 NBT。上游用
+     * {@code IForgeMenuType.create((id, inv, data) -> data.readItem())}，是同一件事。</p>
+     */
+    public static final MenuType<PicnicBasketContainer> PICNIC_BASKET = Registry.register(
+            Registry.MENU,
+            TouhouLittleMaid.rl("picnic_basket"),
+            new ExtendedScreenHandlerType<>((syncId, inventory, buf) ->
+                    new PicnicBasketContainer(syncId, inventory, buf.readItem())));
+
 
     private InitMenu() {
     }

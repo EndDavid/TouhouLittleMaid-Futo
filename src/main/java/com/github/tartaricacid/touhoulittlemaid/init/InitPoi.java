@@ -29,9 +29,14 @@ public final class InitPoi {
     public static PoiType SCARECROW;
 
     /**
-     * 娱乐方块（棋类 / 将来的键盘、书架、电脑）。{@code MaidBoardGameTask} 就是靠它找棋盘。
+     * 娱乐方块（棋类 / 键盘 / 书架 / 电脑）。{@code MaidBoardGameTask} / {@code MaidJoyTask} 靠它找座位。
      */
     public static PoiType JOY_BLOCK;
+
+    /**
+     * 野餐垫（只含中心格）。{@code MaidFindHomeMealTask} 靠它在居家半径内找「还有空位的垫子」。
+     */
+    public static PoiType HOME_MEAL;
 
     private InitPoi() {
     }
@@ -44,5 +49,7 @@ public final class InitPoi {
                 MaidPoiManager.getScarecrowStates(), 0, 1);
         JOY_BLOCK = PoiTypeAccessor.invokeRegister(TouhouLittleMaid.MOD_ID + ":joy_block",
                 MaidPoiManager.getJoyBlockStates(), 0, 1);
+        HOME_MEAL = PoiTypeAccessor.invokeRegister(TouhouLittleMaid.MOD_ID + ":home_meal",
+                MaidPoiManager.getHomeMealStates(), 0, 1);
     }
 }

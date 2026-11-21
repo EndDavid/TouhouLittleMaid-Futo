@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
  * <ul>
  *     <li>上游在 {@code init()} 里还会遍历 {@code TouhouLittleMaid.EXTENSIONS} 让附属包
  *         追加餐类型；Fabric 侧没有那套扩展点，{@link #addMaidMeal} 保留下来供以后使用。</li>
- *     <li>{@code HOME_MEAL} 没有注册具体实现 —— 它依赖野餐墊方块，那块子系统还没移植
- *         （详见 {@link MaidMealType} 的类注释）。</li>
+ *     <li>{@code HOME_MEAL} 现在也注册了：野餐垫移植完成后由 {@code DefaultMaidHomeMeal}
+ *         负责，见 {@link DefaultMaidHomeMeal}。</li>
  *     <li>上游在 {@code ModConfigEvent.Loading} 里把所有「正则黑名单」展开成具体的物品 id 表；
  *         这里改成<b>按需匹配</b>（见 {@link #isRegexBlockList}），结果等价，
  *         而且省掉一次「遍历全部注册物品」的开销。</li>
@@ -47,6 +47,7 @@ public final class MaidMealManager {
         }
         addMaidMeal(MaidMealType.WORK_MEAL, new DefaultMaidWorkMeal());
         addMaidMeal(MaidMealType.HEAL_MEAL, new DefaultMaidHealSelfMeal());
+        addMaidMeal(MaidMealType.HOME_MEAL, new DefaultMaidHomeMeal());
     }
 
     public static void addMaidMeal(MaidMealType type, IMaidMeal maidMeal) {

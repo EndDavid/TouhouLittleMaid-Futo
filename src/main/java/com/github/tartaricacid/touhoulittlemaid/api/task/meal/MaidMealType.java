@@ -16,11 +16,9 @@ package com.github.tartaricacid.touhoulittlemaid.api.task.meal;
  *         <td>坐在野餐垫上吃</td></tr>
  * </table>
  *
- * <p><b>本移植版只实现了前两类。</b>{@code HOME_MEAL} 依赖野餐垫方块
- * （{@code BlockPicnicMat} + {@code TileEntityPicnicMat} + 对应的 POI 与
- * {@code EntitySit} 娱乐坐骑），那块子系统还没搬，所以枚举值保留、
- * 但没有对应的行为去触发它。</p>
- */
+ * <p>三类餐都已实现：{@code WORK_MEAL} / {@code HEAL_MEAL} 在 {@code MaidMealManager#init}
+ * 里注册，{@code HOME_MEAL} 随野餐垫一起落地（{@code DefaultMaidHomeMeal}）。</p>
+*/
 public enum MaidMealType {
     /**
      * 工作餐
