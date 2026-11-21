@@ -607,6 +607,31 @@ BoardStateAuthor  署名
 
 ## 渲染（GeckoLib3 管线）
 
+### 并行层动画不是「TACZ 专用」，`FOX` 就靠它隐藏
+
+`GeckoMaidEntity#registerControllers` 里那 8 个 `pre_parallel_*` 与 8 个 `parallel_*`，
+上游是无条件注册的；本移植版曾误以为它们是 TACZ（枪械）联动专用，在没有 TACZ 时跳过了。
+这个判断是错的：模型包里的 `parallel*` 动画负责的是**低血量表现与隐藏部件**，与枪无关。
+
+以酒狐（`geckolib:winefox`）为例，`parallel1`（`loop: hold_on_last_frame`）写的是：
+
+```
+AllBody : scale = (血量 / 最大血量) < 0.2 ? 0 : 1
+FOX     : scale = (血量 / 最大血量) < 0.2 ? 1 : 0
+```
+
+也就是说模型里那套「狐狸坐骑」子树平时 **scale 0**，只有血量掉到 20% 以下才显现；
+`parallel3` 同理把 `Mask` 的 scale 设成 0。少了 parallel1，`FOX` 就永远停在模型自带的
+默认缩放 1 —— 于是**站着时脚下也有一只狐狸**，而坐姿下那只（`sit` 里给 `Root` 下移）本来就是设计如此。
+
+改回无条件注册后，实测（临时打印 `FOX` 骨骼的 scale）：
+
+```
+hp=20/20  ->  foxScale=0.00   rootY=0.00      （站着，狐狸隐藏）
+hp=0/20   ->  foxScale=1.00   rootY=-12.1     （低血量/死亡，狐狸显现）
+```
+
+
 ### 关键结构
 
 - **GeckoLib3 全量移植**（174 个类）去 Forge 化，实际改动仅 8 处

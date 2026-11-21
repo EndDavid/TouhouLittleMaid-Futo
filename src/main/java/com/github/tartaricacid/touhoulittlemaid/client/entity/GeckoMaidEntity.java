@@ -119,19 +119,23 @@ public class GeckoMaidEntity<T extends Mob> extends AnimatableEntity<T> implemen
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void registerControllers() {
         AnimationManager manager = AnimationManager.getInstance();
-        // parallel / pre_parallel 是 TACZ（枪械）联动专用的并行层动画。
-        // 上游无条件注册，但这些控制器在 main 之后执行，会覆盖 main 写出的骨骼旋转；
-        // 酒狐等模型包里恰好含有 pre_parallel0/1、parallel1/2/3，于是 sit / idle 的
-        // 屈腿与摆臂会被它们整帧覆盖（表现为「坐下模型不变」）。
-        // TACZ 在 Fabric 1.18.2 上不存在，因此这里只在真正加载了 TACZ 时才注册。
-        boolean tacPresent = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("tacz");
-        if (tacPresent) {
-            for (int i = 0; i < 8; i++) {
-                String controllerName = String.format("pre_parallel_%d_controller", i);
-                String animationName = String.format("pre_parallel%d", i);
-                addAnimationController(new AnimationController<>(this, controllerName, 0,
-                        e -> manager.predicateParallel(e, animationName)));
-            }
+        // pre_parallel* / parallel* 必须**无条件**注册（上游 1.20.1 就是这样，各 8 个）。
+        //
+        // 早前本移植版把它们当成「TACZ 枪械联动专用」而在没有 TACZ 时跳过了，
+        // 那是个错误的判断：这些并行层动画跟枪毫无关系，它们负责的是
+        //     · parallel1 —— 低血量表现：`AllBody scale = 血量<20% ? 0 : 1`，
+        //                    `FOX      scale = 血量<20% ? 1 : 0`；
+        //     · parallel3 —— `Mask scale = 0`（把模型里那张狐狸面具藏掉）；
+        //     · parallel2 / pre_parallel0 / pre_parallel1 —— 耳朵抖动、眨眼、尾巴与头发摆动。
+        //
+        // 少了 parallel1，酒狐的 `FOX` 子树就永远停在模型自带的默认缩放（1），
+        // 于是**站着时脚下也有一只大狐狸**（坐姿动画里那只是设计如此：她本来就骑在狐狸上）。
+        // TACZ 的动画只是顺带复用这套并行层，不是它的必要条件。
+        for (int i = 0; i < 8; i++) {
+            String controllerName = String.format("pre_parallel_%d_controller", i);
+            String animationName = String.format("pre_parallel%d", i);
+            addAnimationController(new AnimationController<>(this, controllerName, 0,
+                    e -> manager.predicateParallel(e, animationName)));
         }
         addAnimationController(new AnimationController<>(this, "main", 2, manager::predicateMain));
         addAnimationController(new AnimationController<>(this, "hold_offhand", 0, manager::predicateOffhandHold));
@@ -140,13 +144,11 @@ public class GeckoMaidEntity<T extends Mob> extends AnimatableEntity<T> implemen
         addAnimationController(new AnimationController<>(this, "use", 2, manager::predicateUse));
         addAnimationController(new AnimationController<>(this, "misc", 2, manager::predicateMisc));
         addAnimationController(new AnimationController<>(this, "passenger", 2, manager::predicatePassengerAnimation));
-        if (tacPresent) {
-            for (int i = 0; i < 8; i++) {
-                String controllerName = String.format("parallel_%d_controller", i);
-                String animationName = String.format("parallel%d", i);
-                addAnimationController(new AnimationController<>(this, controllerName, 0,
-                        e -> manager.predicateParallel(e, animationName)));
-            }
+        for (int i = 0; i < 8; i++) {
+            String controllerName = String.format("parallel_%d_controller", i);
+            String animationName = String.format("parallel%d", i);
+            addAnimationController(new AnimationController<>(this, controllerName, 0,
+                    e -> manager.predicateParallel(e, animationName)));
         }
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             if (slot.getType() == EquipmentSlot.Type.ARMOR) {
