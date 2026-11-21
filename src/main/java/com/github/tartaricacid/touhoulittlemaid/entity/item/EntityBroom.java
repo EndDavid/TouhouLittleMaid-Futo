@@ -62,7 +62,7 @@ import java.util.UUID;
  * <p>也就是说「骑着的时候，双端都能读到真实按键」，于是控制可以放在服务端算，
  * 不再依赖「客户端自己飞」。本移植版直接采用这个方案。</p>
  *
- * <h2>与上游 1.20.1 的两处差异</h2>
+ * <h2>与上游 1.20.1 的三处差异</h2>
  * <ol>
  *     <li><b>没有 {@code IBroomControl} 接口层。</b>它在上游存在的意义是让附属模组插入自己的飞行方式
  *         （{@code ILittleMaid.registerBroomControl}）。本移植版还没有 {@code ILittleMaid} 扩展注册表，
@@ -71,6 +71,10 @@ import java.util.UUID;
  *     <li><b>没有 {@code HasCustomInventoryScreen} / {@code getRiddenSpeed} / {@code onGround()} 重写。</b>
  *         这三个 API 在 1.18.2 都不存在（前一个是 1.19.4+ 的接口，后两个分别是 1.19 与 1.20 才有）。
  *         速度乘子直接在 {@code travel} 里算，效果一致。</li>
+ *     <li><b>1.18.2 没有 {@code LivingEntity#travelRidden} / {@code tickRidden}。</b>
+ *         上游那套「骑行输入 → {@code tickRidden} → 只让本地操纵的一侧 {@code travel}」
+ *         在这里压缩成了 {@link #travel(Vec3)} 里的几行，顺序与语义逐条对齐，
+ *         连同「非本地操纵的一侧不模拟位置」这条也一并搬了过来 —— 理由见那个方法的注释。</li>
  * </ol>
  */
 public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity {
@@ -147,13 +151,59 @@ public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity
         this.entityData.get(OWNER_ID).ifPresent(uuid -> compound.putUUID(OWNER_UUID_TAG, uuid));
     }
 
+    /**
+     * 骑行状态下的每 tick 移动，结构对齐上游 1.20.1 的
+     * {@code LivingEntity#travelRidden(Player, Vec3)}。
+     *
+     * <p>1.18.2 的 {@code LivingEntity} 既没有 {@code travelRidden} 也没有 {@code tickRidden}，
+     * 它的 {@code aiStep} 里是<b>无条件</b>调用 {@code this.travel(new Vec3(xxa, yya, zza))}
+     * （字节码偏移 721）。所以这里把上游那三层
+     * 「{@code travelRidden} → {@code tickRidden} → {@code travel}」压进 {@code travel} 一个方法里，
+     * 相对顺序保持一致。</p>
+     *
+     * <h2>为什么必须分成「本地操纵 / 非本地操纵」两半</h2>
+     * <p>上游 1.20.1 的 {@code travelRidden} 原文：</p>
+     * <pre>{@code
+     * private void travelRidden(Player player, Vec3 vec3) {
+     *     Vec3 input = this.getRiddenInput(player, vec3);
+     *     this.tickRidden(player, input);          // 浮动、朝向：两端都跑
+     *     if (this.isControlledByLocalInstance()) {
+     *         this.setSpeed(this.getRiddenSpeed(player));
+     *         this.travel(input);                  // 只有这一侧真的 move
+     *     } else {
+     *         this.calculateEntityAnimation(false);
+     *         this.setDeltaMovement(Vec3.ZERO);    // 另一侧：速度清零，不动
+     *         this.tryCheckInsideBlocks();
+     *     }
+     * }
+     * }</pre>
+     * <p>也就是：<b>被玩家操纵的坐骑只有一侧在算位置</b>，另一侧的位置完全来自客户端上行的
+     * {@code ServerboundMoveVehiclePacket}。</p>
+     *
+     * <p><b>本移植版最初漏掉了这个分支</b>，两端都在 {@code rideControl} + {@code move}。
+     * 于是服务端也按自己的 {@code tickCount} 相位算出一条浮动速度、也在挪扫帚；
+     * 而 1.18.2 的 {@code Entity#lerpTo(...)} 是<b>直接 {@code setPos}</code></b>
+     * （1.18.2 里它没有插值，字节码只有 {@code setPos} + {@code setRot} 两句），
+     * 客户端每收到一次位置包就被硬按到服务端那条<b>相位不同</b>的正弦上 ——
+     * 两条正弦互相拉扯，浮动看起来就是一顿一顿的「生硬」，而不是平滑的上下漂。</p>
+     */
     @Override
     public void travel(Vec3 vec3) {
-        Entity entity = this.getControllingPassenger();
-        if (entity instanceof Player player && this.hasPassenger(e -> e instanceof EntityMaid)) {
-            this.rideControl(player);
-            this.move(MoverType.SELF, this.getDeltaMovement());
-            return;
+        Entity controlling = this.getControllingPassenger();
+        if (controlling instanceof Player player && this.isAlive()) {
+            // 上游：tickRidden 在分支之前，两端都执行（清零摔落距离、浮动、朝向）
+            this.tickRidden(player);
+            if (!this.isControlledByLocalInstance()) {
+                // 非本地操纵的一方不模拟位置：清零速度，位置等对面上行
+                this.setDeltaMovement(Vec3.ZERO);
+                this.tryCheckInsideBlocks();
+                return;
+            }
+            if (this.hasPassenger(e -> e instanceof EntityMaid)) {
+                this.rideControl(player);
+                this.move(MoverType.SELF, this.getDeltaMovement());
+                return;
+            }
         }
         if (!this.isOnGround()) {
             // 没有「玩家 + 女仆」这组乘客，扫帚就只是往下掉
@@ -242,15 +292,15 @@ public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity
         return false;
     }
 
-    @Override
-    public void aiStep() {
-        super.aiStep();
-        LivingEntity passenger = this.getControllingPassenger();
-        if (passenger instanceof Player player && this.isAlive()) {
-            this.tickRidden(player);
-        }
-    }
-
+    /**
+     * 对应上游 1.20.1 的 {@code EntityBroom#tickRidden(Player, Vec3)}，由 {@link #travel(Vec3)}
+     * 在「本地操纵判断之前」调用 —— 与上游 {@code LivingEntity#travelRidden} 里的位置一致。
+     *
+     * <p>位置很要紧：上游是先 {@code tickRidden} 把浮动叠进 {@code deltaMovement}，
+     * 再在同一个 tick 里 {@code travel()} → {@code rideControl()} → {@code move()}。
+     * 本移植版最初把这段放在 {@code aiStep} 末尾（也就是 {@code move} 之后），
+     * 浮动的相位整整晚一个 tick，看起来就和上游对不上。</p>
+     */
     protected void tickRidden(Player player) {
         // 记得把 fall distance 清零，否则落地会摔死
         this.fallDistance = 0;
