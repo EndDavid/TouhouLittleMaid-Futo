@@ -1,5 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.ride;
 
+import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidCheckRateTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.fishing.FishingTypeManager;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -23,9 +24,20 @@ import net.minecraft.world.phys.Vec3;
  */
 public class MaidRideFindWaterTask extends MaidCheckRateTask {
     private static final int MAX_DELAY_TIME = 100;
+    /** 诊断状态：主手不是鱼竿。 */
+    private static final int STATE_NO_ROD = 1;
+    /** 诊断状态：搜索半径内没有水面。 */
+    private static final int STATE_NO_WATER = 2;
+    /** 诊断状态：先前找到的水面失效（离开范围 / 超出活动范围 / 已不是水）。 */
+    private static final int STATE_WATER_LOST = 3;
+    /** 诊断状态：成功抛出鱼钩。 */
+    private static final int STATE_CAST = 4;
 
     private final int verticalSearchRange;
     private final int searchRange;
+
+    /** 上一次诊断状态，用来避免重复打印。 */
+    private int lastState = 0;
 
     protected int verticalSearchStart;
     private IFishingType fishingType = null;
@@ -40,6 +52,15 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
 
     @Override
     protected boolean checkExtraStartConditions(ServerLevel worldIn, EntityMaid owner) {
+        // 自愈：{@code owner.fishing} 非空就代表「她手上已经有一根钩子」，这条行为会一直不启动。
+        // 而钩子被区块卸载、被 /kill、或在客户端侧先行移除时，不一定走得到
+        // {@code MaidFishingHook#remove}（例如实体根本没进过 remove 流程就被回收），
+        // 于是这个引用会永久残留 —— 表现就是「坐进船里以后再也不抛钩」，
+        // 而且换任务、下车、重上船都救不回来（只有重进存档才行，因为该字段不落盘）。
+        // 这里每次尝试启动时兜底清一次，代价是一次 isAlive() 调用。
+        if (owner.fishing != null && !owner.fishing.isAlive()) {
+            owner.fishing = null;
+        }
         return super.checkExtraStartConditions(worldIn, owner) && owner.fishing == null;
     }
 
@@ -49,13 +70,18 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
         this.fishingType = FishingTypeManager.getFishingType(mainHandItem);
 
         if (!this.fishingType.isFishingRod(mainHandItem)) {
+            this.report(maid, STATE_NO_ROD, "main hand is not a fishing rod: " + mainHandItem);
             return;
         }
         if (this.waterPos == null) {
             this.searchForDestination(worldIn, maid, mainHandItem);
+            if (this.waterPos == null) {
+                this.report(maid, STATE_NO_WATER, "no water within " + this.searchRange + " blocks");
+            }
             return;
         }
         if (!this.posCheck(maid)) {
+            this.report(maid, STATE_WATER_LOST, "water at " + this.waterPos + " is out of range or restriction");
             this.waterPos = null;
             return;
         }
@@ -68,7 +94,9 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
                     0.4F / (worldIn.getRandom().nextFloat() * 0.4F + 0.8F));
             maid.swing(InteractionHand.MAIN_HAND);
             maid.getLookControl().setLookAt(centerPos);
+            this.report(maid, STATE_CAST, "cast at " + this.waterPos);
         } else {
+            this.report(maid, STATE_WATER_LOST, "water at " + this.waterPos + " is no longer fishable");
             this.waterPos = null;
         }
     }
@@ -100,5 +128,24 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
         Vec3 waterVec = new Vec3(this.waterPos.getX(), this.waterPos.getY(), this.waterPos.getZ());
         return maid.distanceToSqr(waterVec) < distanceSqr && maid.isWithinRestriction(this.waterPos);
     }
-}
 
+    /**
+     * 只在「状态发生变化」时记一条日志。
+     *
+     * <p><b>为什么需要它：</b>这条链路一旦卡住是完全静默的 —— 女仆坐进船里、
+     * 手里有鱼竿，却既没有鱼钩也没有任何提示。玩家能观察到的只有「她不动」，
+     * 而可能的原因至少有四种（主手不是鱼竿 / 6 格内没水 / 水超出活动范围 /
+     * 骑乘活动根本没激活）。这条日志把前三种区分开，剩下的就是活动表的问题。</p>
+     *
+     * <p>不做每 tick 打印：{@code start} 每 100~200 tick 才跑一次，但一条日志
+     * 一直重复也没有意义，状态没变就不打。</p>
+     */
+    private void report(EntityMaid maid, int state, String detail) {
+        if (this.lastState == state) {
+            return;
+        }
+        this.lastState = state;
+        TouhouLittleMaid.LOGGER.info("[Futo] fishing maid={} at={} -> {}",
+                maid.getUUID(), maid.blockPosition(), detail);
+    }
+}

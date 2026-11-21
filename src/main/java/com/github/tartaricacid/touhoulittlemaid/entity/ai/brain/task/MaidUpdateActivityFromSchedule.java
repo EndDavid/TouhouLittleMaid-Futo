@@ -95,6 +95,10 @@ public class MaidUpdateActivityFromSchedule extends Behavior<EntityMaid> {
         } else {
             riderActivity = InitEntities.RIDE_REST;
         }
+        // 诊断：钓鱼「坐进船却不抛钩」的全部原因都能在这一行里看出来。
+        // RIDE_WORK 是唯一挂着 MaidRideFindWaterTask 的活动，它没被激活就不会有任何动作、
+        // 也不会有 MaidRideFindWaterTask 的日志 —— 那种情况下玩家只能看到「她坐着一动不动」。
+        reportRideState(maid, activity, riderActivity);
         if (brain.isActive(riderActivity)) {
             return;
         }
@@ -116,5 +120,42 @@ public class MaidUpdateActivityFromSchedule extends Behavior<EntityMaid> {
             maid.stopRiding();
         }
     }
-}
 
+    /**
+     * 上一次为这只女仆打印过的骑乘状态（`schedule→rider`）。用于避免每 tick 刷屏。
+     *
+     * <p>上限 128 条：多只女仆同时钓鱼时也不会无限增长，超出就整体清空 ——
+     * 丢一条诊断日志比泄漏内存划算得多。</p>
+     */
+    private static final java.util.Map<java.util.UUID, String> LAST_RIDE_STATE = new java.util.HashMap<>();
+
+    /**
+     * 打印「为什么当前不是 RIDE_WORK」。
+     *
+     * <p>只在这两个条件成立时打印：女仆坐着 / 骑着（否则与钓鱼无关），且状态与上次不同。
+     * 输出形如：</p>
+     * <pre>
+     * [Futo] ride maid=&lt;uuid&gt; schedule=work rider=tlm_ride_work active=true
+     *        task=touhou_little_maid:fishing mainHand=1 minecraft:fishing_rod
+     * </pre>
+     * <p>若 {@code rider} 不是 {@code tlm_ride_work}，说明**当前不是上班时段** ——
+     * 上游就是这样设计的：只有 WORK 时段才抛钩，其余时段她会坐在船上发呆，
+     * 甚至（对无工作点的任务）被赶下船。</p>
+     */
+    private static void reportRideState(EntityMaid maid, Activity activity, Activity riderActivity) {
+        String state = activity.getName() + "->" + riderActivity.getName();
+        java.util.UUID uuid = maid.getUUID();
+        if (state.equals(LAST_RIDE_STATE.get(uuid))) {
+            return;
+        }
+        if (LAST_RIDE_STATE.size() > 128) {
+            LAST_RIDE_STATE.clear();
+        }
+        LAST_RIDE_STATE.put(uuid, state);
+        com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.info(
+                "[Futo] ride maid={} schedule={} rider={} isWork={} task={} mainHand={}",
+                uuid, activity.getName(), riderActivity.getName(),
+                InitEntities.RIDE_WORK.getName().equals(riderActivity.getName()),
+                maid.getTask().getUid(), maid.getMainHandItem());
+    }
+}

@@ -518,10 +518,12 @@ public class MaidFishingHook extends Entity {
         ItemStack mainHandItem = maid.getMainHandItem();
         boolean hasFishingRod = mainHandItem.getItem() instanceof FishingRodItem;
         boolean isFishingTask = maid.getTask() instanceof TaskFishing;
-        // 与上游的差异：上游额外要求 hasVehicle（女仆坐在船 / 坐垫上）。
-        // 我们的渲染管线在「骑乘 + 非人形模型」时会上下翻转，而 EntityChair 尚未移植，
-        // 因此改为「站在岸边钓鱼」也允许，只保留存活 / 任务 / 鱼竿 / 距离四个条件。
-        if (!maid.isRemoved() && maid.isAlive() && isFishingTask && hasFishingRod
+        // 与上游 1.20.1 一致：还要求女仆仍然坐在船 / 坐垫上。
+        // 早期版本因为「骑乘 + 非人形模型上下翻转」改成岸钓，这里把 hasVehicle 去掉了；
+        // 骑乘倒置修好、抛钩回到 RIDE_WORK 之后必须加回来 ——
+        // 否则玩家把女仆从船上抱走，她会在岸上继续「钓鱼」，钩子也不会收。
+        boolean hasVehicle = maid.getVehicle() != null;
+        if (!maid.isRemoved() && maid.isAlive() && hasVehicle && isFishingTask && hasFishingRod
             && this.distanceToSqr(maid) < 256) {
             return false;
         }
@@ -576,4 +578,3 @@ public class MaidFishingHook extends Entity {
         INVALID
     }
 }
-

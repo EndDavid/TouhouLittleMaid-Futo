@@ -951,22 +951,33 @@ pushPose → setupRotations → scale(-1,-1,1) → scale(k) → translate(0,-1.5
 
 **最后一块补丁：附魔台。** 原版 `EnchantmentHelper#getAvailableEnchantmentResults`
 读的是 `category.canEnchant(item)`，**不调** `Enchantment#canEnchant`。
-不管的话剑 / 斧也会被列出这三个附魔。`mixin/EnchantmentHelperMixin` 在 `RETURN`
-处只做减法（分类允许但附魔自己不同意的条目剔除），对原版附魔零影响。
-书本特例不受影响（`category.canEnchant(book)` 本来就不成立），村民的附魔书交易照常。
+因为它读的是分类，候选列表**两个方向**都是错的，`mixin/EnchantmentHelperMixin` 在 `RETURN` 处各补一刀：
 
-实测（临时 debug 类读的真实返回值，验完已删）：
+1. **减法**：分类允许、但附魔自己不同意的条目剔除 → 剑 / 斧不会再被列出这三个附魔；
+2. **加法**：分类拒绝、但附魔自己同意的条目补上 → 御币放进附魔台能刷出它们。
+
+加法只对「分类判否 且 `canEnchant` 判真」生效。原版附魔的 `canEnchant` 就是
+`category.canEnchant(stack.getItem())`，两个条件不可能一假一真，所以对**任何原版附魔
+都是空操作**。等级选取循环逐行对齐原版字节码（`96 → 103 → 115 → 126 → 137/158`）：
+从 `getMaxLevel()` 往下试到 `getMinLevel()`，第一个落在
+`[getMinCost(lv), getMaxCost(lv)]` 区间内的等级胜出。书本特例单独跳过，避免重复。
+
+实测（临时 debug 类读的真实返回值，验完已删；`[]` 里只列本模组的三个附魔）：
 
 ```
-impeding      reg=touhou_little_maid:impeding      gohei=true  sword=false book=false maxLvl=4
-speedy        reg=touhou_little_maid:speedy        gohei=true  sword=false book=false maxLvl=2
-enders_ender  reg=touhou_little_maid:enders_ender  gohei=true  sword=false book=false maxLvl=1
-lvl=30 sword[tlm=false,n=8] gohei[tlm=false,n=1] book[tlm=true,n=34]
+lvl=5   gohei=[]                                          sword=[]
+lvl=12  gohei=[impeding=1]                                sword=[]
+lvl=20  gohei=[impeding=2 enders_ender=1]                 sword=[]
+lvl=25  gohei=[speedy=1 enders_ender=1]                   sword=[]
+lvl=30  gohei=[impeding=3 speedy=1 enders_ender=1]        sword=[]
+lvl=35  gohei=[impeding=4 speedy=2 enders_ender=1]        sword=[]
+lvl=50  gohei=[enders_ender=1]                            sword=[]
 ```
 
-`book[tlm=true]` 说明书本特例确实保留；`gohei[tlm=false]` 是**已知代价** ——
-上游 Forge 因为确有 `GOHEI` 分类，把御币放进附魔台能刷出这三个，这里刷不出来。
-获得途径仍与上游一致：创造栏的附魔书、村民交易、铁砧。
+剑那一列恒为空，说明减法是精确的。`lvl=5 / 12 / 25 …` 的跳变来自 `getMaxCost`
+默认值 `getMinCost + 5`：每个附魔只在自己那段花费区间里出现，这与上游一致
+（上游也是这套 `getMinCost/getMaxCost`，只是它还有 `GOHEI` 分类，
+而本移植版靠分类之外的 `canEnchant` 补上同样的效果）。
 
 ---
 
@@ -2053,6 +2064,42 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 > 早期版本因为 GeckoLib 管线在「骑乘 + 非人形模型」时把模型上下翻转，绕开成
 > 「岸上直接抛钩」（`MaidFishingCastTask`）。骑乘倒置修好后那个类已删除 ——
 > 两者同时挂在 WORK 会让女仆永远优先岸钓，坐船钓鱼根本不会发生。
+**卡住时看日志。** 这条链路一旦不成立是完全静默的，所以 `MaidRideFindWaterTask`
+会在**状态发生变化**时打一条（同一个状态不重复打）：
+
+```
+[Futo] fishing maid=<uuid> at=<pos> -> cast at BlockPos{x=0, y=100, z=0}
+[Futo] fishing maid=<uuid> at=<pos> -> no water within 6 blocks
+[Futo] fishing maid=<uuid> at=<pos> -> main hand is not a fishing rod: 1 air
+[Futo] fishing maid=<uuid> at=<pos> -> water at BlockPos{...} is out of range or restriction
+```
+
+四种分别对应：正常抛钩 / 6 格内没水 / 主手不是鱼竿 / 水超出 16 格活动范围。
+**一条都没有**就说明 `RIDE_WORK` 根本没激活 —— 即女仆不是真正的乘客
+（只是站在船或坐垫上，`Vehicle` 为空），或者当前日程不是上班时间。
+`MaidUpdateActivityFromSchedule` 另外打一条骑乘活动日志，**这一条决定上面那四种到底会不会发生**：
+
+```
+[Futo] ride maid=<uuid> schedule=work rider=tlm_ride_work isWork=true  task=touhou_little_maid:fishing mainHand=1 fishing_rod
+[Futo] ride maid=<uuid> schedule=rest rider=tlm_ride_rest isWork=false task=touhou_little_maid:fishing mainHand=1 fishing_rod
+```
+
+**只有 `isWork=true` 才会抛钩。** 这不是 bug，是上游设计：`RIDE_WORK` 是唯一挂着
+`MaidRideFindWaterTask` 的活动。非工作时段（`schedule=rest` / `idle`）她坐在船上只是发呆，
+而且对 `workPointTask()` 为真的任务（含钓鱼）会被**主动赶下船** —— 实测切到 18000 tick 后
+`boat.Passengers` 立刻变空。所以「坐在船里却一直不钓鱼」的第一嫌疑就是**当前不是上班时段**，
+把她自己的日程表调成工作时段（或用 `/tlm` 改 `MaidScheduleMode`）再试。
+
+**还有一条自愈。** `MaidRideFindWaterTask` 的启动前提是 `maid.fishing == null`，
+而这个字段**不落盘**、只在 `MaidFishingHook#remove` 里清空。钩子若在没走到 `remove` 的路径上被回收
+（区块卸载、`/kill`、客户端侧先移除），引用会永久残留 —— 表现为「坐进船里以后再也不抛钩」，
+换任务 / 下车 / 重上船都救不回来，只有重进存档才行。现在每次尝试启动时若发现钩子已
+`!isAlive()` 就顺手清掉，代价只有一次 `isAlive()` 调用。
+
+**鱼钩要求她仍然坐着。** `MaidFishingHook#shouldStopFishing` 恢复成上游的五个条件
+（活着 / 仍在骑乘 / 任务是钓鱼 / 主手是鱼竿 / 距离 < 16 格）。
+早期版本为了岸钓把「仍在骑乘」去掉了，现在必须加回来，否则玩家把她从船上抱走之后
+鱼钩会继续留在水里、她站在岸上也还在「钓鱼」。
 
 ### `feed` 的挑选顺序（HIGH → LOW → LOWEST）
 
