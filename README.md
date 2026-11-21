@@ -2733,17 +2733,44 @@ save-all flush -> world/advancements/<uuid>.json 里出现 touhou_little_maid:gi
 
 ## 手册进度：53 词条 / 3 分类，只剩模型切换器
 
-判据是 `port/book_pages_held_back/validate-book.ps1` 的输出（它按帕秋莉的失败模式静态检查：
-`spotlight` 物品、词条/分类图标、`entity` 页、`altar_recipe` 的 `recipe_id`、`c:` 标签，
-以及 ingredients / output 里引用的物品与实体 id）：
+判据是 `port/book_pages_held_back/validate-book.ps1`。它按帕秋莉的失败模式静态检查：
+`spotlight` 的物品、词条与分类图标、`entity` 页、`altar_recipe` 的 `recipe_id`、
+`c:` 标签，以及 ingredients / output 里引用的物品与实体 id：
 
 ```
 entries=53 categories=3 problems=0
 ```
 
-唯一还扣着的是 `other/model_switcher.json`：它需要 `MaidModelDetailsGui`（模型切换器界面），
-而那个界面要先让 `AbstractModelGui` 泛型化（两个类型参数）并接管彩蛋模型与图标缓存。
-原文件在 `port/book_pages_held_back/other/`，界面做完搬回去即可。
+另外三项**不在**那个脚本的检查范围内，这轮单独核过：
+
+| 项 | 怎么核 | 结果 |
+| --- | --- | --- |
+| 每个页引用的 `text` / `title` / `link_text` 语言键 | 遍历 53 个词条的所有页，比对 `zh_cn` / `en_us` | 0 缺失 |
+| `image` 页的贴图 | 把 `ns:path` 还原成 `assets/<ns>/<path>` 查文件 | 19 张全在 |
+| `crafting` 页的配方 | 查 `data/touhou_little_maid/recipes/*.json` | 见下 |
+
+**`crafting` 页这轮修掉了一个真缺口**：`overview/gohei_and_danmaku` 引用
+`touhou_little_maid:hakurei_gohei` 与 `sanae_gohei` 两条**工作台**配方，而本移植版只有
+祭坛配方。客户端日志里每次都刷这两行：
+
+```
+[WARN] (patchouli) Recipe touhou_little_maid:hakurei_gohei (of type minecraft:crafting) not found
+[WARN] (patchouli) Recipe touhou_little_maid:sanae_gohei (of type minecraft:crafting) not found
+```
+
+按上游 1.18.2 / 1.20.1 的同名配方补上（`forge:rods/wooden` → `c:wooden_rods`、
+`forge:gems/diamond` → `c:diamonds`）。补完后客户端连服，这两行不再出现。
+
+**`multiblock` 页不需要 JSON。** `overview/multiblocks_altar` 引用
+`touhou_little_maid:altar`，但上游 jar 里两个版本都**没有** `multiblocks/altar.json` ——
+它是在代码里注册的（`compat/patchouli/MultiblockRegistry#init`，由 `PatchouliCompat#init` 调），
+本移植版逐字照搬了这段。
+
+唯一还扣着的是 `other/model_switcher.json`：它引用的 `model_switcher` 方块/物品还没移植。
+那是一整块子系统（block 181 行 + TE 192 行 + 物品 + 两个 GUI + 两个包），而且两个 GUI 都建立在
+`AbstractModelGui` 之上，得先把它从一个类型参数泛型化到两个、并接管 `MaidModelDetailsGui`、
+彩蛋模型与图标缓存。原文件在 `port/book_pages_held_back/other/`，做完搬回去即可。
+
 
 ## 「一放置就崩溃」：渲染器注册丢了，但服务端毫无异常
 ### 现象

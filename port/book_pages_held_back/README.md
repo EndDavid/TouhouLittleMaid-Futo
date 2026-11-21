@@ -33,18 +33,22 @@
 
 ## 现在还剩什么缺口
 
-被挪出来的页面还剩下 **3 页**，缺的是**尚未移植的物品 / 方块**：
+**只剩 1 页**：`other/model_switcher.json`，它引用的 `touhou_little_maid:model_switcher`
+（模型切换器方块 / 物品）还没移植。那不是一个「补个物品 id」的活，而是一整块子系统：
 
-| 词条 | 缺失的物品 ID | 所属子系统 |
+| 上游文件 | 行数 | 用途 |
 | --- | --- | --- |
-| `maid/gap` | `wireless_io` | 女仆饰品（无线 IO） |
-| `other/broom` | `broom` | 扫帚 |
-| `other/gomoku` | `gomoku` | 棋类与娱乐方块 |
-| `other/maid_joy` | `keyboard`、`bookshelf`、`computer`、`gomoku` | 棋类与娱乐方块 |
-| `other/model_switcher` | `model_switcher` | 模型切换器 |
+| `block/BlockModelSwitcher` | 181 | 方块本体、朝向、`getStateForPlacement` |
+| `tileentity/TileEntityModelSwitcher` | 192 | 存一份女仆 NBT + 全部模型 id 列表 |
+| `item/ItemModelSwitcher` | —— | 方块物品 |
+| `client/gui/block/ModelSwitcherGui` | —— | 左侧女仆预览 + 右侧模型网格 |
+| `client/gui/block/ModelSwitcherModelGui` | —— | 单个模型的详情面板 |
+| `network/message/OpenSwitcherGuiMessage` / `SaveSwitcherDataMessage` | —— | 两个包 |
 
-对应 1 个子系统：**模型切换器**（`model_switcher`）。其余三个
-（棋类与娱乐方块 / 扫帚 / 无线 IO）都已经还原回去了。
+两个界面都建立在 `AbstractModelGui` 之上，而本移植版的那个基类只有**一个**类型参数，
+必须先泛型化成两个参数并接管 `MaidModelDetailsGui`、彩蛋模型与图标缓存，
+才能让「模型切换器」和「换肤界面」共用同一套网格。这一块的动线见 `MaidModelGui`。
+
 
 ## 已经还回去的
 
@@ -67,16 +71,17 @@
   `entity/passive/SchedulePos`（工作 / 娱乐 / 睡觉三坐标），`MaidAreaPacket`
   与 `CheckSchedulePosPacket` 两个新包，以及 `ItemKappaCompass` 的 UI 提示界面。
 
-`maid/gap.json` 仍留在本目录：它讲的是 `wireless_io`（无线 IO 饰品），
-这件物品要等 IO 配置界面一起移植，所以先不还原。
+`maid/gap.json`（无线 IO）与 `other/gomoku.json`（棋类）的副本已经从本目录删掉：
+它们各自引用的物品都已注册，页面早就搬回 `entries/` 了，只留着两份「差一个换行」的
+副本只会让人以为还没还原。
 
 ## 怎么还原
 
 某个子系统移植完成后，把对应文件原样搬回：
 
 ```
-port/book_pages_held_back/other/gomoku.json
-  -> src/main/resources/assets/touhou_little_maid/patchouli_books/memorizable_gensokyo/en_us/entries/other/gomoku.json
+port/book_pages_held_back/other/model_switcher.json
+  -> src/main/resources/assets/touhou_little_maid/patchouli_books/memorizable_gensokyo/en_us/entries/other/model_switcher.json
 ```
 
 不需要改任何其它东西：分类页是自动收录词条的，词条回来自动出现。
