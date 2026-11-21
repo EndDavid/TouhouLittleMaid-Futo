@@ -71,7 +71,7 @@ loom_version=1.15.5
 | 工具链 / Forge 兼容层 | 完成 |
 | 渲染（GeckoLib3 魔改 + 模型包 + 动画） | 完成 |
 | Brain 行为（活动 / 记忆 / 感知器 / 日程） | 完成 |
-| 工作模式 | **20 个**，仅缺 `board_games`（依赖 `EntitySit`） |
+| 工作模式 | **20 个**，与上游 `TaskManager` 的登记表逐项一致（`board_games` 已在其中） |
 | 女仆背包（7 种）+ 物品栏 | 完成 |
 | 主界面 GUI + 左侧任务列表 | 完成 |
 | 顶部三页签（主界面 / 任务设置 / 女仆配置） | 完成（服务端换菜单式切换） |
@@ -1555,7 +1555,10 @@ Y(sleepDirectionToRotation(bedFacing)) → Z(getFlipDegrees() = 90) → Y(270)
 
 ### 帕秋莉手册
 
-- 56 个 `patchouli_books/` JSON 与上游逐字节相同，但 `data/.../book.json` 上游**没有打包**，已补（version 5）。
+- 资源清单：`assets` 侧 58 个 JSON（54 条目 + 3 分类 + 1 模板），`data` 侧 `book.json`（version 5）；
+  `book.json` 上游 jar 里其实**有**打包，早先「上游没有」的结论来自只解包 `assets/` 的提取脚本。
+  条目 = 1.18.2 Forge 的 52 条全集 + 本模组特有的 `other/cchess`、`other/wchess`；
+  `overview/world_spawn` 比 1.20.1 少一页 `replace_allay.png` —— 1.18.2 没有 allay，那一页讲不通。
 - 侧边页签：`MaidSideTabButton` + `AbstractMaidScreen.addSideTabButtons()`，位置
   `leftPos+251 / topPos+37`，图标 UV `(193,111)`。框架在 `maid_gui_side.png` 里其实是
   **两个独立的 21×25 圆角格**（列 107–130 与 132–155，中间第 131 列是空的），所以只画 21×25。
@@ -1565,7 +1568,7 @@ Y(sleepDirectionToRotation(bedFacing)) → Z(getFlipDegrees() = 90) → Y(270)
   一个不存在的物品 ID 直接抛 `JsonParseException` → `BookContents.empty` → 「Loading error!」。
   而 entry 的 `icon` **不是**致命的（`BookIcon#from` 只 warn 并回退成空 `StackIcon`）。
   所以产物未移植的页要用 `port/book_pages_held_back/` 暂存，不能用「图标占位」蒙过去。
-- 当前 **40 条目 / 3 分类**，`port/book_pages_held_back/validate-book.ps1` 校验 0 问题。
+- 当前 **54 条目 / 3 分类**，`port/book_pages_held_back/validate-book.ps1` 校验 0 问题。
   它按帕秋莉的规则静态检查 `spotlight` 物品、词条 / 分类图标、`entity` 页，
   另外还检查祭坛配方的 `recipe_id` 是否存在、`c:` 标签是否真的定义了、
   以及 ingredients / output 里引用的物品与实体 id 是否已注册。

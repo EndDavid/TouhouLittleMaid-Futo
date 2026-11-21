@@ -96,26 +96,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File port/book_pages_held_back/va
 它按帕秋莉的规则静态检查 `spotlight` 物品 / 词条与分类图标 / 分类引用 / entity 页。
 **每还原一页就要跑一次，并同步在 `$registered` 里补上新增的物品 id。**
 
-## 目前手册里保留了什么（40 词条 / 3 分类）
+## 目前手册里保留了什么（54 词条 / 3 分类）
 
-`validate-book.ps1` 的当前输出：`entries=40 categories=3 problems=0`。
+`validate-book.ps1` 的当前输出：`entries=54 categories=3 problems=0`。
 
-- `maid/`：backpack、chat_bubbles、film、item_magnet、last_slot、maid_bauble、maid_base、
-  maid_config、maid_home、maid_meal、maid_skin、maid_sound、maid_task、mute_bauble、
-  naming_eggs、other_backpack、snowball_fight、spawn_maid、substitute_jizo
-- `other/`：camera_and_photo、chair、chair_show、command、extinguisher、favorability_tool、
-  granite_inari_fox、maid_beacon、maid_bed、power_point、shrine
-- `overview/`：download_custom_pack、favorability、gohei_and_danmaku、
-  make_custom_chatbubble_text、make_custom_model、multiblocks_altar、power_point、
-  vanilla_change、what_is_touhou、world_spawn
-
-图标现在是上游原样：`overview/favorability` 用 `favorability_tool_add`
-（好感度工具移植完成后已经能用，不必再用 `minecraft:cake` 占位），
-`categories/other.json` 用 `chair{ModelId:'touhou_little_maid:beach_chair'}`。
+- 54 条全部在 `src/main/resources/assets/touhou_little_maid/patchouli_books/memorizable_gensokyo/`
+  的 `en_us/entries/` 下：1.18.2 Forge 的 52 条全集，另加本模组特有的 `other/cchess`、`other/wchess`
+  （1.18.2 的三张棋盘是三个独立方块，上游 1.20.1 把三张并进 `gomoku` 一页）。
+  本目录（`book_pages_held_back/`）现在**没有任何待还原的 `*.json`**。
+- 图标现在是上游原样：`overview/favorability` 用 `favorability_tool_add`，
+  `categories/other.json` 用 `chair{ModelId:'touhou_little_maid:beach_chair'}`。
 
 ## 祭坛配方的渲染组件（`AltarRecipeComponent`）
 
-上一版这里写的是「仍是占位实现」，现在已经**不是**这个状态了：手册里 28 个
+上一版这里写的是「仍是占位实现」，现在已经**不是**这个状态了：手册里 43 个（41 个不同配方）
 `altar_recipe` 页会画出真实的六个材料槽、灵力消耗、产物槽与产物实体。
 上游有一句特判（「产物实体是 `touhou_little_maid:box` 时改画女仆」），当时
 `EntityBox` 还没移植、这条分支不可达所以没写；盒子移植完成后已经补回。
