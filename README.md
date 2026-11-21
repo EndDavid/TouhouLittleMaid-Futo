@@ -77,7 +77,7 @@ loom_version=1.15.5
 | 顶部三页签（主界面 / 任务设置 / 女仆配置） | 完成（服务端换菜单式切换） |
 | 女仆配置界面（8 项子配置） | 完成 |
 | 任务设置界面（默认提示 / 攻击名单） | 完成 |
-| 饮食系统 | 完成（工作餐 / 回血餐；HOME_MEAL 待野餐垫） |
+| 饮食系统 | 完成（工作餐 / 回血餐 / 家庭餐，三类均已注册） |
 | 配置系统（Forge Config API Port） | 完成，`AIConfig` 待补 |
 | 声音（语音包 / 环境音 / 频率控制） | 完成 |
 | 弹幕攻击 / 御币 / 钓鱼 | 完成 |
@@ -873,8 +873,6 @@ pushPose → setupRotations → scale(-1,-1,1) → scale(k) → translate(0,-1.5
 | 农耕 | `farm` / `sugar_cane` / `melon` / `cocoa` / `grass` / `snow` |
 | 其它 | `extinguishing`（灭火）/ `fishing`（钓鱼） |
 
-未移植：`board_games`（棋类，需要 `EntitySit` 娱乐方块子系统）。
-
 **远程类的走位**用 `MaidRangedWalkToTarget`，**不是**原版的
 `SetWalkTargetFromAttackTargetIfTargetOutOfReach`。后者只在进入近战距离（约 2 格）才停止写
 `WALK_TARGET`，而 `MaidAttackStrafingTask` 的前置条件是 `WALK_TARGET` 必须**不存在** ——
@@ -1307,7 +1305,7 @@ poseStack.mulPose(Vector3f.YP.rotationDegrees((float) time / 10));
 | 文件 | 原因 |
 |---|---|
 | `models/block/maid_bed_{head,foot}.json` | 1.20.1 也只剩 `particle` 字段，几何在 `models/bedrock/block/maid_bed/<颜色>.json`（7 种颜色）。床的渲染器还是 1.18.2 那套原版模型，换上基岩模型要重写渲染器并处理「7 种颜色怎么选」，留到女仆床重做时一起 |
-| `models/bedrock/block/{bookshelf,computer,keyboard,picnic_mat,snack_cabinet,statue_base,cchess,gomoku,wchess}.json` | 对应的方块本身还没移植；文件已一并放进资源目录，等方块移植时直接接上 |
+| `models/bedrock/block/{bookshelf,computer,keyboard,picnic_mat,cchess,gomoku,wchess}.json` | 已在用（键盘 / 书架 / 电脑 / 野餐垫 / 三张棋盘都走基岩管线）。`snack_cabinet`、`statue_base` 是仍未移植的方块 |
 | `sounds.json` / `lang/*.json` | 1.20.1 版会覆盖掉本移植自己加的条目，必须逐键合并而不是整体覆盖 |
 | `textures/entity/**` | 女仆模型走的是模型包（`maid_model.json` + 资源包），不属于方块贴图体系 |
 
@@ -1785,7 +1783,7 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 |---|---|---|---|
 | `WORK_MEAL` | `MaidWorkMealTask` | `Activity.WORK`，priority 7 | 工作时间 + 没睡觉 + Task 允许吃饭 + 工作餐冷却走完 |
 | `HEAL_MEAL` | `MaidHealSelfTask` | `Activity.CORE`，priority 3 | 缺失生命 ≥ 2 + 没睡觉 + Task 允许吃饭 |
-| `HOME_MEAL` | `MaidHomeMealTask` | —— | **未移植**：依赖野餐垫 + POI + `EntitySit` |
+| `HOME_MEAL` | `MaidHomeMealTask` | `tlm_ride_idle`，priority 5 | 坐在野餐垫上（`EntitySit` 的 `OnHomeMeal`）+ 家庭餐冷却走完 |
 
 `HEAL_MEAL` 挂 CORE 而不是 WORK：工作 / 空闲 / 休息三种活动下都会触发。
 
@@ -1999,8 +1997,8 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 
 ## 已知问题
 
-- **未移植的子系统**：`EntitySit` / `EntityChair` 娱乐方块（椅子、野餐垫、连坐棋类都依赖它）、
-  `MaidModelDetailsGui`、图标缓存、彩蛋模型、声音包 GUI。完整清单见上方「进度总览」。
+- **仍未移植**：`MaidModelDetailsGui`（模型切换器界面）、图标缓存、彩蛋模型、声音包 GUI。
+  完整清单见上方「进度总览」。
 - **祭坛配方渲染（`AltarRecipeComponent`）已可用**：28 个 `altar_recipe` 页会画出真实的
   六个材料槽、灵力消耗、产物槽与产物实体。上游那句「产物是盒子时就改画女仆」的特判
   （`InitEntities.BOX` → `InitEntities.MAID`）在盒子移植完成后已经补回。
@@ -2605,18 +2603,20 @@ public interface LivingEntityAccessor {
   于是原版那条 `No data fixer registered for broom` 日志里只有 `broom` 而没有命名空间
   （本移植版其它实体都是 `touhou_little_maid:xxx`）。这里改成全名，日志就一致了。
 ---
-## 手册进度：52 词条 / 3 分类，只剩两页
-`validate-book.ps1` 现在输出 `entries=52 categories=3 problems=0`。
-这一轮还原了两页：`other/maid_joy.json`（键盘/书架/电脑）与 `other/broom.json`。
-还留在 `port/book_pages_held_back/` 的是：
-| 词条 | 缺什么 | 为什么还没还回去 |
-| --- | --- | --- |
-| `other/model_switcher` | `model_switcher` 方块与物品 | 它的模型选择界面 `ModelSwitcherModelGui` 继承 `AbstractModelGui<EntityMaid, MaidModelInfo>`（**两个**类型参数），而本移植版的 `AbstractModelGui` 只有一个；还依赖 `MaidModelDetailsGui`、彩蛋模型 `EASTER_EGG_MODEL` 与图标缓存。这三样都是「女仆皮肤界面」那套基础设施，得先泛型化 `AbstractModelGui` |
-| `other/picnic_basket` | `picnic_basket` 物品 + 5×5 野餐垫 | 自成一个子系统（方块 275 行 + 方块实体 + 容器 + 界面 + 3 个渲染器 + 528 行垫子模型），没有外部阻塞，可直接开工 |
-**所以「手册相关缺失」还不能说全部补完**：一词条被图形基础设施挡住，
-另一词条是自己一大块，两类原因完全不同，不能混成一句「都已补完」。
+## 手册进度：53 词条 / 3 分类，只剩模型切换器
 
----
+判据是 `port/book_pages_held_back/validate-book.ps1` 的输出（它按帕秋莉的失败模式静态检查：
+`spotlight` 物品、词条/分类图标、`entity` 页、`altar_recipe` 的 `recipe_id`、`c:` 标签，
+以及 ingredients / output 里引用的物品与实体 id）：
+
+```
+entries=53 categories=3 problems=0
+```
+
+唯一还扣着的是 `other/model_switcher.json`：它需要 `MaidModelDetailsGui`（模型切换器界面），
+而那个界面要先让 `AbstractModelGui` 泛型化（两个类型参数）并接管彩蛋模型与图标缓存。
+原文件在 `port/book_pages_held_back/other/`，界面做完搬回去即可。
+
 ## 「一放置就崩溃」：渲染器注册丢了，但服务端毫无异常
 ### 现象
 扫帚放下去客户端立刻崩：
@@ -2819,88 +2819,15 @@ public boolean wantsToStopRiding();
 
 ## 扫帚：浮动、碰撞箱，还有那句提示
 
-上一轮解决的是「按什么键下车」，这一轮补的三件事看着不相干，
-其实都来自同一件事：**拿上游 1.20.1 的代码去比 1.18.2 的字节码**。
-三件事是：静止时不浮动、靠近扫帚被反复推开抖动、下车提示里的键名还是「左 Shift」。
+这一节的早期版本把「浮动要怎么写」「抖动为什么发生」当成结论写下来过，
+但后续实测推翻了其中两条（浮动加在 `aiStep` 末尾会晚一个 tick、抖动若只是把箱子改大反而更糟）。
+现在只保留**经实测确认**的部分，推导过程见下一节。
 
-### 1. 静止浮动：上游有一行正弦，本移植版漏了
-
-上游 1.20.1 的 `EntityBroom#tickRidden` 里有这几行：
-
-```java
-// 施加上下晃动
-if (!this.onGround()) {
-    this.addDeltaMovement(new Vec3(0, 0.003 * Math.sin(this.tickCount * Math.PI / 18), 0));
-}
-```
-
-周期 `2*PI / (PI/18)` = **36 tick（1.8 秒）**，峰值只有 0.003 格/tick。
-扫帚 `setNoGravity(true)`，悬空飞行时 `onGround` 为 false，于是这条速度每 tick
-都往 `getDeltaMovement()` 里叠一点；而 `rideControl` 在无输入时是 `scale(0.75)`（快速减速），
-两者叠加成一条稳定的小幅振荡，位移幅度只有几厘米 —— 正好是「看得出来、但不会晃到头晕」的量级。
-
-**1.18.2 没有 `Entity#addDeltaMovement`**（1.19+ 才有），等价写法是
-`setDeltaMovement(getDeltaMovement().add(0, 0.003 * Math.sin(...), 0))`。
-
-更要紧的一点：**1.18.2 的 `LivingEntity` 里根本没有 `tickRidden` 这个方法**。
-这次用 `javap -p` 把 `LivingEntity` 的方法名全列了一遍，确实没有 `tickRidden`，
-`travel` 是在 `aiStep` 内部调的（字节码偏移 721）。所以上游那个
-`@Override protected void tickRidden(Player, Vec3)` 在 1.18.2 无处可挂。
-本移植版本来就是自己覆写 `aiStep()`、再在里头调 `tickRidden(player)`，这行直接加进那个方法即可。
-
-一个刻意的细节：它在 `super.aiStep()` **之后**执行，语义是「先移动、再把浮动速度留给下一 tick」。
-上游的 `tickRidden` 在 `travel` 之前，等价于「先叠加、再移动」，两者只差 1 tick 的相位，
-肉眼分辨不出；不为此去调整 `aiStep` 里的调用顺序，以免把上一轮验证过的朝向 / 俯仰逻辑搅乱。
-
-### 2. 「卡碰撞箱」抖动：真实碰撞箱不能跟着乘客数变
-
-症状是「靠近扫帚时玩家被反复推开、抖动」，像是服务端与客户端在互相纠正位置。
-
-**根因在本移植版自己身上。** 上游 1.20.1 的写法是：
-
-```java
-private AABB physicalBoundingBox = new AABB(Vec3.ZERO, Vec3.ZERO);
-
-@Override
-protected AABB makeBoundingBox() {
-    AABB aabb = super.makeBoundingBox();
-    if (this.getPassengers().size() > 1) {
-        this.physicalBoundingBox = new AABB(... aabb.maxY + 1 ...);   // 只存进字段
-    } else {
-        this.physicalBoundingBox = aabb;
-    }
-    return aabb;                                                      // 真实碰撞箱永远不变
-}
-```
-
-也就是说那口「长高一格」的箱子是**另一个箱子**，只在一处被消费：
-上游的 `EntityMixin` 在 `Entity#move` 调 `collide` 的前后开关 `inPhysicalCheck`，
-再在 `getBoundingBox()` 的 RETURN 上按标志位换箱子 —— **只有解算方块碰撞时**才看得到它。
-
-本移植版最初图省事，直接在 `makeBoundingBox()` 里 `return` 了那个大箱子，
-于是「真实碰撞箱」的高度变成了**乘客数的函数**。而乘客数是同步状态：
-
-- 服务端刚把女仆放上扫帚、客户端还在等 `ClientboundSetPassengersPacket` 的那几 tick；
-- 两端箱子高度差一整格：同一个位置在一端「撞住了」、在另一端「是空的」；
-- 位置包来回纠正 -> 就是那个「卡碰撞箱」的回弹抖动。
-
-更长期的麻烦是：扫帚 `canBeCollidedWith()` 返回 `isAlive()`（上游如此），所以它对玩家是**实心**的；
-女仆上车那一瞬间凭空长出一格高的实心墙，恰好站在那个高度里的玩家会被挤出去 ——
-「靠近扫帚就抖」的另一半原因在这里。
-
-修法：`makeBoundingBox()` 不再覆写，新增 `getPhysicalBoundingBox()`；
-新 mixin `EntityBroomPhysicalBoxMixin` 把 `Entity#collide` 里**取箱子那一次调用**重定向过去。
-
-**为什么不照抄上游的「标志位 + RETURN 注入」**：
-
-- `getBoundingBox()` 是热路径，每个实体每次移动 / 碰撞 / 渲染都调，
-  在 RETURN 上做全局判断等于给全服每个实体每 tick 白加一次 `instanceof`；
-- 单点重定向没有跨方法状态，也就没有「其它模组中途抛异常导致标志位永久为 true」的风险
-  （上游的注释里也提到了这个担忧，只是它靠 `shift = AFTER` 的第二个注入点绕开）。
-
-覆盖范围也核对过 1.18.2 的字节码：`collide` 里 `getBoundingBox()` 只出现一次（偏移 1），
-`Entity#move` 里另一个调用在偏移 990、已经在 `collide`（偏移 132）返回之后，
-所以两种写法的作用范围等价。
+| 项 | 结论 |
+| --- | --- |
+| 静止浮动 | 上游那行 `0.003 * sin(tickCount * PI / 18)` 有效，但必须放在 `travel()` 里、`rideControl()` 之前；写在 `aiStep` 末尾会晚一个 tick |
+| 「长高一格的物理箱」 | 只在 `Entity#collide` 里生效（`EntityBroomPhysicalBoxMixin`），真实 `makeBoundingBox()` 不得随乘客数变化 |
+| 下车提示 | 原版 `mount.onboard` 写死 `options.keyShift`，必须整段接管 `handleSetEntityPassengersPacket` |
 
 ### 3. 那句提示：`mount.onboard` 里的键名是原版写死的
 
@@ -2931,34 +2858,6 @@ this.minecraft.gui.setOverlayMessage(
 而这个 mixin 可能先于 `init()` 被调用（例如还没注册键位就收到了乘客包），
 所以 `getDismountKey()` 允许返回 `null`，调用方遇到 `null` 就**交回原版**（也就是还是老提示），
 而不是 NPE。
-
-### 验证的边界
-
-这三件事里，只有两件能靠字节码证明：
-
-```
-# 扫帚自己的类：makeBoundingBox 的覆写已经消失，浮动那几行确实编译进去了
-javap -p build/classes/java/main/.../EntityBroom.class
-  -> 只有 getPhysicalBoundingBox / tickRidden，没有 makeBoundingBox
-
-# Mixin 导出（JAVA_TOOL_OPTIONS=-Dmixin.debug.export=true gradlew runClient -PjoinServer）
-javap -p -c run/.mixin.out/class/net/minecraft/world/entity/Entity.class
-  1999: invokespecial redirect$...$futo$physicalBoundingBoxForCollide   # collide 里那一次取箱子
-
-javap -p -c run/.mixin.out/class/net/minecraft/client/multiplayer/ClientPacketListener.class
-  -> handler$...$futo$handleSetEntityPassengersPacket 在方法头
-  -> 里面 invokestatic DismountBroomKey.getDismountKey + ldc "mount.onboard"
-```
-
-运行时也跑过一遍：development server 上 summoned 一把带两个女仆乘客的扫帚，
-它带着 `getPhysicalBoundingBox()` 那条「长高一格」的路径从空中落到地面并稳定停住，
-服务端日志无异常、`crash-reports` 为空。
-
-**不能自动验证的部分**：那句提示和浮动都要「真人骑上去」才看得见 ——
-它由 `ClientboundSetPassengersPacket` 触发，而 1.18.2 没有 `/ride` 命令
-（`net/minecraft/server/commands/RideCommand` 在 1.18.2 的 jar 里不存在），
-服务端无法把玩家塞上扫帚。这两条留给你实测：骑上扫帚应该看到「按下 C 来脱离」，
-静止悬停时扫帚应该以约 1.8 秒的周期轻轻上下浮动。
 
 ## 扫帚浮动为什么看着生硬：两端都在算同一条正弦
 
