@@ -20,6 +20,12 @@ import net.minecraft.server.level.ServerPlayer;
  * {@code keySneak → vertical = -0.2f}），这是上游 1.20.1 的设计，
  * 所以下扫帚必须另给一个键。上游给它的是默认 C、可在「控制」里改绑定。</p>
  *
+ * <p><b>光有 C 键还不够：</b>原版 {@code Player#wantsToStopRiding()} 就是
+ * {@code isShiftKeyDown()}，{@code Player#rideTick()} 拿着它每 tick 做「潜行即下车」的判定
+ * —— 于是按住 Shift 的人会先被原版从扫帚上踢下来，下降一次都用不上。
+ * 那条判定由 {@code mixin/PlayerBroomMixin} 在骑扫帚时屏蔽掉，
+ * 两个改动是一组，缺哪个都不成立。</p>
+ *
  * <p>载荷只有一个 byte：上游用 int 是因为它的 {@code DismountMessage} 还想复用来做别的事，
  * 结果到最后只用到 {@link #DISMOUNT_BROOM} 一个动作。</p>
  */
@@ -75,4 +81,3 @@ public final class DismountBroomPacket {
         player.stopRiding();
     }
 }
-

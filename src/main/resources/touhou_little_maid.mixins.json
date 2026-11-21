@@ -9,6 +9,7 @@
     "StructureTemplateAccessor",
     "LivingEntityKillCreditMixin",
     "PlayerPowerMixin",
+    "PlayerBroomMixin",
     "ServerPlayerPowerMixin",
     "NaturalSpawnerMixin",
     "EntityPositionRiderMixin",
