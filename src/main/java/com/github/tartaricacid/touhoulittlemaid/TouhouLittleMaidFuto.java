@@ -27,6 +27,9 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
     public void onInitialize() {
         InitSounds.init();
         InitEntities.init();
+        // 战利品函数：魂符发放时把领取者 UUID 写进物品。普通注册表，顺序不敏感，
+        // 但要在任何战利品表（数据包）被解析之前完成。
+        com.github.tartaricacid.touhoulittlemaid.init.InitLootFunction.init();
         // 方块 / 方块实体必须在物品之前：ItemMaidBeacon 的构造器要读 InitBlocks.MAID_BEACON
         com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.init();
         // 兴趣点必须晚于方块注册（状态集合是从已注册方块枚举出来的）

@@ -12,8 +12,9 @@ import net.minecraft.server.level.ServerPlayer;
  * 这里用 Fabric 的 {@code ServerPlayConnectionEvents.JOIN} —— 它在客户端回完
  * 「准备就绪」之后触发，此时玩家的进度管理器已经就绪，可以安全写入。</p>
  *
- * <p>上游同一处还触发了 {@code GIVE_SMART_SLAB_CONFIG}（灵魂符卡）并同步 AI 设置，
- * 这两块依赖尚未移植的系统，本移植版暂不处理。</p>
+ * <p>上游同一处还触发了 {@code GIVE_SMART_SLAB_CONFIG}（魂符）。本移植版一并补上：
+ * 那条隐藏进度会在玩家第一次登录这个世界时发一个 {@code smart_slab_init}，
+ * 送出过的记录存在玩家档案里，所以只会发一次。AI 设置同步仍未移植。</p>
  */
 public final class EnterServerEvent {
     private EnterServerEvent() {
@@ -22,8 +23,14 @@ public final class EnterServerEvent {
     public static void init() {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayer player = handler.player;
-            if (player != null && InitTrigger.GIVE_PATCHOULI_BOOK_CONFIG != null) {
+            if (player == null) {
+                return;
+            }
+            if (InitTrigger.GIVE_PATCHOULI_BOOK_CONFIG != null) {
                 InitTrigger.GIVE_PATCHOULI_BOOK_CONFIG.trigger(player);
+            }
+            if (InitTrigger.GIVE_SMART_SLAB_CONFIG != null) {
+                InitTrigger.GIVE_SMART_SLAB_CONFIG.trigger(player);
             }
         });
     }

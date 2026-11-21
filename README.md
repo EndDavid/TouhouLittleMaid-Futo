@@ -2628,6 +2628,109 @@ public interface LivingEntityAccessor {
   于是原版那条 `No data fixer registered for broom` 日志里只有 `broom` 而没有命名空间
   （本移植版其它实体都是 `touhou_little_maid:xxx`）。这里改成全名，日志就一致了。
 ---
+## 新生成女仆的随机外观：从 6 个写死的模型到 193 个
+
+上一版 `EntityMaid#finalizeSpawn` 里是一张写死的 `RANDOM_MODEL_IDS`（灵梦 / 魔理沙 / 琪露诺 /
+咲夜 / 芙兰 / 酒狐）。上游不是这么做的：它扫模型包，把「所有可用 model_id」都放进池子，
+刷怪蛋 / 祭坛 / 魂符生成时随机挑一个。
+
+### 上游的数据来源，以及它为什么会失效
+
+上游是 `entity/info/ServerCustomPackLoader` + `ServerMaidModels`：扫描游戏目录下的
+`tlm_custom_pack/`，解析每个包的 `assets/<domain>/maid_model.json`，收集 `model_id`。
+问题在于上游的<b>内置模型是资源包</b>
+（jar 里的 `assets/touhou_little_maid/tlm_custom_pack/touhou_little_maid-1.0.0.zip`），
+而服务端的资源管理器根本不加载 `assets` —— 所以干净专用服务端上这个池子是空的。
+上游自己在 `finalizeSpawn` 里留了一句「这里居然可能为 0」，就是撞上过这件事。
+
+### 本移植版换了数据来源
+
+`entity/info/ServerModelPool` 直接读<b>模组自己的</b> `assets/<domain>/maid_model.json`：
+`FabricLoader#getModContainer` + `ModContainer#findPath` 在开发环境与生产环境都返回真实 NIO 路径，
+于是可以遍历 `assets/` 下每个域，单人 / 专用服务端行为一致。只读 JSON 的 `model_id` 与
+`easter_egg` 两个键（后者非空则跳过，与上游那句 `if (getEasterEgg() == null)` 对应），
+不把 `client.resource.pojo.MaidModelInfo` 拖进服务端。
+
+读不到任何东西时回退到原来那 6 个，保证 `finalizeSpawn` 永远有值可选。
+
+### 实测
+
+```
+[Futo] random model pool: 193 models
+```
+
+193 = `touhou_little_maid` 143 + `touhou_little_maid_old` 34 + `authors_and_credits` 8
++ `geckolib` 4 + `minecraft_15th` 4（彩蛋模型已被排除 1 个）。
+连续 `summon` 六只，读到的 `ModelId` 分别是
+`yasaka_kanako` / `miyadeguchi_mizuchi` / `satsuki_rin` / `horikawa_raiko` /
+`usami_sumireko` / `touhou_little_maid_old:konngara` —— 六个互不相同，而且跨了域。
+
+### 三条生成路径都吃这张表
+
+| 路径 | 走 `finalizeSpawn` 吗 | 结果 |
+| --- | --- | --- |
+| 刷怪蛋 | 是（原版 `SpawnEggItem` → `EntityType#spawn` → `Mob#finalizeSpawn`，dataTag 为空） | 随机 |
+| 祭坛合成 | 是（`AltarRecipe#finalizeSpawn` 传 `SPAWN_EGG` + null dataTag） | 随机 |
+| 魂符 INIT | 是（`ItemSmartSlab#spawnNewMaid` 同样传 null dataTag） | 随机 |
+| `/summon` 带 `ModelId` | dataTag 非空 → 不覆盖 | 指定值 |
+
+
+## 魂符（smart_slab）：首次进服送的那张「已驯服女仆」
+
+上游有这样一个物品：新玩家第一次进世界时会拿到一张魂符，右击地面就能直接放出一只
+已经属于自己、随机外观的女仆 —— 相当于「开局即送」。本移植版之前整块缺失。
+
+### 三件物品，一个类
+
+| 类型 | 物品 id | 右击地面 | 右击女仆 |
+| --- | --- | --- | --- |
+| `INIT` | `smart_slab_init` | 现场生成一只全新女仆并认主 | —— |
+| `EMPTY` | `smart_slab_empty` | —— | 把她收进魂符（实体 `discard`） |
+| `HAS_MAID` | `smart_slab_has_maid` | 把那只女仆放出来 | —— |
+
+用完之后一律换回 `EMPTY` 并给 1 秒冷却。三件共用 `ItemSmartSlab`，
+名字与提示共用 `item.touhou_little_maid.smart_slab` 一条键（上游也是靠 `getDescriptionId()` 这么做的）。
+只有 `INIT` 进创造模式物品栏，另两个是中间态 —— 上游 `InitCreativeTabs` 也只 accept 了 INIT。
+
+### 「只发一次」靠的是进度，不是自己记标志位
+
+上游把赠礼做成一条隐藏进度：`advancements/give_smart_slab.json` 的判据命中后，
+奖励战利品表 `loot_tables/give_smart_slab.json` 给出一个 `smart_slab_init`。
+本移植版照搬，连 Fabric 侧缺的那块也补上了：
+
+- **判据**：`GiveSmartSlabConfigTrigger`，`test` 里读 `MiscConfig.giveSmartSlab()`（`GiveSoulSpell`，默认开）；
+- **战利品函数**：`touhou_little_maid:set_init_maid_owner` —— 上游是 Forge 的
+  `DeferredRegister<LootItemFunctionType>`，1.18.2 直接 `Registry.register(Registry.LOOT_FUNCTION_TYPE, ...)`；
+- **触发点**：`EnterServerEvent` 在 `ServerPlayConnectionEvents.JOIN` 里与「送书」一起敲一下。
+
+好处是<b>持久化天然正确</b>：进度存在 `world/advancements/<uuid>.json` 里，
+送过就不会再送 —— 这正是「按玩家数据文件是否存在判断新玩家」的等价实现，但不用自己碰文件。
+
+实测（`runServer` + RCON）：
+
+```
+首次登录 -> 背包里出现 1 个 smart_slab_init
+          其 NBT InitMaidOwner = [I; 940439953, ...]
+          与 data get entity Dev UUID 逐项相同      （战利品函数生效）
+save-all flush -> world/advancements/<uuid>.json 里出现 touhou_little_maid:give_smart_slab
+重启服务器再登录 -> 背包里仍然是 1 个            （不重复发放）
+```
+
+### 与上游的四处差异
+
+1. **没有 `MaidAndItemTransformEvent`。** 那是给附属模组改数据的 Forge 事件；本移植版没有扩展注册表。
+2. **「收女仆」走 `Item#interactLivingEntity`，不是 `InteractMaidEvent`。** Fabric 1.18.2 本来就有这个钩子，
+   相机 `ItemCamera` 也是这么写的，语义一致且少一层事件。
+3. **数量上限用按需统计。** 上游读玩家 capability，这里与驯服路径共用 `countOwnedMaid`。
+4. **`onEntityItemUpdate` 的「发光 + 无敌 + 不落虚空」没有对应钩子。**
+   防火改用 `Item.Properties#fireResistant()`（与照片、胶片一致）；
+   发光与虚空保护需要每 tick 扫实体，代价与收益不成比例，暂不实现 —— 这一点与 `AbstractStoreMaidItem` 里已有的说明一致。
+
+另外加了一处上游没有的防御：放女仆时主人 UUID 先读 `Owner`（原版 `TamableAnimal` 写的），
+读不到再回退本移植版自己的 `FutoOwner`，两者都没有就当作「不是你的女仆」拒绝。
+宁可拒绝，也不要把别人的女仆放出来。
+
+
 ## 手册进度：53 词条 / 3 分类，只剩模型切换器
 
 判据是 `port/book_pages_held_back/validate-book.ps1` 的输出（它按帕秋莉的失败模式静态检查：

@@ -135,20 +135,9 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             com.github.tartaricacid.touhoulittlemaid.api.client.render.MaidRenderState.ENTITY;
 
     /**
-     * 刷怪蛋 / 结构生成时随机挑选的模型（与 Forge 1.18.2 观感一致：会刷出不同东方角色）。
-     *
- * <p>只收录「模型与动画能对上」的条目：灵梦、魔理沙、琪露诺、咲夜、芙兰朵露，
-     * 以及基岩版模型酒狐。若带 {@code ModelId} 的 dataTag 生成则不会被覆盖。</p>
+     * 当前外观的模型 id（同步数据）。默认值就是兜底模型灵梦，
+     * 真正的随机在 {@code finalizeSpawn} 里由 {@code ServerModelPool} 挑一个写进来。
      */
-    private static final String[] RANDOM_MODEL_IDS = {
-            "touhou_little_maid:hakurei_reimu",
-            "touhou_little_maid:kirisame_marisa",
-            "touhou_little_maid:cirno",
-            "touhou_little_maid:izayoi_sakuya",
-            "touhou_little_maid:flandre_scarlet",
-            "geckolib:winefox"
-    };
-
     private static final EntityDataAccessor<String> DATA_MODEL_ID =
             SynchedEntityData.defineId(EntityMaid.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> DATA_FAVORABILITY =
@@ -1710,9 +1699,15 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                                         MobSpawnType reason, @Nullable SpawnGroupData spawnData,
                                         @Nullable CompoundTag dataTag) {
         this.setPersistenceRequired();
-        // 刷怪蛋 / 结构生成时随机外观，与上游一致；带 dataTag 指定 ModelId 时不覆盖
+        // 刷怪蛋 / 祭坛 / 魂符 / 结构生成时随机外观，与上游一致；带 dataTag 指定 ModelId 时不覆盖。
+        // 池子来自 ServerModelPool（服务端读 jar 内所有 assets/<domain>/maid_model.json），
+        // 不是写死的几个 —— 见那个类的注释。
         if (dataTag == null || !dataTag.contains("ModelId")) {
-            this.setModelId(RANDOM_MODEL_IDS[this.random.nextInt(RANDOM_MODEL_IDS.length)]);
+            String randomId = com.github.tartaricacid.touhoulittlemaid.entity.info.ServerModelPool
+                    .randomId(this.random);
+            if (randomId != null) {
+                this.setModelId(randomId);
+            }
         }
         return super.finalizeSpawn(level, difficulty, reason, spawnData, dataTag);
     }

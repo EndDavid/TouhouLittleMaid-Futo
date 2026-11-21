@@ -119,6 +119,16 @@ public final class MiscConfig {
     }
 
     /**
+     * 首次进入世界时是否送一个魂符（{@code smart_slab_init}）。
+     *
+     * <p>上游配置键是 {@code GiveSoulSpell}，默认开；判据触发器每次登录都会读一次，
+     * 所以同样要走 {@code boolOr} 这个空安全入口。</p>
+     */
+    public static boolean giveSmartSlab() {
+        return boolOr(GIVE_SMART_SLAB, true);
+    }
+
+    /**
      * 是否使用新版女仆妖精模型。
      *
      * <p><b>本移植版暂不生效：</b>新版模型是 {@code simplebedrockmodel} 的 JSON 模型，

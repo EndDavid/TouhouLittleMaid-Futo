@@ -282,6 +282,32 @@ public final class InitItems {
             new com.github.tartaricacid.touhoulittlemaid.item.ItemPicnicBasket(
                     com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.PICNIC_MAT));
 
+    // ------------------------------------------------------------------ 魂符
+
+    /**
+     * 魂符（上游 {@code SMART_SLAB_INIT} / {@code SMART_SLAB_EMPTY} / {@code SMART_SLAB_HAS_MAID}）。
+     *
+     * <p>三件物品共用一个类，靠 {@code ItemSmartSlab.Type} 区分行为：
+     * 初始魂符（首次进服赠送、现场生成一只新女仆）、空魂符（把女仆收进去）、
+     * 存着女仆的魂符（把她放出来）。三者的名字与提示共用 {@code item...smart_slab} 一条键，
+     * 与上游一致 —— 上游也是靠 {@code getDescriptionId()} 把三件都叫「魂符」。</p>
+     */
+    public static final Item SMART_SLAB_INIT = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("smart_slab_init"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemSmartSlab(
+                    com.github.tartaricacid.touhoulittlemaid.item.ItemSmartSlab.Type.INIT));
+
+    public static final Item SMART_SLAB_EMPTY = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("smart_slab_empty"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemSmartSlab(
+                    com.github.tartaricacid.touhoulittlemaid.item.ItemSmartSlab.Type.EMPTY));
+
+    public static final Item SMART_SLAB_HAS_MAID = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("smart_slab_has_maid"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemSmartSlab(
+                    com.github.tartaricacid.touhoulittlemaid.item.ItemSmartSlab.Type.HAS_MAID));
+
+
     // ------------------------------------------------------------------ 残局道具
 
     /**
