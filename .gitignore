@@ -1,28 +1,28 @@
-# ============================================================ 构建产物
+# prompt custom
+.github/copilot-instructions.md
+
+# build artifacts
 build/
 .gradle/
 out/
 bin/
 *.class
 
-# ============================================================ 运行目录
-# run/ 里是世界存档、日志、运行期生成的配置、以及 Gradle 运行时的缓存。
-# 每次测试都会变，而且 run/saves 可能有几百 MB，不入库。
+# run dir
 run/
 
-# ============================================================ 临时文件
-# 我用脚本做批量改写时会在这两个位置留临时文件，不要入库
+# tmps
 tmp_*
 *.tmp
 *.bak
 *.orig
 *.rej
 
-# ============================================================ 日志
+# logs
 *.log
 *.log.gz
 
-# ============================================================ IDE
+# IDE
 # .idea/ 里的 workspace.xml / usage.statistics.xml 每次打开都会变；
 # 只保留能表达项目结构的几份共享配置（见下方 ! 例外）。
 .idea/*
@@ -34,14 +34,13 @@ tmp_*
 *.iml
 !hello\ java.iml
 
-# Eclipse / VSCode
 .classpath
 .project
 .settings/
 .vscode/
 *.code-workspace
 
-# ============================================================ 系统
+# sys
 Thumbs.db
 Desktop.ini
 .DS_Store

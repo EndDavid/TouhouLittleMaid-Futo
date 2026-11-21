@@ -46,8 +46,16 @@
 - 收尾自检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./check-encoding.ps1`，输出必须为 0。
 
 ## 4. 语言
+
 一律用中文回复用户。
 
-
 ## 5. 进程
+
 杀死冒烟测试的进程时请勿误伤其他 java.exe 进程。
+
+## 6. 移植工作
+
+严格参考上游 TLM Forge 1.18.2 与 TLMO Fabric 1.20.1 的代码来进行移植。
+即，移植特性时尽量贴近后者，但主要从前者找代码实现，遇到打不通的接口必须依赖 `ForgeConfigAPIPort` 进行，切勿瞎猜
+
+并且 材质 / 纹理 / 模型 请使用 TLMO Fabric 1.20.1 的。
