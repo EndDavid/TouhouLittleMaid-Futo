@@ -93,8 +93,8 @@ loom_version=1.15.5
 | **帕秋莉手册（书内容 + 侧边页签）** | **完成**（54 条目 / 3 分类） |
 | **搜索 / 定位（小号 / 仆从铃 / 狐狸卷轴 / 河童罗盘）** | **完成**（含 `SchedulePos` 三坐标作息） |
 | **棋类（象棋 / 五子棋 / 国际象棋：各 3×3 多方块 + 对局 AI）** | **完成**（三块棋盘全部可玩） |
-| 骑乘模型倒置 | 未开始（钓鱼改岸钓绕开） |
-| 自定义附魔（滞弹 / 速弹 / 末影之末） | 未开始 |
+| 骑乘模型倒置 | **完成**（钓鱼已回归上游的「坐船 / 坐垫再抛钩」） |
+| 自定义附魔（滞弹 / 速弹 / 末影之末） | **完成**（挂在御币上，效果走弹幕链路） |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
 | **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
 
@@ -930,6 +930,43 @@ pushPose → setupRotations → scale(-1,-1,1) → scale(k) → translate(0,-1.5
   ④ `MAID_RANGED_ATTACK_IGNORE` 名单 → ⑤ 命中。
   ② 是必须的：上游只比 `ownerUUID`，而它可能为 `null`（未驯服 / Owner 丢失）时会漏判。
 - 撞到**没有碰撞体积**的方块不消失；存活 200 tick 后自动消失。
+
+#### 三个自定义附魔
+
+| 附魔 id | 名称 | 等级 | 作用 |
+|---|---|---|---|
+| `impeding` | 阻碍 | I–IV | 命中后施加缓慢，时长 `(20 + level * 10) * 20` tick |
+| `speedy` | 极速 | I–II | 初速 ×`(level + 1)`，即两倍 / 三倍 |
+| `enders_ender` | 末影终结者 | I | 置位 `hurtEnderman`，弹幕能伤末影人 / 末影龙 |
+
+三者都**只作用于御币**：`TaskDanmakuAttack#performRangedAttack` 读等级，
+经 `DanmakuShoot` 传给 `EntityDanmaku`，在 `onHitEntity` 里结算。
+
+**没有 `GOHEI` 附魔分类的原因。** 上游写的是
+`EnchantmentCategory.create("gohei", item -> item instanceof ItemHakureiGohei)`，
+而 `EnchantmentCategory#create` 是 **Forge 给原版类打的补丁**，1.18.2 原版没有。
+而且 `EnchantmentCategory` 是枚举：常量在类初始化时定死，外部既不能新增常量，
+也没法继承它（枚举构造函数是包私有的）。所以改成 TLMO Fabric 1.20.1 的做法 ——
+把三个附魔登记在 `WEAPON` 分类下，各自重写 `canEnchant(ItemStack)` 只认御币。
+
+**最后一块补丁：附魔台。** 原版 `EnchantmentHelper#getAvailableEnchantmentResults`
+读的是 `category.canEnchant(item)`，**不调** `Enchantment#canEnchant`。
+不管的话剑 / 斧也会被列出这三个附魔。`mixin/EnchantmentHelperMixin` 在 `RETURN`
+处只做减法（分类允许但附魔自己不同意的条目剔除），对原版附魔零影响。
+书本特例不受影响（`category.canEnchant(book)` 本来就不成立），村民的附魔书交易照常。
+
+实测（临时 debug 类读的真实返回值，验完已删）：
+
+```
+impeding      reg=touhou_little_maid:impeding      gohei=true  sword=false book=false maxLvl=4
+speedy        reg=touhou_little_maid:speedy        gohei=true  sword=false book=false maxLvl=2
+enders_ender  reg=touhou_little_maid:enders_ender  gohei=true  sword=false book=false maxLvl=1
+lvl=30 sword[tlm=false,n=8] gohei[tlm=false,n=1] book[tlm=true,n=34]
+```
+
+`book[tlm=true]` 说明书本特例确实保留；`gohei[tlm=false]` 是**已知代价** ——
+上游 Forge 因为确有 `GOHEI` 分类，把御币放进附魔台能刷出这三个，这里刷不出来。
+获得途径仍与上游一致：创造栏的附魔书、村民交易、铁砧。
 
 ---
 
@@ -2004,9 +2041,18 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 2 格内有着火的驯服生物。生效内容为移除 5×3×5 内的火焰方块、2 格内生物 `clearFire()`，
 但火免疫的敌对生物反而受伤（每 5 tick 2 点魔法）—— 上游用来对付烈焰人。
 
-钓鱼流程：扫描岸边 → 走到 5 格内 → 抛钩 → 等待（100~600 tick，受饵钓缩短）→
-水花粒子 → 咬钩音效 → 收杆，战利品直接弹到身边，鱼竿 -1 耐久。
-离钩超 16 格或换掉鱼竿立刻收回。
+钓鱼流程（与上游 1.20.1 一致的两段式）：
+
+1. **WORK**：`MaidFindSitTask` 在 16 格内找**船**或**女仆坐垫**，走过去坐下；
+   找不到时冒出气泡 `chat_bubble.touhou_little_maid.inner.fishing.no_sit`。
+2. 坐下后活动自动切到 **RIDE_WORK**（`MaidUpdateActivityFromSchedule`），
+   `MaidRideFindWaterTask` 螺旋扫描水面 → 抛钩 → 等待（100~600 tick，受饵钓缩短）→
+   水花粒子 → 咬钩音效 → 收杆，战利品直接弹到身边，鱼竿 -1 耐久。
+   离钩超 16 格或换掉鱼竿立刻收回。
+
+> 早期版本因为 GeckoLib 管线在「骑乘 + 非人形模型」时把模型上下翻转，绕开成
+> 「岸上直接抛钩」（`MaidFishingCastTask`）。骑乘倒置修好后那个类已删除 ——
+> 两者同时挂在 WORK 会让女仆永远优先岸钓，坐船钓鱼根本不会发生。
 
 ### `feed` 的挑选顺序（HIGH → LOW → LOWEST）
 

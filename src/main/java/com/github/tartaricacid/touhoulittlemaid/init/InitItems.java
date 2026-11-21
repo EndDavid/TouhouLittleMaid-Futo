@@ -35,6 +35,16 @@ public final class InitItems {
                     item.fillItemCategory(tab, defaults);
                 }
                 items.addAll(defaults);
+                // 三个自定义附魔的附魔书（上游 InitCreativeTabs 末尾同样手工补三本书）。
+                // 必须手工补：EnchantedBookItem#fillItemCategory 只枚举「原版书会出现的附魔分类」
+                // （反编译可见它读 CreativeModeTab#getEnchantmentCategories），
+                // 本模组的附魔挂在 WEAPON 之外没有专属分类，靠遍历永远遍历不到。
+                items.add(com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments.createBook(
+                        com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments.IMPEDING));
+                items.add(com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments.createBook(
+                        com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments.SPEEDY));
+                items.add(com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments.createBook(
+                        com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments.ENDERS_ENDER));
             })
             .build();
 

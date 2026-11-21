@@ -35,6 +35,9 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // 兴趣点必须晚于方块注册（状态集合是从已注册方块枚举出来的）
         com.github.tartaricacid.touhoulittlemaid.init.InitPoi.init();
         InitItems.init();
+        // 三个自定义附魔（滞弹 / 速弹 / 末影之末）。它们的 canEnchant 要 instanceof
+        // ItemHakureiGohei，所以必须晚于 InitItems —— 类字面量会在类初始化时解析。
+        com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments.init();
         // 饰品登记表：必须晚于物品注册（它按物品实例建立「物品 → 行为」映射），
         // 但必须早于任何女仆被创建 —— BaubleItemHandler 在读档 / 换物时会查它。
         com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager.init();

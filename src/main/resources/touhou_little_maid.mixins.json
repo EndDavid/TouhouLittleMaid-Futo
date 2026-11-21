@@ -12,6 +12,7 @@
     "PlayerBroomMixin",
     "ServerPlayerPowerMixin",
     "NaturalSpawnerMixin",
+    "EnchantmentHelperMixin",
     "EntityPositionRiderMixin",
     "EntityBroomPhysicalBoxMixin",
     "LivingEntityMaidBedMixin",

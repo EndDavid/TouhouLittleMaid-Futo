@@ -9,6 +9,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidRangedW
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidShootTargetTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.projectile.DanmakuShoot;
+import com.github.tartaricacid.touhoulittlemaid.init.InitEnchantments;
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
 import com.github.tartaricacid.touhoulittlemaid.init.InitSounds;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemHakureiGohei;
@@ -52,14 +53,21 @@ import java.util.function.Predicate;
  *     <tr><td>&gt; 5</td><td>32 发 120° 扇</td><td>{@code attack * (f + 1.5)}</td></tr>
  * </table>
  *
- * <p><b>与上游的差异（都是「依赖未移植内容」）：</b></p>
+ * <p><b>三个自定义附魔</b>（{@code InitEnchantments}）：</p>
  * <ul>
- *     <li>{@code Impeding（滞弹）} / {@code Speedy（速弹）} / {@code EndersEnder（末影之末）}
- *         是本模组的三个自定义附魔，附魔系统尚未移植 → 减速等级恒 0、速度倍率恒 1、
- *         打不到末影人。判定链路已经接好（{@code EntityDanmaku#setImpedingLevel} 等），
- *         接入附魔后只需改这里的取值。</li>
+ *     <li>{@code impeding}（滞弹）→ 弹幕命中后按等级施加缓慢（时长
+ *         {@code (20 + level * 10) * 20} tick，在 {@code EntityDanmaku} 里结算）；</li>
+ *     <li>{@code speedy}（速弹）→ 初速乘 {@code level + 1}，即 I 级两倍、II 级三倍；</li>
+ *     <li>{@code enders_ender}（末影之末）→ 弹幕能伤到末影人 / 末影龙。</li>
+ * </ul>
+ *
+ * <p><b>与上游的差异：</b></p>
+ * <ul>
  *     <li>{@code isWeapon(maid, stack)}（上游 1.20.1 用它做「主手是不是武器」的通用判定）
  *         本移植版的 {@code IAttackTask} 还没有这个方法，因此直接用 {@link #hasGohei}。</li>
+ *     <li>上游在 {@code speed} 之上还叠了一段距离修正
+ *         （{@code += clamp(distance / 40 - 0.4, 0, 2.4)}），不准确度也随距离从 1.0 收到 0.2。
+ *         本移植版目前用固定值，属于既有实现，未在这次改动范围内。</li>
  * </ul>
  */
 public class TaskDanmakuAttack implements IRangedAttackTask {
@@ -152,10 +160,11 @@ public class TaskDanmakuAttack implements IRangedAttackTask {
             if (attackDamage != null) {
                 attackValue = (float) attackDamage.getBaseValue();
             }
-            // 三个自定义附魔未移植，取值恒为 0 / false（见类注释）
-            int impedingLevel = 0;
-            int speedyLevel = 0;
-            boolean hurtEnderman = false;
+            // 三个自定义附魔（滞弹 / 速弹 / 末影之末）的等级，判定与上游 1.20.1 一致：
+            // 都从主手御币的附魔标签里读，缺省 0 / false。
+            int impedingLevel = EnchantmentHelper.getItemEnchantmentLevel(InitEnchantments.IMPEDING, mainHandItem);
+            int speedyLevel = EnchantmentHelper.getItemEnchantmentLevel(InitEnchantments.SPEEDY, mainHandItem);
+            boolean hurtEnderman = EnchantmentHelper.getItemEnchantmentLevel(InitEnchantments.ENDERS_ENDER, mainHandItem) > 0;
             int multiShotLevel = EnchantmentHelper.getItemEnchantmentLevel(Enchantments.MULTISHOT, mainHandItem);
 
             float speed = (0.3F * (distanceFactor + 1)) * (speedyLevel + 1);
