@@ -45,6 +45,18 @@ public final class DismountBroomKey {
     private DismountBroomKey() {
     }
 
+    /**
+     * 供 {@code mixin.client.ClientPacketListenerMixin} 取用：
+     * 上车提示要把原版那句「按潜行键下车」换成「按这个键下车」。
+     *
+     * <p>可能在 {@link #init()} 之前被调用（例如键位还没注册就收到了乘客包），
+     * 所以调用方必须容忍 {@code null} —— 上游直接暴露成 {@code public static final} 字段，
+     * 这里用 getter 只是为了能把这句提醒写在签名旁边。</p>
+     */
+    public static KeyMapping getDismountKey() {
+        return dismountKey;
+    }
+
     public static void init() {
         dismountKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.touhou_little_maid.dismount.desc",

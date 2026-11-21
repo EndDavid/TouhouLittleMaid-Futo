@@ -13,10 +13,12 @@
     "ServerPlayerPowerMixin",
     "NaturalSpawnerMixin",
     "EntityPositionRiderMixin",
+    "EntityBroomPhysicalBoxMixin",
     "LivingEntityMaidBedMixin",
     "LivingEntityAccessor"
   ],
   "client": [
+    "client.ClientPacketListenerMixin",
     "client.LivingEntityBreakItemAccessor",
     "client.HumanoidModelMixin",
     "client.ItemInHandRendererMixin",

@@ -27,6 +27,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
@@ -77,7 +78,6 @@ public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity
             SynchedEntityData.defineId(EntityBroom.class, EntityDataSerializers.OPTIONAL_UUID);
     private static final String OWNER_UUID_TAG = "OwnerUUID";
 
-
     public EntityBroom(EntityType<EntityBroom> entityType, Level worldIn) {
         super(entityType, worldIn);
         this.setNoGravity(true);
@@ -98,21 +98,35 @@ public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity
     }
 
     /**
-     * 两个乘客时把碰撞箱<b>向上长一格</b>（行为对齐上游 1.20.1）。
+     * 「物理碰撞箱」：两个乘客时把碰撞箱<b>向上长一格</b>（对齐上游 1.20.1）。
      *
-     * <p>原因是「人 + 女仆」叠在一起时真实高度远超 0.5625 格。
-     * 碰撞箱不变的话，飞过单格空隙时上半身会直接穿过去。
-     * 和上游一样只影响实体碰撞（{@code physicalBoundingBox}），不影响选框。</p>
+     * <p><b>它只用于方块碰撞，不是实体真正的碰撞箱。</b>调用方是
+     * {@code EntityBroomPhysicalBoxMixin}：它把 {@code Entity#collide(Vec3)} 里取箱子那一次调用
+     * 重定向到这里，所以只有「解算方块碰撞」看得到这个大一号的箱子。</p>
+     *
+     * <p>理由与上游一样：人 + 女仆叠起来真实高度远超 0.5625 格，碰撞箱不变的话，
+     * 飞过单格空隙时上半身会直接穿过去。</p>
+     *
+     * <p><b>为什么不能直接改大 {@code makeBoundingBox()}（本移植版最初就是那么写的）：</b>
+     * 真正的 {@code bb} 会随乘客数变化，而乘客数是<b>同步来的状态</b>。
+     * 服务端刚把女仆放上去、客户端还在等 {@code ClientboundSetPassengersPacket} 的那几 tick，
+     * 两端箱子高度差一整格：同一个位置在服务端「撞住了」、在客户端「是空的」，
+     * 位置包来回纠正，表现就是玩家靠近扫帚时被反复推开、抖动。
+     * 上游 1.20.1 的 {@code physicalBoundingBox} 字段就是为这件事存在的。</p>
+     *
+     * <p><b>为什么不缓存</b>（上游是缓存在字段里的）：{@code Entity} 的构造函数里就会调一次
+     * {@code makeBoundingBox()}，而 Java 的实例字段初始化在父类构造之后才执行，
+     * 缓存字段会被初始化式覆盖成零盒子。这里每次现算：既不依赖初始化顺序，
+     * 也永远跟着最新位置走；只在一段 {@code collide} 里取一次，开销可以忽略。</p>
      */
-    @Override
-    protected net.minecraft.world.phys.AABB makeBoundingBox() {
-        net.minecraft.world.phys.AABB aabb = super.makeBoundingBox();
+    public AABB getPhysicalBoundingBox() {
+        AABB aabb = super.makeBoundingBox();
         if (this.getPassengers().size() > 1) {
-            return new net.minecraft.world.phys.AABB(aabb.minX, aabb.minY, aabb.minZ,
-                    aabb.maxX, aabb.maxY + 1, aabb.maxZ);
+            return new AABB(aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY + 1, aabb.maxZ);
         }
         return aabb;
     }
+
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
@@ -240,6 +254,13 @@ public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity
     protected void tickRidden(Player player) {
         // 记得把 fall distance 清零，否则落地会摔死
         this.fallDistance = 0;
+        // 施加上下晃动（上游 1.20.1 EntityBroom#tickRidden 原样）：
+        // 悬停时速度里叠一条周期 36 tick 的正弦，静止时扫帚就会小幅上下浮动。
+        // 1.18.2 没有 Entity#addDeltaMovement，写成 setDeltaMovement(getDeltaMovement().add(...)) 等价。
+        if (!this.isOnGround()) {
+            this.setDeltaMovement(this.getDeltaMovement()
+                    .add(0, 0.003 * Math.sin(this.tickCount * Math.PI / 18), 0));
+        }
         // 扫帚朝向完全跟着驾驶者：yRotO / yBodyRot / yHeadRot 一起改，否则模型会「拧」一下
         this.yRotO = this.yBodyRot = this.yHeadRot = this.getYRot();
         this.setRot(player.getYRot(), player.getXRot());
