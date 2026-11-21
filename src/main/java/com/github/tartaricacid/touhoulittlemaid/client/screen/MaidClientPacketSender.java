@@ -128,4 +128,16 @@ public final class MaidClientPacketSender {
         buf.writeUtf(modelId, 128);
         ClientPlayNetworking.send(MaidConfigPacket.CHANNEL, buf);
     }
+
+    /**
+     * 切换日程表（白班 / 夜班 / 全天）。载荷是枚举 ordinal。
+     */
+    public static void sendSchedule(com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.MaidSchedule schedule,
+                                    int entityId) {
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeByte(MaidConfigPacket.SCHEDULE);
+        buf.writeInt(entityId);
+        buf.writeEnum(schedule);
+        ClientPlayNetworking.send(MaidConfigPacket.CHANNEL, buf);
+    }
 }

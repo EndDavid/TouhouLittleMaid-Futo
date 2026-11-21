@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.api.event.client.OpenPatchouliBookEvent;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.client.event.PlayerLoggedInNotice;
+import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.ScheduleButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.MaidSideTabButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.MaidTabButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.TaskButton;
@@ -128,6 +129,17 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
     private ImageButton pageDownButton;
     private ImageButton pageCloseButton;
     private ImageButton infoButton;
+
+    /**
+     * 日程表切换按钮（白班 / 夜班 / 全天），位置与上游一致：{@code leftPos+9, topPos+187}。
+     *
+     * <p><b>少了它就只有白班一种作息可用</b> —— 女仆默认 {@code DAY}，
+     * 而玩家没有任何途径改成夜班，于是「白天休息」这条路径永远走不到，
+     * 野餐垫、娱乐方块这些只在 IDLE 里触发的东西也就永远看不到。</p>
+     */
+    @Nullable
+    private ScheduleButton scheduleButton;
+
     /**
      * 右侧侧边栏的「任务手册」按钮（帕秋莉手册入口）。
      *
@@ -241,6 +253,10 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         this.rideButton.initTextureValues(84, 0, 21, 21, BUTTON);
         this.addRenderableWidget(this.rideButton);
         this.lastSyncedRideable = this.maid.isRideable();
+
+        // 日程表（白班 / 夜班 / 全天）：三个开关上方那一格，上游同样是 leftPos+9, topPos+187
+        this.scheduleButton = new ScheduleButton(this.leftPos + 9, this.topPos + 187, this.maid);
+        this.addRenderableWidget(this.scheduleButton);
 
         // 详细信息按钮（蓝色感叹号）。上游 AbstractMaidContainerGui#addStateButton 里的 `info`，
         // 位置与 UV 逐像素一致：leftPos+8, topPos+14，9x9，UV(72,65)，hover 下移 10。
@@ -523,6 +539,11 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
                 this.rideButton.setStateTriggered(rideable);
                 this.lastSyncedRideable = rideable;
             }
+        }
+        if (this.scheduleButton != null) {
+            // 作息没有「本地乐观翻转」的问题：按钮自己记着它显示的档位，
+            // 只有同步值真的变了（本次切换的回包 / 别的玩家改的）才跟着变。
+            this.scheduleButton.syncFromMaid();
         }
     }
 
@@ -928,6 +949,12 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
                 "gui.touhou_little_maid.button.pickup");
         this.renderStateTooltip(this.rideButton, poseStack, mouseX, mouseY,
                 "gui.touhou_little_maid.button.maid_riding_set");
+
+        // 日程表按钮的提示是动态的（当前时刻 + 各时段是否在进行），与上面几个不一样
+        if (this.scheduleButton != null && isMouseOver(this.scheduleButton, mouseX, mouseY)) {
+            this.renderComponentTooltip(poseStack, this.scheduleButton.getTooltips(), mouseX, mouseY);
+            return;
+        }
 
         this.renderWidgetTooltip(this.taskSwitchButton, poseStack, mouseX, mouseY,
                 "gui.touhou_little_maid.task.switch");

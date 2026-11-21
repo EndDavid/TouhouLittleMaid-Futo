@@ -3060,6 +3060,61 @@ public void travel(Vec3 vec3) {
 而浮动只在「有玩家操纵」时才有。这条仍然要你实测：
 现在扫帚静止悬停时应该是一条平滑的正弦，而不是之前那种碎抖。
 
+
+## 日程表按钮：从「只有白班」到能切夜班
+
+上一轮读者实测反馈：女仆界面左下角那块「WORK」下面的横条是空的（1.20.1 那里有一个
+太阳/云的小图），而且**没有任何办法把女仆改成夜班** —— 于是「白天休息」这条路径
+永远走不到，只挂在 IDLE 上的野餐垫、娱乐方块也就永远看不到。
+
+### 缺的是哪一块
+
+作息<b>机制</b>早就移植好了：`MaidSchedule`（DAY / NIGHT / ALL）、
+`InitEntities` 里三张 `ScheduleBuilder`、`MaidBrain#registerSchedule`，
+以及 `EntityMaid#setSchedule`（写同步数据 + `refreshBrain` 重建活动表）。
+**缺的只是「让玩家点得到」这一层**：
+
+| 缺的东西 | 现在补上的位置 |
+| --- | --- |
+| 界面上的按钮 | `client/screen/widget/ScheduleButton`（61x13，`leftPos+9, topPos+187`） |
+| 客户端发包 | `MaidClientPacketSender#sendSchedule` |
+| 动作码与载荷 | `MaidConfigPacket.SCHEDULE = 16`，载荷是 `MaidSchedule` 的枚举 |
+| 服务端处理 | `MaidConfigPacket#handleSchedule` |
+
+贴图不用改：`maid_gui_button.png` 与 1.20.1 的那份**逐字节相同**，
+`(82, 43 + 14 * ordinal)` 三个 61x13 状态图都在（解码后实测 793/793、780/793、793/793
+个不透明像素），所以按钮自己带着「白班 / 夜班 / 全天」的图案，不需要另外画文字。
+
+### 服务端那四步，少一步就有怪现象
+
+`handleSchedule` 与上游 `MaidConfigMessage#handle` 里那一段逐句对应：
+
+1. `setSchedule` —— 写 `SynchedEntityData` 并 `refreshBrain`（作息换了，活动表也要换）；
+2. `getSchedulePos().restrictTo(maid)` —— 把活动范围挪到新作息对应的点；
+3. 开着居家模式时给她一个走过去的目标，否则她会杵到下一次日程刷新；
+4. 触发 `switch_schedule` 判据。
+
+第 2 步是最容易漏的：只改 `MaidSchedule` 不动 `SchedulePos`，
+活动范围仍按旧作息算 —— 表现为「切了夜班，白天照样在外面干活」。
+
+### 三张作息表（供对照实测）
+
+| 模式 | 06:00-14:00 | 14:00-18:00 | 18:00-22:00 | 22:00-06:00 |
+| --- | --- | --- | --- | --- |
+| 白班 DAY | 工作 | 工作 | 娱乐 | 睡觉 |
+| 夜班 NIGHT | 睡觉 | 娱乐 | 工作 | 工作 |
+| 全天 ALL | 工作 | 工作 | 工作 | 工作 |
+
+所以**白天想测 IDLE，切夜班再把时间调到 14:00~18:00**（`/time set 9000`）即可，
+不必等到晚上。
+
+### 验证边界
+
+编译通过、按钮已接进 `AbstractMaidScreen#init`（`syncButtonState` 里跟同步值，
+`renderButtonTooltips` 里给动态提示：当前时刻 + 各时段是否在进行）。
+**点击本身没法自动验证** —— 需要真人开女仆界面点一下，看三件事：
+按钮显示当前作息、点一下轮转、女仆的活动范围随之改变。
+
 ## 野餐篮与野餐垫：一个物品，三种身份
 
 第六个「野餐与娱乐」子系统。野餐篮在原模组里同时是**方块物品 / 9 格容器 / tooltip 组件**，

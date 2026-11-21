@@ -1,7 +1,10 @@
 package com.github.tartaricacid.touhoulittlemaid.network;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType;
+import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
 import com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig;
+import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.MaidSchedule;
 import com.github.tartaricacid.touhoulittlemaid.entity.data.AttackListData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidSubConfig;
@@ -13,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.network.chat.TranslatableComponent;
 
@@ -115,6 +119,15 @@ public final class MaidConfigPacket {
     public static final byte MODEL = 15;
 
     /**
+     * 切换日程表（白班 / 夜班 / 全天）。
+     *
+     * <p>上游把它塞在 {@code MaidConfigMessage} 里，与 home / pick / ride 一起发；
+     * 本移植版每个开关各占一个动作码，所以单开一个。
+     * 载荷是一个枚举 ordinal（见 {@link MaidSchedule}），不是布尔。</p>
+     */
+    public static final byte SCHEDULE = 16;
+
+    /**
      * 开启居家模式时，女仆距离她记录的作息点允许的最大距离（格）。
      *
      * <p>与上游 {@code MaidConfigMessage#handleHome} 里的 {@code 32 * 32} 一致。
@@ -168,6 +181,10 @@ public final class MaidConfigPacket {
                         case RIDEABLE -> {
                             boolean value = buf.readBoolean();
                             server.execute(() -> handleRideable(player, value, entityId));
+                        }
+                        case SCHEDULE -> {
+                            MaidSchedule schedule = buf.readEnum(MaidSchedule.class);
+                            server.execute(() -> handleSchedule(player, schedule, entityId));
                         }
                         default -> {
                             boolean value = buf.readBoolean();
@@ -408,6 +425,37 @@ public final class MaidConfigPacket {
         if (!value && maid.getVehicle() != null) {
             maid.stopRiding();
         }
+    }
+
+    /**
+     * 切换日程表，逻辑对齐上游 {@code MaidConfigMessage#handle} 里那一段。
+     *
+     * <p>四件事，缺一不可：</p>
+     * <ol>
+     *     <li>{@code setSchedule} —— 写同步数据并<b>重建大脑</b>（作息表换了，活动表也要换）；</li>
+     *     <li>{@code getSchedulePos().restrictTo} —— 把活动范围挪到新作息对应的那个点；</li>
+     *     <li>开着居家模式时给她一个走过去的目标，否则她会站在原地直到下一次日程刷新；</li>
+     *     <li>触发 {@code switch_schedule} 进度判据。</li>
+     * </ol>
+     *
+     * <p>第 2 步是本移植版最容易漏的一点：只改 {@code MaidSchedule} 而不动
+     * {@code SchedulePos}，女仆的活动范围还是按旧作息算的，表现为
+     * 「切了夜班但白天照样在外面干活」。</p>
+     */
+    private static void handleSchedule(ServerPlayer player, MaidSchedule schedule, int entityId) {
+        EntityMaid maid = findOwnedMaid(player, entityId);
+        if (maid == null) {
+            return;
+        }
+        if (maid.getSchedule() == schedule) {
+            return;
+        }
+        maid.setSchedule(schedule);
+        maid.getSchedulePos().restrictTo(maid);
+        if (maid.isHomeModeEnable()) {
+            BehaviorUtils.setWalkAndLookTargetMemories(maid, maid.getRestrictCenter(), 0.7f, 3);
+        }
+        InitTrigger.MAID_EVENT.trigger(player, TriggerType.SWITCH_SCHEDULE);
     }
 }
 
