@@ -124,9 +124,22 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
     }
 
     private boolean posCheck(EntityMaid maid) {
-        int distanceSqr = this.searchRange * this.searchRange;
-        Vec3 waterVec = new Vec3(this.waterPos.getX(), this.waterPos.getY(), this.waterPos.getZ());
-        return maid.distanceToSqr(waterVec) < distanceSqr && maid.isWithinRestriction(this.waterPos);
+        // 注意这里**不能**直接用 searchRange 的平方当阈值。
+        //
+        // searchForDestination 是按「整数方块偏移」搜的：x/z 覆盖 [-(searchRange-1), searchRange-1]，
+        // y 覆盖 [-(1), verticalSearchRange-1]，折成平方距离最大可达
+        // (searchRange-1)² + verticalSearchRange² + (searchRange-1)²，明显大于 searchRange²。
+        // 再用 searchRange² 去判「水还在不在范围内」，就会出现
+        // 「刚搜到的水立刻被判失效 → waterPos 清空 → 下一次又搜到同一片水」的死循环，
+        // 表现为女仆站在水边一动不动、永远不抛钩（日志里是
+        // "water at ... is out of range or restriction" 反复出现）。
+        //
+        // 改用「方块中心」+ 放宽 2 格：既覆盖搜索范围的全部可能性，又容忍
+        // 女仆站在方块角落（浮点位置最多比方块坐标远 √3 格）带来的误差。
+        double maxDistance = this.searchRange + 2.0;
+        Vec3 waterVec = Vec3.atCenterOf(this.waterPos);
+        return maid.distanceToSqr(waterVec) < maxDistance * maxDistance
+                && maid.isWithinRestriction(this.waterPos);
     }
 
     /**

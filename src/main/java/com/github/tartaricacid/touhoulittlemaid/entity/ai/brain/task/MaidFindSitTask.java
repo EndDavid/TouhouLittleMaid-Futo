@@ -47,14 +47,25 @@ public class MaidFindSitTask extends MaidCheckRateTask {
     @Override
     protected void start(ServerLevel worldIn, EntityMaid maid, long gameTimeIn) {
         this.sitEntity = null;
-        this.findSitEntity(maid).ifPresent(entity -> {
+        Optional<Entity> found = this.findSitEntity(maid);
+        if (found.isEmpty()) {
+            // 诊断：找不到坐具时是完全静默的，玩家只会看到「女仆站在水边不动」。
+            // 这里只在「状态变化」时打一条，避免这个行为每 60 tick 刷屏。
+            MaidFishingDiagnostics.reportSit(maid, null, "no boat or cushion within " + SIT_SEARCH_RADIUS);
+        }
+        found.ifPresent(entity -> {
             this.sitEntity = entity;
             BehaviorUtils.setWalkAndLookTargetMemories(maid, this.sitEntity, this.speedModifier, 0);
         });
 
         if (this.sitEntity != null && this.sitEntity.isAlive() && this.sitEntity.closerThan(maid, 2)) {
             if (this.sitEntity.getPassengers().isEmpty()) {
-                maid.startRiding(this.sitEntity, true);
+                boolean riding = maid.startRiding(this.sitEntity, true);
+                // 诊断：走到坐具旁边却骑不上（例如 showVehicle 为 false、或被别的实体占位）
+                // 会表现为「她就站在船边上站着」。startRiding 的返回值是唯一的判据。
+                MaidFishingDiagnostics.reportSit(maid, this.sitEntity, riding ? "mounted" : "startRiding refused");
+            } else {
+                MaidFishingDiagnostics.reportSit(maid, this.sitEntity, "seat already occupied");
             }
             this.sitEntity = null;
         }

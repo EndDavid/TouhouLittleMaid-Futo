@@ -2095,6 +2095,46 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 （区块卸载、`/kill`、客户端侧先移除），引用会永久残留 —— 表现为「坐进船里以后再也不抛钩」，
 换任务 / 下车 / 重上船都救不回来，只有重进存档才行。现在每次尝试启动时若发现钩子已
 `!isAlive()` 就顺手清掉，代价只有一次 `isAlive()` 调用。
+#### 「站得远了就永远不抛钩」：`posCheck` 与搜索的语义不一致（已修）
+
+日志里最典型的形态是这样，而且它**每 5 tick 重复一次**、永远不会变成 `cast at`：
+
+```
+[Futo] ride ... isWork=true task=touhou_little_maid:fishing mainHand=1 fishing_rod
+[Futo] fishing ... at=BlockPos{x=4, y=101, z=2} -> water at BlockPos{x=-1, y=100, z=-1} is out of range or restriction
+```
+
+原因在 `searchForDestination` 与 `posCheck` 用的**不是同一种距离**：
+
+| | 依据 | 覆盖范围 |
+|---|---|---|
+| 搜索 | `BlockPos` 的整数偏移 `setWithOffset(centre, x, y-1, z)`，`i < searchRange` | x/z 可达 5 、y 可达 -1…+2 |
+| 判定 | `maid.distanceToSqr(new Vec3(水块最小角))`，阈值 searchRange * searchRange = 36 | 浮点，且**从方块角落算** |
+
+两者不等价：女仆站在方块角落（浮点坐标 x.5）时，偏 5 格、y 偏 1 的水块
+折成浮点平方距离可以到 43+。于是**刚搜到的水立刻被判「超出范围」→ `waterPos` 清空 →
+下一轮又搜到同一片水**，死循环。上游没暴露这个问题是因为它总在船上、船紧贴水边；
+本移植版的船放在草地上时就会稳定复现，而且玩家只能看到「她坐在船里一动不动」。
+
+修法是让判定与搜索同一语义：改用 `Vec3.atCenterOf(waterPos)`（方块中心，而不是角落），
+阈值放宽到 `(searchRange + 2) * (searchRange + 2)²`（覆盖上面那张表的全部可能，并容忍浮点误差）。
+自测：女仆距船 11 格、水在搜索半径边缘时，修复前永远 `out of range`，修复后正常 `cast at` 且鱼钩持续存活。
+
+#### 客户端看不到浮标的三处「一票否决」（已修）
+
+`MaidFishingHook` 继承的是 `Entity` 而不是 `Projectile`（1.18.2 的 `Projectile` 构造函数是包私有的），
+所以 owner 要自己维护。早期实现里有三处「拿不到 owner 就自我了断」，任何一处触发都是
+**服务端日志照写 `cast at`、客户端什么都看不到**：
+
+1. `tick()` 里 `maid == null` 就 `discard()`（上游继承 `Projectile`，不会走到这条分支）；
+2. `recreateFromPacket` 里 owner 解析失败就 `kill()`；
+3. `MaidFishingHookRenderer#render` 里 `maid == null` 就 `return`（连浮标都不画）。
+
+现在分别是：客户端不丢弃自己、只记一条 warn、渲染器**永远画浮标**（鱼线依赖女仆手部坐标，
+拿不到就跳过）。这样即使 owner 解析失败，玩家至少能看见抛出去的钩子。
+
+顺带确认过 `ClientboundAddEntityPacket(Entity, int)` 的第二个参数确实写进 `data` 字段
+（`javap -c` 里 `iload_2` 直接进构造器），与 `Projectile#recreateFromPacket` 的 `getData()` 对得上。
 
 **鱼钩要求她仍然坐着。** `MaidFishingHook#shouldStopFishing` 恢复成上游的五个条件
 （活着 / 仍在骑乘 / 任务是钓鱼 / 主手是鱼竿 / 距离 < 16 格）。

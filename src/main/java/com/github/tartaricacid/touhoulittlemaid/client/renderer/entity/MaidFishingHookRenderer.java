@@ -38,13 +38,18 @@ public class MaidFishingHookRenderer<T extends MaidFishingHook> extends EntityRe
     @Override
     public void render(T fishingHook, float entityYaw, float partialTicks, PoseStack poseStack,
                        MultiBufferSource buffer, int packedLight) {
-        EntityMaid maid = fishingHook.getMaidOwner();
-        if (maid == null) {
-            return;
-        }
         poseStack.pushPose();
+        // 浮标**永远**画，即使拿不到女仆。
+        //
+        // 早期这里在 maid == null 时直接 return —— 而客户端拿不到 owner 的情况是可能发生的
+        // （add entity 包里的 owner id 在客户端尚未解析出来时会为 null）。
+        // 那时服务端日志照常打 "cast at ..."，玩家却完全看不到浮标，
+        // 排查起来就像「鱼钩根本没生成」。鱼线依赖女仆手部坐标，拿不到就跳过。
         this.renderBobber(poseStack, buffer, packedLight);
-        this.renderFishingLine(fishingHook, partialTicks, poseStack, buffer, maid);
+        EntityMaid maid = fishingHook.getMaidOwner();
+        if (maid != null) {
+            this.renderFishingLine(fishingHook, partialTicks, poseStack, buffer, maid);
+        }
         poseStack.popPose();
         super.render(fishingHook, entityYaw, partialTicks, poseStack, buffer, packedLight);
     }
@@ -148,4 +153,3 @@ public class MaidFishingHookRenderer<T extends MaidFishingHook> extends EntityRe
         return TEXTURE_LOCATION;
     }
 }
-

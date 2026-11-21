@@ -136,7 +136,16 @@ public class MaidFishingHook extends Entity {
         super.tick();
         EntityMaid maid = this.getMaidOwner();
         if (maid == null) {
-            this.discard();
+            // 客户端找不到 owner 时**不要**丢弃自己。
+            //
+            // 早期这里无条件 discard()（照抄上游，上游因为继承 Projectile、owner 一定被
+            // Projectile#recreateFromPacket 还原，所以不会走到这条分支）。本移植版的
+            // owner 是自己维护的，客户端一旦没解析成功就自我了断 —— 于是水面上的浮标
+            // 一次都看不见，而服务端日志仍会照常打 "cast at ..."。
+            // 现在只在服务端丢弃；客户端留着一个没有鱼线的浮标，至少玩家能看到抛出去的钩。
+            if (!this.level.isClientSide) {
+                this.discard();
+            }
         } else if (this.level.isClientSide || !this.shouldStopFishing(maid)) {
             if (this.lifeTick()) {
                 return;
@@ -555,15 +564,18 @@ public class MaidFishingHook extends Entity {
         super.recreateFromPacket(packet);
         // 关键：Entity#recreateFromPacket 不会恢复 owner（那是 Projectile 自己做的）。
         // 我们的 getAddEntityPacket 把 owner 的实体 id 放进了 packet.getData()，
-        // 这里必须手工还原，否则客户端 getMaidOwner() 恒为 null，
-        // 渲染器直接 return（看不到浮漂和鱼线），tick 里还会立刻 discard。
+        // 这里必须手工还原，否则客户端 getMaidOwner() 恒为 null。
         this.owner = this.level.getEntity(packet.getData());
         if (this.getMaidOwner() == null) {
-            int dataId = packet.getData();
-            TouhouLittleMaid.LOGGER.error(
-                    "Failed to recreate fishing hook on client. {} (id: {}) is not a valid owner.",
-                    this.level.getEntity(dataId), dataId);
-            this.kill();
+            // 不要在这里 kill()。
+            //
+            // 早期这里直接 kill 掉自己 —— 那是一票否决：客户端一旦没拿到 owner，
+            // 浮标就一次都不会画出来，而服务端日志仍然照常打 "cast at ..."，
+            // 现象就是「女仆明明抛钩了，玩家什么都看不到」，且没有任何崩溃可查。
+            // 现在只记一条 warn，让渲染器退化成「只画浮标、不画鱼线」。
+            TouhouLittleMaid.LOGGER.warn(
+                    "Fishing hook has no maid owner on client (data id {}). "
+                            + "Rendering the bobber without a fishing line.", packet.getData());
         }
     }
 
