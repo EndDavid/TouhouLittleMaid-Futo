@@ -3,7 +3,7 @@
 > **不要整份读 `README.md`**（3400+ 行，光读一遍就几十万 token）。需要细节时按小节
 > `grep -n "^### " README.md` 找到行号，再 `sed -n 'A,Bp' README.md` 取那一段。
 ---
-## 1. 当前状态：模型切换器已落地并提交
+## 1. 当前状态：模型切换器 / 帕秋莉手册 / 三个附魔 / 坐船钓鱼 均已提交
 上游对应 `block/BlockModelSwitcher`、`tileentity/TileEntityModelSwitcher`、
 `item/ItemModelSwitcher`、两个 Screen、两个数据包。手册条目 `other/model_switcher` 已搬回，
 `entries` 由 53 变 54 —— 帕秋莉手册**全部补齐**。
@@ -17,6 +17,26 @@
 | `runServer` + RCON | 红石切换 / 边沿 / 回绕 / 空列表 / 拆方块掉物品，全部断言通过 |
 | `runClient` 到主菜单 | 无 `Missing model` / `missing texture`，`crash-reports` 为空 |
 详细结论写在 README 文末「模型切换器」一节，**不要重新推导**。
+
+### 之后又完成的两块（都在 `main` 上）
+- **帕秋莉手册封板**：54 条目 / 3 分类，条目集 = 1.18.2 Forge 的 52 条全集 + 本模组特有的
+  `other/cchess`、`other/wchess`。语言键 153 个，`en_us` 与 `zh_cn` 完全一致；
+  43 个 `altar_recipe` 页（41 个配方）与 4 个 `crafting` 页引用的配方全部存在；
+  手册贴图 18 处引用全部命中。与 1.20.1 的差异只剩三处**有意为之**（棋盘分页、
+  `world_spawn` 缺 allay 页、多一条 `make_custom_chatbubble_text`）。
+- **三个御币附魔**（`impeding` / `speedy` / `enders_ender`）：登记在 `WEAPON` 分类下并
+  各自重写 `canEnchant` 只认御币（`EnchantmentCategory#create` 是 Forge 补丁，枚举无法扩展）。
+  另加 `mixin/EnchantmentHelperMixin`：原版附魔台候选列表只读 `category.canEnchant`，
+  该 mixin 在 `RETURN` 处剔掉「附魔自己不同意」的条目。实测 `sword[tlm=false]`、
+  `book[tlm=true]`（书本特例保留 → 村民交易照常）；代价是御币放进附魔台刷不出来。
+- **坐船钓鱼**：`TaskFishing#createBrainTasks` 改回上游的 `MaidFindSitTask`，
+  抛钩仍在 RIDE_WORK；临时的 `MaidFishingCastTask`（岸钓绕行）已删除。
+
+### 仍然要真人验证的
+1. 模型切换器界面（见下一小节）。
+2. 附魔的实际效果：给御币附上三个附魔，看弹幕是否变快 / 命中是否施加缓慢 / 能否打末影人。
+   无玩家的空服上女仆 brain 不 tick（`Brain.memories` 恒为空），所以这部分只能客户端验。
+3. 钓鱼：放一条船在水边，`/tlm task <maid> fishing`，看她是「坐进船 → 抛钩」还是站在岸边发呆。
 ### 还没做的一件事
 **界面的人工实测。** 需要真人：右击方块开界面 → 加 / 删 / 排序模式 → 选模型与朝向 →
 关界面后红石脉冲仍能切换；以及「手持物品右击女仆」把 tooltip 从「未绑定」变成「已绑定」。
