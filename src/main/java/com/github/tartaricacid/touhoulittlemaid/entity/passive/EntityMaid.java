@@ -1986,10 +1986,15 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             }
         }
         if (tag.contains("MaidScheduleMode")) {
+            // 必须走 setSchedule，不能直接写 entityData：
+            // 大脑是在 Mob 的构造函数里按「默认 DAY」建好的（Mob#makeBrain 早于读档），
+            // 只改同步数据不会重建活动表 —— 于是读档后 GUI 显示「夜班」、
+            // 大脑却仍按白班跑（白天照常干活、晚上才去坐着）。
+            // 上游 readAdditionalSaveData 里同样是 setSchedule(...)，它内部会 refreshBrain。
             try {
-                this.entityData.set(SCHEDULE_MODE, MaidSchedule.valueOf(tag.getString("MaidScheduleMode")));
+                this.setSchedule(MaidSchedule.valueOf(tag.getString("MaidScheduleMode")));
             } catch (IllegalArgumentException ignored) {
-                this.entityData.set(SCHEDULE_MODE, MaidSchedule.DAY);
+                this.setSchedule(MaidSchedule.DAY);
             }
         }
         this.setHomeModeEnable(tag.getBoolean("HomeModeEnable"));
