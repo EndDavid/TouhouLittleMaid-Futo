@@ -66,15 +66,16 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
 
     @Override
     protected void start(ServerLevel worldIn, EntityMaid maid, long gameTimeIn) {
-        ItemStack mainHandItem = maid.getMainHandItem();
-        this.fishingType = FishingTypeManager.getFishingType(mainHandItem);
+        ItemStack rod = com.github.tartaricacid.touhoulittlemaid.util.FishingRodUtil.getRod(maid);
+        this.fishingType = FishingTypeManager.getFishingType(rod);
 
-        if (!this.fishingType.isFishingRod(mainHandItem)) {
-            this.report(maid, STATE_NO_ROD, "main hand is not a fishing rod: " + mainHandItem);
+        if (!this.fishingType.isFishingRod(rod)) {
+            this.report(maid, STATE_NO_ROD, "neither hand has a fishing rod: main="
+                                            + maid.getMainHandItem() + " off=" + maid.getOffhandItem());
             return;
         }
         if (this.waterPos == null) {
-            this.searchForDestination(worldIn, maid, mainHandItem);
+            this.searchForDestination(worldIn, maid, rod);
             if (this.waterPos == null) {
                 this.report(maid, STATE_NO_WATER, "no water within " + this.searchRange + " blocks");
             }
@@ -85,9 +86,9 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
             this.waterPos = null;
             return;
         }
-        if (this.fishingType.suitableFishingHook(maid, worldIn, mainHandItem, this.waterPos)) {
+        if (this.fishingType.suitableFishingHook(maid, worldIn, rod, this.waterPos)) {
             Vec3 centerPos = Vec3.atCenterOf(this.waterPos);
-            MaidFishingHook fishingHook = this.fishingType.getFishingHook(maid, worldIn, mainHandItem, centerPos);
+            MaidFishingHook fishingHook = this.fishingType.getFishingHook(maid, worldIn, rod, centerPos);
             worldIn.addFreshEntity(fishingHook);
             worldIn.playSound(null, maid.getX(), maid.getY(), maid.getZ(),
                     SoundEvents.FISHING_BOBBER_THROW, SoundSource.NEUTRAL, 0.5F,

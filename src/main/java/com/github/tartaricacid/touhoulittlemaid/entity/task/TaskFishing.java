@@ -11,7 +11,6 @@ import com.mojang.datafixers.util.Pair;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.ai.behavior.Behavior;
-import net.minecraft.world.item.FishingRodItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.Nullable;
@@ -72,8 +71,9 @@ public class TaskFishing implements IMaidTask {
 
     @Override
     public List<Pair<String, Predicate<EntityMaid>>> getConditionDescription(EntityMaid maid) {
+        // 主手或副手都认（上游只看主手，见 FishingRodUtil 的说明）。
         return Collections.singletonList(
-                Pair.of("has_fishing_rod", e -> e.getMainHandItem().getItem() instanceof FishingRodItem));
+                Pair.of("has_fishing_rod", com.github.tartaricacid.touhoulittlemaid.util.FishingRodUtil::hasRod));
     }
 
     @Override

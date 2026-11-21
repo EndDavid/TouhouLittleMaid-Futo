@@ -24,7 +24,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.FishingRodItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -359,10 +358,19 @@ public class MaidFishingHook extends Entity {
         EntityMaid maid = this.getMaidOwner();
         int retrieveTime = Mth.nextInt(this.random, 2, 10);
         if (this.nibble <= retrieveTime && maid != null) {
-            ItemStack rodItem = maid.getMainHandItem();
+            // 扣耐久必须扣「真是在钓的那只手」：主手优先、副手兜底。
+            // 早期固定用主手，于是「副手拿竿钓鱼」时会出现「鱼竿不损耗」或
+            // 「扣了主手别的东西的耐久」。
+            InteractionHand rodHand = com.github.tartaricacid.touhoulittlemaid.util.FishingRodUtil.getRodHand(maid);
+            if (rodHand == null) {
+                // 钓到一半把竿收了：直接收线，不要拿空手去结算。
+                this.discard();
+                return;
+            }
+            ItemStack rodItem = maid.getItemInHand(rodHand);
             int rodDamage = this.retrieve(rodItem);
-            this.hurtRod(maid, rodItem, rodDamage);
-            maid.swing(InteractionHand.MAIN_HAND);
+            this.hurtRod(maid, rodItem, rodDamage, rodHand);
+            maid.swing(rodHand);
             level.playSound(null, maid.getX(), maid.getY(), maid.getZ(),
                     SoundEvents.FISHING_BOBBER_RETRIEVE, SoundSource.NEUTRAL, 1.0F,
                     0.4F / (level.getRandom().nextFloat() * 0.4F + 0.8F));
@@ -425,8 +433,8 @@ public class MaidFishingHook extends Entity {
     protected void afterFishing() {
     }
 
-    protected void hurtRod(EntityMaid maid, ItemStack rodItem, int rodDamage) {
-        rodItem.hurtAndBreak(rodDamage, maid, m -> m.broadcastBreakEvent(InteractionHand.MAIN_HAND));
+    protected void hurtRod(EntityMaid maid, ItemStack rodItem, int rodDamage, InteractionHand rodHand) {
+        rodItem.hurtAndBreak(rodDamage, maid, m -> m.broadcastBreakEvent(rodHand));
     }
 
     private boolean calculateOpenWater(BlockPos pos) {
@@ -520,12 +528,14 @@ public class MaidFishingHook extends Entity {
     /**
      * 是否应该立刻收线。
      *
-     * <p>四个条件缺一不可（与原版 {@code FishingHook#shouldStopFishing} 一致）：
-     * 女仆还活着、仍然骑着东西、任务仍是钓鱼、主手仍是鱼竿、且距离不超过 16 格。</p>
+     * <p>五个条件缺一不可（与原版 {@code FishingHook#shouldStopFishing} 一致）：
+     * 女仆还活着、仍然骑着东西、任务仍是钓鱼、<b>手上仍有鱼竿</b>、且距离不超过 16 格。</p>
+     *
+     * <p>「手上」指主手或副手 —— 上游只看主手，但那会让「副手拿竿」的玩家看到
+     * 钩子刚抛出去就被收回。见 {@code FishingRodUtil}。</p>
      */
     private boolean shouldStopFishing(EntityMaid maid) {
-        ItemStack mainHandItem = maid.getMainHandItem();
-        boolean hasFishingRod = mainHandItem.getItem() instanceof FishingRodItem;
+        boolean hasFishingRod = com.github.tartaricacid.touhoulittlemaid.util.FishingRodUtil.hasRod(maid);
         boolean isFishingTask = maid.getTask() instanceof TaskFishing;
         // 与上游 1.20.1 一致：还要求女仆仍然坐在船 / 坐垫上。
         // 早期版本因为「骑乘 + 非人形模型上下翻转」改成岸钓，这里把 hasVehicle 去掉了；

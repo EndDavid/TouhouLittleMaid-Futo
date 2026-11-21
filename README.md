@@ -2111,6 +2111,39 @@ maid.startUsingItem(hand);   // ← 全部动画与进食逻辑的起点
 | 搜索 | `BlockPos` 的整数偏移 `setWithOffset(centre, x, y-1, z)`，`i < searchRange` | x/z 可达 5 、y 可达 -1…+2 |
 | 判定 | `maid.distanceToSqr(new Vec3(水块最小角))`，阈值 searchRange * searchRange = 36 | 浮点，且**从方块角落算** |
 
+#### 鱼竿放副手也要能钓鱼（本移植版放宽）
+
+上游 1.20.1 全链路只看 `getMainHandItem()`：抛钩、收线、扣耐久、界面条件说明都是。
+玩家把鱼竿放副手是很自然的习惯（主手留武器 / 工具），后果是**她坐在船里完全不动，
+而且没有任何提示** —— `has_fishing_rod` 条件只影响界面上的说明文字，不会弹消息。
+这个坑极难自诊断：看起来和「抛钩逻辑坏了」一模一样。
+
+现在统一走 `util/FishingRodUtil`：**主手优先、副手兜底**。四条链路全部改用它：
+
+| 位置 | 原来 | 现在 |
+|---|---|---|
+| `TaskFishing#getConditionDescription` | 主手 `instanceof FishingRodItem` | `FishingRodUtil.hasRod` |
+| `MaidRideFindWaterTask#start` | 主手取竿 | `getRod`（任一手） |
+| `MaidFishingHook#shouldStopFishing` | 主手是竿才不收线 | `hasRod`（任一手） |
+| `MaidFishingHook#onNibble` / `hurtRod` | 主手扣耐久 | 按**实际持竿的那只手**扣 |
+
+主手有鱼竿时行为与上游逐字一致，所以这是纯放宽，不会让任何原本可用的组合失效。
+扣耐久必须和取竿用同一个 `InteractionHand`，否则会出现「用副手的竿钓鱼、扣主手物品耐久」。
+
+实测（`runServer` + RCON，主手 `stone_sword`、副手 `fishing_rod`）：
+
+```
+[Futo] ride ... isWork=true task=touhou_little_maid:fishing
+[Futo] fishing ... at=BlockPos{x=0, y=101, z=0} -> cast at BlockPos{x=2, y=100, z=0}
+HandItems: [{id: "minecraft:stone_sword", ...}, {id: "minecraft:fishing_rod", tag: {Damage: 2}}]
+```
+
+最后一行是关键：钩子抛出、且耐久扣在**副手**那根竿上（`Damage` 0 → 2，岸上收杆扣 2）。
+
+> 排查记录：这个坑让本移植版误判了好几轮 —— 服务端日志一切正常、鱼钩也生成了，
+> 但玩家看不到任何动作。教训是**先问清「你把鱼竿放哪只手了」**，再怀疑代码。
+> 真正因此修掉的独立 bug 见上一节（`posCheck` 与搜索语义不一致）。
+
 两者不等价：女仆站在方块角落（浮点坐标 x.5）时，偏 5 格、y 偏 1 的水块
 折成浮点平方距离可以到 43+。于是**刚搜到的水立刻被判「超出范围」→ `waterPos` 清空 →
 下一轮又搜到同一片水**，死循环。上游没暴露这个问题是因为它总在船上、船紧贴水边；
