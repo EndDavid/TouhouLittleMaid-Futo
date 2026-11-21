@@ -1,11 +1,11 @@
 package com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity;
-
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockPicnicMat;
-import com.github.tartaricacid.touhoulittlemaid.client.model.PicnicMatModel;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels;
+import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoBone;
+import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoModel;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityPicnicMat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Vector3f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -18,79 +18,108 @@ import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
-
 /**
- * 野餐垫的渲染器，移植自上游 1.18.2 {@code client/renderer/tileentity/PicnicMatRender}。
+ * 野餐垫的渲染器，对应上游 1.20.1 的 {@code PicnicMatRender}。
  *
- * <p><b>只画中心格</b>（{@code PART == CENTER}）：整张垫子是一个模型，
- * 挂在边缘格上会画出 25 份互相重叠的垫子。边缘格的方块实体存在的唯一理由
- * 是「拆掉任意一格时能找回中心」（见 {@code BlockPicnicMat#handlePicnicMatRemove}）。</p>
+ * <p>模型直接读 1.20.1 的 {@code models/bedrock/block/picnic_mat.json}（与本模组 jar 里
+ * 那一份<b>逐字节相同</b>），贴图是 {@code textures/bedrock/block/picnic_mat.png}，
+ * 走本移植版已有的 {@link BedrockBlockModels} 管线 —— 与祭坛 / 神社 / 三张棋盘同一条路。
+ * 那条管线把基岩几何的细节（按面 UV、负 inflate、零厚度面、骨骼层级与缩放）都处理过了，
+ * 所以这里不再有手抄几百行 {@code addBox} 的可能。</p>
+ *
+ * <h2>为什么不照抄上游那两句 {@code translate(0.5,1.5,0.5)} + {@code ZN(180)}</h2>
+ * <p>上游是拿「原版 {@code ModelPart} 空间」的旧模型画的：那个空间 Y 向下、y=24 是地面，
+ * 所以要抬 1.5 格再翻过来。而这套 json 进的是本移植版的基岩管线，
+ * {@code GeoCube#createFromPojoCube} 在换算时已经处理过方向，
+ * 量出来的包围盒就是 <b>Y 向上、底面在 0、水平居中</b>：</p>
+ * <pre>
+ * Block model picnic_mat loaded: 49 bones, bbox x[-2.231..2.313] y[-0.013..0.625] z[-2.251..2.251]
+ * </pre>
+ * <p>照抄那两句的话，模型会被翻个底朝天再抬到 0.875~1.5 格高 —— 也就是「悬空倒扣」。
+ * 这与上一轮祭坛 / 神社换基岩模型时踩过的坑是同一个，所以这里按实测包围盒来摆。</p>
+ *
+ * <h2>食物坐标为什么是 {@code 1.5 - z}</h2>
+ * <p>上游那 6 组坐标是在「抬 1.5 格 + 翻转」之后的空间里给的，其中竖直分量正好被那个 1.5
+ * 反了过来（{@code 1.4125 → 0.0875} 就是「贴着垫面」）。本移植版没有那两句，
+ * 于是把 z 换成 {@code 1.5 - z} 就落回同一个世界位置；x / y 不变。</p>
  *
  * <h2>三层内容</h2>
  * <ol>
- *     <li><b>装饰件</b>：模型里的 {@code basketHide / breadHide / cakeHide} 三组，
- *         对应格子里<b>真的</b>有东西时隐藏 —— 否则会与下面那层物品模型叠在一起；</li>
- *     <li><b>物品</b>：{@code 3..8} 六格按上游的固定坐标摆盘，超过 10 个时叠一小摞；</li>
- *     <li><b>垫子本身</b>：最后画，避免半透明边缘把物品盖掉。</li>
+ *     <li><b>装饰件</b>：{@code basketHide / breadHide / cakeHide} 是模型自带的
+ *         「看起来有东西」的贴片，对应格子里真放了东西时隐藏；开关是
+ *         {@link AnimatedGeoBone#setHidden}（基岩模型没有 {@code visible} 字段）；</li>
+ *     <li><b>物品</b>：{@code 3..8} 六格按固定坐标摆盘，数量 ≥ 10 时叠一摞；</li>
+ *     <li><b>垫子本身</b>：最后画。</li>
  * </ol>
  */
 public class TileEntityPicnicMatRenderer implements BlockEntityRenderer<TileEntityPicnicMat> {
     private static final ResourceLocation TEXTURE =
-            new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/picnic_mat.png");
-
+            new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/bedrock/block/picnic_mat.png");
+    private static final RenderType RENDER_TYPE = RenderType.entityCutoutNoCull(TEXTURE);
     /**
-     * 六个摆盘位的坐标，与 {@code PicnicMatModel} 里那 6 个空位一一对应。
-     * 前三个是 {@code z<0} 那侧，后三个是另一侧；最后一个（8 号）稍微高一点、靠里一点。
+     * 六个摆盘位。数字来自上游那六次 {@code renderFood}，但 <b>z 换成了 {@code 1.5 - z}</b>：
+     * 上游是在「{@code translate(0.5,1.5,0.5)} 之后、再 {@code ZN(180)}」的空间里给的坐标，
+     * 而本移植版的基岩几何已经是 Y 向上、底面在 y=0（实测 bbox y[-0.013..0.625]，
+     * 见启动日志），所以既不需要那 1.5 也不需要翻转 —— 那个 1.5 正好是翻转时被减掉的部分。
      */
     private static final float[][] FOOD_POS = {
-            {-0.6f, -1.5f, 1.4125f},
-            {0.15f, -1.2f, 1.4125f},
-            {0.55f, -1.6f, 1.4125f},
-            {-0.5f, 1.65f, 1.4125f},
-            {0.375f, 1.575f, 1.4125f},
-            {-0.05f, 1.2f, 1.25f},
+            {-0.6f, -1.5f, 0.0875f},
+            {0.15f, -1.2f, 0.3f},
+            {0.55f, -1.6f, -0.1f},
+            {-0.5f, 1.65f, -0.15f},
+            {0.375f, 1.575f, -0.075f},
+            {-0.05f, 1.2f, 0.25f},
     };
-
-    private final PicnicMatModel model;
-
     public TileEntityPicnicMatRenderer(BlockEntityRendererProvider.Context context) {
-        this.model = new PicnicMatModel(context.bakeLayer(PicnicMatModel.LAYER));
+        // 模型懒加载（BedrockBlockModels#get）：构造函数早于资源管理器就绪，那时读不到文件
     }
-
     @Override
     public void render(TileEntityPicnicMat picnicMat, float partialTick, PoseStack poseStack, MultiBufferSource bufferIn,
                        int combinedLightIn, int combinedOverlayIn) {
         BlockState blockState = picnicMat.getBlockState();
-        if (!(blockState.getBlock() instanceof BlockPicnicMat) || !blockState.getValue(BlockPicnicMat.PART).isCenter()) {
+        if (!(blockState.getBlock() instanceof BlockPicnicMat)
+                || !blockState.getValue(BlockPicnicMat.PART).isCenter()) {
+            return;
+        }
+        AnimatedGeoModel model = BedrockBlockModels.get("picnic_mat");
+        if (model == null) {
             return;
         }
         Direction facing = blockState.getValue(BlockPicnicMat.FACING);
         poseStack.pushPose();
-        poseStack.translate(0.5, 1.5, 0.5);
-        poseStack.mulPose(Vector3f.ZN.rotationDegrees(180));
-        poseStack.mulPose(Vector3f.YN.rotationDegrees(180 - facing.get2DDataValue() * 90));
-
-        // ① 装饰件：格子里有真食物就藏起来
-        this.model.getHideModel().getChild("basketHide").visible = !picnicMat.isEmpty(0);
-        this.model.getHideModel().getChild("breadHide").visible = !picnicMat.isEmpty(1);
-        this.model.getHideModel().getChild("cakeHide").visible = !picnicMat.isEmpty(2);
-
-        // ② 摆盘
+        // 模型已经 Y 向上、底面在 y=0、水平居中（启动日志实测 bbox
+        // x[-2.231..2.313] y[-0.013..0.625] z[-2.251..2.251]），
+        // 所以摆放只需要「挪到方块中心 + 按朝向转」，与三张棋盘完全一样。
+        // floorOffset 只压不抬，这里量出来是 -0.000，写了也不影响。
+        poseStack.translate(0.5, BedrockBlockModels.floorOffset("picnic_mat"), 0.5);
+        // 朝向角与上游等价：上游是 YN(180 - 2D*90)，在 Y 向上的同一空间里
+        // 就是 YP(toYRot + 180)。不要照抄 BoardRenderUtil#applyFacing ——
+        // 那个多带了一句「Z 轴朝向再转半圈」，是给按点击坐标对齐的棋盘用的。
+        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot() + 180));
+        // ① 装饰件：真放了东西就藏起来
+        setHidden(model, "basketHide", picnicMat.isEmpty(0));
+        setHidden(model, "breadHide", picnicMat.isEmpty(1));
+        setHidden(model, "cakeHide", picnicMat.isEmpty(2));
+        // ② 摆盘（同一姿态，坐标与模型同空间）
         for (int i = 0; i < FOOD_POS.length; i++) {
             this.renderFood(picnicMat, 3 + i, FOOD_POS[i], poseStack, bufferIn, combinedLightIn, combinedOverlayIn);
         }
-
         // ③ 垫子
-        VertexConsumer buffer = bufferIn.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        this.model.renderToBuffer(poseStack, buffer, combinedLightIn, combinedOverlayIn, 1.0F, 1.0F, 1.0F, 1.0F);
+        GeoBlockRenderer.render(model, TEXTURE, poseStack, bufferIn, combinedLightIn, combinedOverlayIn, RENDER_TYPE);
         poseStack.popPose();
     }
-
     /**
-     * 画一格食物。
-     *
-     * <p>数量 ≥ 10 时额外叠几份模型（{@code count / 10} 份），每份按
-     * {@code sin(i)} / {@code cos(i)} 抖一点位置与角度 —— 上游原样，看起来像「一摞」。</p>
+     * 骨骼存在才切换可见性：模型若改名 / 缺块，顶多装饰件不隐藏，不该抛异常。
+     */
+    private static void setHidden(AnimatedGeoModel model, String boneName, boolean hidden) {
+        AnimatedGeoBone bone = model.bones().get(boneName);
+        if (bone != null) {
+            bone.setHidden(hidden);
+        }
+    }
+    /**
+     * 画一格食物。数量 ≥ 10 时额外叠几份（{@code count / 10}），每份按
+     * {@code sin(i)} / {@code cos(i)} 抖一点位置与角度 —— 上游原样。
      */
     private void renderFood(TileEntityPicnicMat picnicMat, int slotId, float[] pos, PoseStack poseStack,
                             MultiBufferSource bufferIn, int combinedLightIn, int combinedOverlayIn) {
@@ -117,10 +146,8 @@ public class TileEntityPicnicMatRenderer implements BlockEntityRenderer<TileEnti
         }
         poseStack.popPose();
     }
-
     @Override
     public boolean shouldRenderOffScreen(TileEntityPicnicMat te) {
         return true;
     }
 }
-

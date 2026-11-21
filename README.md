@@ -3129,10 +3129,12 @@ public void travel(Vec3 vec3) {
 顺带把 `JOY_BLOCK` 兴趣点补全成上游的六块（棋盘 3 块 + 键盘 / 书架 / 电脑）——
 之前只收了棋盘。
 
-### 6. 渲染：两个模型层 + 一个物品渲染器
+### 6. 渲染：直接用 1.20.1 的基岩模型
 
-- `PicnicMatModel`（529 行几何）与 `PicnicBasketModel` 从上游 1.18.2 **逐字节**搬过来，
-  见 `port/port_picnic_models.py`（只加文件头注释并转 CRLF）。手抄几百行 `addBox` 只会引入抄错。
+- 几何**直接读 1.20.1 的 `models/bedrock/block/picnic_mat.json` 与 `picnic_basket.json`**
+  （与本模组 jar 里那一份逐字节相同），走 `BedrockBlockModels` —— 与祭坛 / 神社 / 三张棋盘
+  同一条管线。上一版曾把这两个模型手抄成 Java `ModelPart`（529 行 `addBox`），
+  那是在重复造轮子：管线已经能用，手抄只会引入抄错。现在已经删掉。
 - `PicnicBasketIconModel` 是唯一的重写：上游用基岩模型库的「单南面」方块（厚度 0 的板），
   本移植版没有那个库，于是用原版 `addBox` 造同样一块 0 厚度的板 —— 六面共用同一段 UV，
   正对摄像机时看到的就是同一张图。
@@ -3140,7 +3142,43 @@ public void travel(Vec3 vec3) {
   其余画 3D 模型（上游用 Forge 的 `IItemRenderProperties`，Fabric 用 `BuiltinItemRendererRegistry`）。
   图层在**第一次渲染时**才烘焙 —— 注册时 `Minecraft#getEntityModels()` 还没就绪。
 - `TileEntityPicnicMatRenderer` 三层：装饰件（`basketHide/breadHide/cakeHide` 在真的放了东西时隐藏）
+
+**为什么不能照抄上游那两句 `translate(0.5, 1.5, 0.5)` + `ZN(180)`：** 那是给
+「原版 `ModelPart` 空间」的旧模型用的（那个空间 Y 向下、y=24 是地面）。野餐这套 json 进的是
+本移植版的基岩管线，`GeoCube#createFromPojoCube` 在换算时已经处理过方向。实测包围盒：
+
+```
+Block model picnic_mat loaded: 49 bones, bbox x[-2.231..2.313] y[-0.013..0.625] z[-2.251..2.251]
+```
+
+底面就在 0、水平居中、Y 向上 —— 照抄那两句会被翻个底朝天再抬到 0.875~1.5 格高，
+也就是「悬空倒扣」。这与上一轮祭坛 / 神社换基岩模型时踩的是同一个坑，
+所以这次先看日志里的实测包围盒，再决定姿态：摆放只有 `translate(0.5, floorOffset, 0.5)` +
+`YP(toYRot + 180)`（后者与上游的 `YN(180 - 2D*90)` 等价）。
+
+食物那 6 组坐标也是同理：上游给的是「抬 1.5 格 + 翻转」之后的空间，竖直分量正好被那个 1.5
+反了过来，于是本移植版把 z 换成 `1.5 - z`（`1.4125 → 0.0875` 就是「贴着垫面」），x / y 不变。
   → 六格食物按固定坐标摆盘（≥10 个时叠一摞）→ 最后画垫子本身。
+
+### 6.5 「取出食物后模型不消失」：`ItemStackHandler#deserializeNBT` 不清空
+
+实测报告：空手潜行右键把垫子里的食物取走，**物品还画在原地**。
+
+根因在 Forge 的 `ItemStackHandler#deserializeNBT`：
+
+```java
+public void deserializeNBT(CompoundTag nbt) {
+    setSize(nbt.contains("Size") ? nbt.getInt("Size") : stacks.size());   // 9 → 9，什么都不做
+    for (每个 NBT 里出现的 Items 条目) { stacks.set(slot, ItemStack.of(tag)); }
+}
+```
+
+空槽本来就不会写进 `Items`，而它<b>只覆盖 NBT 里出现的槽位</b> —— 于是客户端
+「复用同一个方块实体、再 `load()` 一次」时，被取空的那些格子仍然留着上一次的物品，
+渲染器照旧画它。服务端是对的（`extractItem` 自己清了），只有客户端这份拷贝会残留。
+
+修法：`TileEntityPicnicMat#load` 在 `deserializeNBT` 之前把 9 格显式清空；座位表同理，
+先复位成 `NIL_UUID` 再读。这条对任何「方块实体里挂 `ItemStackHandler`、靠数据包同步」的场景都成立。
 
 ### 7. 验证到什么程度
 

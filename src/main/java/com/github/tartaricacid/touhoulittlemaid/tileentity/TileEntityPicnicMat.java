@@ -136,10 +136,28 @@ public class TileEntityPicnicMat extends BlockEntity {
         if (nbt.contains(CENTER_POS_NAME, Tag.TAG_COMPOUND)) {
             this.centerPos = NbtUtils.readBlockPos(nbt.getCompound(CENTER_POS_NAME));
         }
+        // ------------------------------------------------------------------
+        // 先把 9 格清空，再反序列化。这一句是「取出食物后模型不消失」的正因：
+        //
+        // Forge 的 ItemStackHandler#deserializeNBT 只做两件事 ——
+        //   1. 若 Size 变了才重建列表（9 → 9 时什么都不做）；
+        //   2. 遍历 NBT 里出现的 Items，把对应槽位改成那个物品。
+        // 也就是说 **NBT 里没有的槽位，它不会去清**。而空槽本来就不会写进 Items，
+        // 于是客户端拿到「空 Items」的包之后，旧物品仍然留在 handler 里，
+        // 渲染器继续画那一份食物。服务端是对的（它自己 extractItem 清过），
+        // 只有客户端这份「复用同一个方块实体、再 load 一次」的拷贝会残留。
+        // ------------------------------------------------------------------
+        for (int slot = 0; slot < this.handler.getSlots(); slot++) {
+            this.handler.setStackInSlot(slot, ItemStack.EMPTY);
+        }
         if (nbt.contains(STORAGE_ITEM, Tag.TAG_COMPOUND)) {
             this.handler.deserializeNBT(nbt.getCompound(STORAGE_ITEM));
         }
         ListTag sitIdsTag = nbt.getList(SIT_IDS, Tag.TAG_INT_ARRAY);
+        for (int i = 0; i < SIT_COUNT; i++) {
+            // 同样的道理：座位表也要先复位，否则被打断的那几格会留着上一次的 UUID
+            this.sitIds[i] = Util.NIL_UUID;
+        }
         int i = 0;
         for (Tag uuidTag : sitIdsTag) {
             if (i >= SIT_COUNT) {

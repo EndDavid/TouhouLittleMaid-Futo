@@ -119,19 +119,12 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.COMPUTER_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityComputerRenderer::new);
 
-        // 野餐篮 / 野餐垫。三个模型层都要先烘焙：
-        //   · PicnicBasketModel     —— 物品的 3D 图标（手持 / 掉落 / 展示框）
-        //   · PicnicBasketIconModel —— 物品栏里的扁平图标（一块厚度为 0 的板）
-        //   · PicnicMatModel        —— 放下的那张 5×5 垫子（含装饰件与 hide 组）
-        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
-                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketModel.LAYER,
-                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketModel::createBodyLayer);
+        // 野餐篮 / 野餐垫。几何直接用 1.20.1 的 models/bedrock/block/picnic_*.json
+        // （运行时由 BedrockBlockModels 读，与祭坛 / 神社 / 三张棋盘同一条管线），
+        // 唯一需要烘焙的图层是物品栏里那块扁平图标。
         net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
                 com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketIconModel.LAYER,
                 com.github.tartaricacid.touhoulittlemaid.client.model.PicnicBasketIconModel::createBodyLayer);
-        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
-                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicMatModel.LAYER,
-                com.github.tartaricacid.touhoulittlemaid.client.model.PicnicMatModel::createBodyLayer);
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.PICNIC_MAT_TE,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntityPicnicMatRenderer::new);
