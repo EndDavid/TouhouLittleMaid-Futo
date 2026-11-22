@@ -4,14 +4,16 @@ import net.minecraftforge.common.ForgeConfigSpec;
 /**
  * AI 聊天 / TTS / STT 的配置，移植自上游 {@code config/subconfig/AIConfig}。
  *
- * <p>九项与上游逐字一致（键名、默认值、范围都不改），这样配置文件可与上游互换。
- * 本轮真正生效的是聊天那四项：{@link #CHAT_ENABLED}、{@link #CHAT_TEMPERATURE}、
- * {@link #CHAT_PROXY_ADDRESS}、{@link #MAID_MAX_HISTORY_CHAT_SIZE}。</p>
+ * <p>九项与上游逐字一致（键名、默认值、范围都不改），配置文件可与上游互换。</p>
  *
- * <p><b>TTS / STT 三项本轮只是「留位」</b>：{@code ai/service/tts}、{@code ai/service/stt}
- * 尚未移植，{@code MaidAIChatManager} 也不走 TTS 分支，所以这几项填了不会有任何效果。
- * 保留下来的原因是 {@code MaidAIDataSerializable} 的 tts 字段仍需读写（存档 / 未来的
- * 配置界面要一致），且 {@code PapiReplacer} 的 {@code ${tts_language}} 占位符要有个值。</p>
+ * <p>已经生效：聊天四项（{@link #CHAT_ENABLED} / {@link #CHAT_TEMPERATURE} /
+ * {@link #CHAT_PROXY_ADDRESS} / {@link #MAID_MAX_HISTORY_CHAT_SIZE}），
+ * TTS 三项（{@link #TTS_ENABLED} / {@link #TTS_LANGUAGE} / {@link #TTS_PROXY_ADDRESS}），
+ * 以及 1.20.1 才有的 {@link #AUTO_GEN_SETTING_ENABLED} 与 {@link #MAX_TOKENS_PER_PLAYER}。</p>
+ *
+ * <p><b>STT 两项仍只是「留位」</b>：{@code ai/service/stt} 尚未移植，
+ * 因此 {@link #STT_URL} / {@link #STT_PROXY_ADDRESS} 填了不会有任何效果，
+ * 保留下来只是为了配置文件可与上游互换。</p>
  */
 public class AIConfig {
     public static ForgeConfigSpec.BooleanValue CHAT_ENABLED;
