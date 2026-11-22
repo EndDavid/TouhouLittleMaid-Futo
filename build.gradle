@@ -84,6 +84,14 @@ dependencies {
 	// 单独作为模组依赖加载（jar 自带 fabric.mod.json，mod id 为 fiber）。
 	// 我们不对 Fiber 写代码，因此只需运行期存在，用 modLocalRuntime 即可。
 	modLocalRuntime files("libs/fiber-0.23.0-2.jar")
+	// snakeyaml：AI 聊天子系统读取 available_sites.yml / 角色设定 settings/*.yml 用。
+	//
+	// 上游两份产物都自带它（Forge 1.18.2 走 JiJ 的 snakeyaml-2.4.jar，
+	// TLMO 1.20.1 则把类重定位到 touhoulittlemaid.libs.org.yaml.snakeyaml）。
+	// 这里直接从上游 Forge jar 的 META-INF/jarjar 里解出来放进 libs/，
+	// 与 night-config 的做法一致：离线可用、版本钉死。
+	// 它不是一个 mod（没有 fabric.mod.json），所以用 implementation 而不是 modImplementation。
+	implementation files("libs/snakeyaml-2.4.jar")
 }
 
 processResources {

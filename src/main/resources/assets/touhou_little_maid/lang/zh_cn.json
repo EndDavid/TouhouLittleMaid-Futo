@@ -1,5 +1,6 @@
 {
   "ai.touhou_little_maid.chat.api_key.empty": "你没有设置 AI 对话的 API Key",
+  "ai.touhou_little_maid.chat.no_setting": "这个模型还没有角色设定文件（config/touhou_little_maid/settings 或模型包里的 settings/*.yml）",
   "ai.touhou_little_maid.chat.stt.empty": "你没有设置 STT 功能",
   "ai.touhou_little_maid.chat.disable": "AI 对话功能已被禁用",
   "ai.touhou_little_maid.chat.input.tip": "输入内容进行对话，按下回车键进行发送",

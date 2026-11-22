@@ -296,6 +296,24 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      * （上游 {@code SyncMaidAreaMessage} 同款），而不是让每只女仆常驻同步三个 BlockPos。</p>
      */
     private final SchedulePos schedulePos;
+    /**
+     * 女仆的 AI 聊天状态（站点 / 模型 / 温度 / 历史 / TTS 设置）。
+     *
+     * <p><b>只能在构造器里创建</b>：{@code MaidAIChatData} 的构造器会读 {@code AIConfig}
+     * （历史长度上限），而 {@code EntityMaid} 在注册阶段会被构造出原型实体，
+     * 那时配置可能还没加载完。{@code MaidAIChatData} 内部对配置读取做了兜底。</p>
+     *
+     * <p><b>不能在 {@code defineSynchedData()} 里碰它</b>：那个方法在 {@code super()}
+     * 期间就被调用，此刻本字段还是 {@code null}。</p>
+     */
+    private final com.github.tartaricacid.touhoulittlemaid.ai.manager.entity.MaidAIChatManager aiChatManager;
+    /**
+     * 头顶三个气泡槽（到期时间戳 + 内容）。必须是同步数据：
+     * 气泡内容是服务端决定的（AI 回复、内部提示），客户端只负责画。
+     */
+    private static final EntityDataAccessor<com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles> CHAT_BUBBLE =
+            SynchedEntityData.defineId(EntityMaid.class,
+                    com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles.DATA);
 
     private int pickupSoundCount = 5;
     /**
@@ -326,6 +344,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         // 上游同款：初始「家」= 当前位置，维度取实体自己的维度。
         // 这样一只没被罗盘配置过的女仆打开 Home 后仍然有一个有效的工作点。
         this.schedulePos = new SchedulePos(BlockPos.ZERO, level.dimension().location());
+        this.aiChatManager = new com.github.tartaricacid.touhoulittlemaid.ai.manager.entity.MaidAIChatManager(this);
     }
 
     /**
@@ -394,6 +413,9 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         // 用 EmptyBackpack.ID 而不是 BackpackManager.getEmptyBackpack()：
         // defineSynchedData 可能早于 BackpackManager.init()（例如注册阶段创建原型实体）
         this.entityData.define(DATA_BACKPACK_TYPE, EmptyBackpack.ID.toString());
+        // 头顶气泡槽：三个都空。这里不能碰 aiChatManager（super() 期间它为 null）
+        this.entityData.define(CHAT_BUBBLE,
+                com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles.DEFAULT);
     }
 
     @Override
@@ -1647,6 +1669,39 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.entityData.set(DATA_BEGGING, begging);
     }
 
+    // ---------------------------------------------------------------- AI 聊天 / 聊天气泡
+    /**
+     * 女仆的 AI 聊天管理器（上游 EntityMaid#getAiChatManager）。
+     */
+    public com.github.tartaricacid.touhoulittlemaid.ai.manager.entity.MaidAIChatManager getAiChatManager() {
+        return this.aiChatManager;
+    }
+    /**
+     * 头顶三个气泡槽（上游 EntityMaid#getChatBubble）。
+     */
+    public com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles getChatBubble() {
+        return this.entityData.get(CHAT_BUBBLE);
+    }
+    public void setChatBubble(com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles bubbles) {
+        this.entityData.set(CHAT_BUBBLE, bubbles);
+    }
+    /**
+     * 往头顶塞一条气泡（上游 EntityMaid#addChatBubble）。
+     * 槽位选择逻辑在 ChatBubbleManger#addChatBubble 里。
+     */
+    public void addChatBubble(long endTime,
+                              com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatText text) {
+        com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger
+                .addChatBubble(endTime, text, this);
+    }
+    /**
+     * 当前头顶实际挂着几条气泡（上游 EntityMaid#getChatBubbleCount）。
+     */
+    public int getChatBubbleCount() {
+        return com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger
+                .getChatBubbleCount(this);
+    }
+
     // ---------------------------------------------------------------- 基础行为
 
     @Override
@@ -1935,6 +1990,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         tag.put(MAID_BAUBLE_INVENTORY_TAG, this.maidBauble.serializeNBT());
         this.favorabilityManager.save(tag);
         this.gameRecordManager.addAdditionalSaveData(tag);
+        this.aiChatManager.writeToTag(tag);
 
         MaidSubConfig.save(tag, this);
         this.attackList.save(tag);
@@ -2014,6 +2070,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         }
         this.favorabilityManager.load(tag);
         this.gameRecordManager.readAdditionalSaveData(tag);
+        this.aiChatManager.readFromTag(tag);
         // 好感度决定最大生命与攻击力，读档后必须按当前好感度重建一次属性，
         // 否则会出现「好感度 300 但生命還是 20」
         this.favorabilityManager.refreshAttributes();
@@ -2121,6 +2178,8 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             }
         }
 
+        // 头顶气泡到期清理（上游 ChatBubbleManger#tick 的服务端那一半）
+        com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger.tick(this);
         // 作息坐标维护（上游 {@code SchedulePos#tick}）：每 40 tick 把活动范围挪到
         // 当前活动对应的点上，跑出范围就把寻路目标指回去、跑太远就直接传送。
         // 少了这一段，开/关 Home 按钮只改了标志位，玩家看不到任何行为变化。

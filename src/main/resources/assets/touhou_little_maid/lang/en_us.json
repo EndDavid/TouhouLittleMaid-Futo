@@ -1,5 +1,6 @@
 {
   "ai.touhou_little_maid.chat.api_key.empty": "You don't have an API Key for AI Chat",
+  "ai.touhou_little_maid.chat.no_setting": "This model has no character setting file yet (config/touhou_little_maid/settings or settings/*.yml in a model pack)",
   "ai.touhou_little_maid.chat.stt.empty": "You don't have the STT feature set up",
   "ai.touhou_little_maid.chat.disable": "The AI chat feature has been disabled",
   "ai.touhou_little_maid.chat.input.tip": "Enter text and press the Enter key to send",

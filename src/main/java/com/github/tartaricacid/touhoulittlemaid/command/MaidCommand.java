@@ -66,6 +66,9 @@ public final class MaidCommand {
                 (dispatcher, dedicated) -> dispatcher.register(
                         Commands.literal("tlm")
                                 .requires(source -> source.hasPermission(2))
+                                .then(Commands.literal("ai_chat")
+                                        .then(Commands.literal("reload")
+                                                .executes(MaidCommand::reloadAiChat)))
                                 .then(Commands.literal("task")
                                         .then(Commands.argument("targets", EntityArgument.entities())
                                                 .executes(MaidCommand::queryTask)
@@ -130,6 +133,32 @@ public final class MaidCommand {
     }
 
     // ------------------------------------------------------------------ task
+
+    /**
+     * /tlm ai_chat reload：重读站点表与角色设定，并把结果广播给全部在线玩家。
+     *
+     * <p>AI 的两个数据源都在服务运行中可改：</p>
+     * <ul>
+     *     <li>config/touhou_little_maid/available_sites.yml（填 api_key）；</li>
+     *     <li>config/touhou_little_maid/settings/*.yml（角色设定）。</li>
+     * </ul>
+     * <p>没有这条命令就只能重启服务器。上游同样提供。</p>
+     *
+     * <p>权限等级 2：它会重新读取磁盘上的配置，属于管理操作。</p>
+     */
+    private static int reloadAiChat(CommandContext<CommandSourceStack> context)
+            throws CommandSyntaxException {
+        net.minecraft.server.MinecraftServer server = context.getSource().getServer();
+        // 顺序有讲究：站点表先（它决定有哪些站点可选），设定后（它决定哪些模型能聊天）
+        com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.AvailableSites.readSites();
+        com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.SettingReader.reloadSettings();
+        // 必须广播：否则客户端那份 CAN_CHAT_MAID_IDS 与站点表还是旧的
+        com.github.tartaricacid.touhoulittlemaid.network.SyncAiSettingPacket.broadcast(server);
+        context.getSource().sendSuccess(
+                new net.minecraft.network.chat.TranslatableComponent(
+                        "message.touhou_little_maid.ai_chat.reload_success"), true);
+        return 1;
+    }
 
     private static int queryTask(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         for (EntityMaid maid : maids(ctx)) {

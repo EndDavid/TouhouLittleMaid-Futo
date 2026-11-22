@@ -1,0 +1,50 @@
+package com.github.tartaricacid.touhoulittlemaid.config.subconfig;
+import com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.AvailableSites;
+import net.minecraftforge.common.ForgeConfigSpec;
+/**
+ * AI 聊天 / TTS / STT 的配置，移植自上游 {@code config/subconfig/AIConfig}。
+ *
+ * <p>九项与上游逐字一致（键名、默认值、范围都不改），这样配置文件可与上游互换。
+ * 本轮真正生效的是聊天那四项：{@link #CHAT_ENABLED}、{@link #CHAT_TEMPERATURE}、
+ * {@link #CHAT_PROXY_ADDRESS}、{@link #MAID_MAX_HISTORY_CHAT_SIZE}。</p>
+ *
+ * <p><b>TTS / STT 三项本轮只是「留位」</b>：{@code ai/service/tts}、{@code ai/service/stt}
+ * 尚未移植，{@code MaidAIChatManager} 也不走 TTS 分支，所以这几项填了不会有任何效果。
+ * 保留下来的原因是 {@code MaidAIDataSerializable} 的 tts 字段仍需读写（存档 / 未来的
+ * 配置界面要一致），且 {@code PapiReplacer} 的 {@code ${tts_language}} 占位符要有个值。</p>
+ */
+public class AIConfig {
+    public static ForgeConfigSpec.BooleanValue CHAT_ENABLED;
+    public static ForgeConfigSpec.DoubleValue CHAT_TEMPERATURE;
+    public static ForgeConfigSpec.ConfigValue<String> CHAT_PROXY_ADDRESS;
+    public static ForgeConfigSpec.BooleanValue TTS_ENABLED;
+    public static ForgeConfigSpec.ConfigValue<String> TTS_LANGUAGE;
+    public static ForgeConfigSpec.ConfigValue<String> TTS_PROXY_ADDRESS;
+    public static ForgeConfigSpec.ConfigValue<String> STT_URL;
+    public static ForgeConfigSpec.ConfigValue<String> STT_PROXY_ADDRESS;
+    public static ForgeConfigSpec.IntValue MAID_MAX_HISTORY_CHAT_SIZE;
+    public static void init(ForgeConfigSpec.Builder builder) {
+        // 读取网站列表（jar 内置的 + config/touhou_little_maid/available_sites.yml）
+        AvailableSites.readSites();
+        builder.push("ai");
+        builder.comment("Whether or not to enable the AI Chat feature");
+        CHAT_ENABLED = builder.define("ChatEnabled", true);
+        builder.comment("Chat temperature, the higher this value, the more random the output will be");
+        CHAT_TEMPERATURE = builder.defineInRange("ChatTemperature", 0.5, 0, 2);
+        builder.comment("Chat AI Proxy Address, such as 127.0.0.1:1080, empty is no proxy, SOCKS proxies are not supported");
+        CHAT_PROXY_ADDRESS = builder.define("ChatProxyAddress", "");
+        builder.comment("Whether or not to enable the TTS feature");
+        TTS_ENABLED = builder.define("TTSEnabled", true);
+        builder.comment("The TTS language you intend to use");
+        TTS_LANGUAGE = builder.define("TTSLanguage", "en_us");
+        builder.comment("TTS Proxy Address, such as 127.0.0.1:1080, empty is no proxy, SOCKS proxies are not supported");
+        TTS_PROXY_ADDRESS = builder.define("TTSProxyAddress", "");
+        builder.comment("STT Url address, currently only the player2 app is supported");
+        STT_URL = builder.define("STTUrl", "http://127.0.0.1:4315/v1/stt");
+        builder.comment("STT Proxy Address, such as 127.0.0.1:1080, empty is no proxy, SOCKS proxies are not supported");
+        STT_PROXY_ADDRESS = builder.define("STTProxyAddress", "");
+        builder.comment("The maximum historical conversation length cached by the maid");
+        MAID_MAX_HISTORY_CHAT_SIZE = builder.defineInRange("MaidMaxHistoryChatSize", 16, 1, 128);
+        builder.pop();
+    }
+}

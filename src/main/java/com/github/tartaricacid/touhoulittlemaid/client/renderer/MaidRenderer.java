@@ -149,6 +149,32 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
     /**
      * 在模型真正绘制之前调整骨骼可见性 —— 这是唯一能保证「本帧生效」的时机。
      */
+    /**
+     * 女仆本体绘制完成之后，再画头顶的聊天气泡。
+     *
+     * <h2>为什么覆写 render 而不是加一个 LayerRenderer</h2>
+     * <p>气泡要画在「世界坐标 + 相机朝向」上，不是实体模型空间；</p>
+     * <p>而 super.render 结束时 PoseStack 已经弹回「实体脚部为原点」，
+     * 正好是气泡需要的坐标系。加图层反而要多做一次矩阵还原。</p>
+     *
+     * <h2>只给真正的女仆画</h2>
+     * <p>雕像与手办把实体 NBT 读进一个临时实体来渲染，那些实例的 renderState
+     * 不是 ENTITY。给它们画气泡既没有意义，</p>
+     * <p>也会让「摆在家里当装饰」的手办冒出 15 秒就消失的空气泡。</p>
+     */
+    @Override
+    public void render(EntityMaid entity, float entityYaw, float partialTick, PoseStack poseStack,
+                       MultiBufferSource bufferSource, int packedLight) {
+        super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
+        if (entity.renderState
+                != com.github.tartaricacid.touhoulittlemaid.api.client.render.MaidRenderState.ENTITY) {
+            return;
+        }
+        double distanceSqr = net.minecraft.client.Minecraft.getInstance()
+                .getEntityRenderDispatcher().distanceToSqr(entity);
+        com.github.tartaricacid.touhoulittlemaid.client.renderer.ai.ChatBubbleRenderer
+                .renderChatBubble(entity, poseStack, bufferSource, packedLight, distanceSqr);
+    }
     @Override
     public void renderEarly(EntityMaid animatable, PoseStack poseStack, float partialTick,
                             MultiBufferSource bufferSource, VertexConsumer buffer,

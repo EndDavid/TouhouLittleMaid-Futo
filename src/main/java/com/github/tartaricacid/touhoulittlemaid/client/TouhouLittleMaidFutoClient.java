@@ -156,6 +156,12 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 坐垫换肤界面：服务端发实体 id、客户端找到坐垫后开 Screen。
         // 同样是纯 Screen（没有物品槽），不走 MenuType。
         com.github.tartaricacid.touhoulittlemaid.network.OpenChairGuiPacket.initClient();
+        // AI 聊天：站点表同步（S2C）与「开设置界面」（S2C）。
+        // 两者都是纯客户端处理，因此在这里注册；服务端那两个 C2S 包在主入口注册。
+        com.github.tartaricacid.touhoulittlemaid.network.SyncAiSettingPacket.initClient();
+        com.github.tartaricacid.touhoulittlemaid.network.OpenMaidAIDataScreenPacket.initClient();
+        // 对着可聊天的女仆按聊天键（默认 T）开界面
+        com.github.tartaricacid.touhoulittlemaid.client.event.PressAIChatKeyEvent.init();
 
 
         // 座位实体不该被看见，但必须有渲染器：未注册类型的

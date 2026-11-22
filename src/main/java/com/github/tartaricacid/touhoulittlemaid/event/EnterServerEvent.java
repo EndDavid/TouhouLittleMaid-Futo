@@ -32,6 +32,9 @@ public final class EnterServerEvent {
             if (InitTrigger.GIVE_SMART_SLAB_CONFIG != null) {
                 InitTrigger.GIVE_SMART_SLAB_CONFIG.trigger(player);
             }
+            // 把服务端的站点表与「哪些模型能聊天」同步给这位玩家。
+            // 聊天界面与设置界面的候选项全靠它，缺了这一句玩家看到的永远是空列表。
+            com.github.tartaricacid.touhoulittlemaid.network.SyncAiSettingPacket.sendTo(player);
         });
     }
 }

@@ -60,6 +60,11 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // Fabric 事件（LOADING / RELOADING），这里接上它 —— 见 ConfigLifecycleEvents 的类注释。
         com.github.tartaricacid.touhoulittlemaid.event.ConfigLifecycleEvents.init();
 
+        // 角色设定（config/touhou_little_maid/settings + 模型包里的 settings/*.yml）。
+        // 必须在配置注册之后：AvailableSites.readSites() 已经在 AIConfig.init 里跑过，
+        // 而设定文件的扫描只依赖文件系统，越早越好 —— 女仆一被创建就可能要查它。
+        com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.SettingReader.reloadSettings();
+
         // 判据触发器必须在任何数据包（进度 JSON）被解析之前注册，
         // 否则 grant_book_on_first_join 里的自定义触发器会被当成「未知判据」而整条进度不加载。
         com.github.tartaricacid.touhoulittlemaid.init.InitTrigger.init();
@@ -101,6 +106,10 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.SaveSwitcherDataPacket.initServer();
         // 坐垫换肤：C2S 改写坐垫四个同步字段（S2C 的「开界面」在客户端入口注册）
         com.github.tartaricacid.touhoulittlemaid.network.ChairModelPacket.initServer();
+        // AI 聊天：说话（C2S）、保存 / 请求设置（C2S）
+        com.github.tartaricacid.touhoulittlemaid.network.SendUserChatPacket.initServer();
+        com.github.tartaricacid.touhoulittlemaid.network.SaveMaidAIDataPacket.initServer();
+        com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIDataPacket.initServer();
 
         // 女仆位置留档：周期性记录，供仆从铃 / 小号处理「她在未加载区块」那一半。
         // 原版 1.18.2 没有实体卸载钩子，Fabric API 0.77 也没有对应事件，说明见该类注释。

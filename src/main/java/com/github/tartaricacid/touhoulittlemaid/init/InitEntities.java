@@ -36,6 +36,9 @@ public final class InitEntities {
         // 1.18.2 没有 DataSerializer 注册表，序列化器直接登记到 EntityDataSerializers（网络同步用）。
         // 必须先于实体类型注册：EntityMaid 的静态初始化会用到 MaidSchedule.DATA
         net.minecraft.network.syncher.EntityDataSerializers.registerSerializer(MaidSchedule.DATA);
+        // 聊天气泡（三个槽位）也是同步数据：EntityMaid#CHAT_BUBBLE 用它
+        net.minecraft.network.syncher.EntityDataSerializers.registerSerializer(
+                com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles.DATA);
     }
 
     public static final EntityType<EntityMaid> MAID = Registry.register(Registry.ENTITY_TYPE,

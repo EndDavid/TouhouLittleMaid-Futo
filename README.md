@@ -78,7 +78,7 @@ loom_version=1.15.5
 | 女仆配置界面（8 项子配置） | 完成 |
 | 任务设置界面（默认提示 / 攻击名单） | 完成 |
 | 饮食系统 | 完成（工作餐 / 回血餐 / 家庭餐，三类均已注册） |
-| 配置系统（Forge Config API Port） | 完成，`AIConfig` 待补 |
+| 配置系统（Forge Config API Port） | 完成（含 `AIConfig`） |
 | 声音（语音包 / 环境音 / 频率控制） | 完成 |
 | 弹幕攻击 / 御币 / 钓鱼 | 完成 |
 | 灵力（Power / P 点） | 完成（Mixin 挂在玩家实体上） |
@@ -95,6 +95,7 @@ loom_version=1.15.5
 | **棋类（象棋 / 五子棋 / 国际象棋：各 3×3 多方块 + 对局 AI）** | **完成**（三块棋盘全部可玩） |
 | 骑乘模型倒置 | **完成**（钓鱼已回归上游的「坐船 / 坐垫再抛钩」） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | **完成**（挂在御币上，效果走弹幕链路） |
+| **AI 聊天（LLM 对话 + 头顶气泡 + 设置界面）** | **完成**（TTS / STT 未做） |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
 | **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
 
@@ -3632,3 +3633,174 @@ if (!switcher.isPowered()) return;               // 掉电不换模式
 数据包已按 1.18.2 的线程模型写好：`ClientPlayNetworking` 的回调里**先把 buffer 读完**
 （出回调即失效），再 `client.execute(...)` 切主线程开 Screen；C2S 那侧服务端复核
 `ServerLevel#isLoaded`（避免被伪造坐标强制加载区块）与「该坐标确实是模型切换器」。
+
+---
+
+## AI 聊天（LLM 对话）
+
+对着自己的女仆按聊天键（默认 T）输入一句话，服务端把它连同角色设定与对话历史发给
+OpenAI 兼容接口，回复以**头顶气泡 + 聊天栏**两种形式送到玩家眼前。
+
+`ai` 包共 24 个文件。上游 44 个里去掉 TTS 16 个与 STT 3 个，其余逐个移植。
+
+### 数据流
+
+```
+客户端  按 T  [ 准星指着自己的女仆 && 她的模型有角色设定 ]
+          -> SendUserChatPacket   maidId / 文本 / 当前语言显示名
+服务端  复核 [ 实体是女仆 && 活着 && 是自己的 ]
+          -> MaidAIChatManager#chat
+              站点表 [ 必须有 api_key ] -> 角色设定 [ 必须有对应 model_id ]
+              -> 拼 ChatCompletion [ system 设定 + 历史 + 末尾语言强调 ]
+              -> HttpClient.sendAsync [ 异步，20 秒超时 ]
+          <- 回调 -> MinecraftServer#submit 回主线程
+              -> 解析 ResponseChat{chat_text, tts_text}
+              -> ChatBubbleManger.addAiChatText [ 气泡 + 聊天栏 ]
+                  同步字段 CHAT_BUBBLE -> 客户端渲染
+```
+
+### 两个数据源都在「运行时可改」
+
+| 文件 | 内容 | 何时读 |
+|---|---|---|
+| `assets/touhou_little_maid/config/available_sites.yml`（jar 内置） | 站点模板 | 启动时 |
+| `config/touhou_little_maid/available_sites.yml`（玩家） | 填 `api_key` 的地方 | 启动时 / `/tlm ai_chat reload` |
+| `config/touhou_little_maid/settings/*.yml`（玩家，最多 8 层） | 角色设定 | 同上 |
+| `assets/<domain>/settings/*.yml`（模型包，1 层） | 角色设定 | 同上 |
+
+**只有填了 `api_key` 的站点才会进 `CHAT_SITES`。**
+一份干净的配置里 `CHAT_SITES` 是空的，聊天时提示
+`ai.touhou_little_maid.chat.api_key.empty` —— 这是预期行为。
+
+内置模板里 `player2` 的 `api_key` 是字面量 `empty`（上游同款），所以**默认会走 player2 本地站点**。
+没装 player2 桌面端就会连接失败并提示错误，这也是上游行为。想用云端站点请自己填 key。
+
+读完后会**把合并结果写回玩家配置文件**（上游同样如此），第一次进游戏就能看到一份完整模板。
+
+### 角色设定：决定「这只女仆能不能聊天」
+
+```yaml
+meta:
+  author: 作者
+  model_id: [touhou_little_maid:hakurei_reimu]
+setting: |
+  你是博丽灵梦……
+  现在是 ${game_time}，天气 ${weather}，你在 ${dimension}。
+  主人叫 ${owner_name}。
+```
+
+支持的占位符（与上游逐条一致）：
+
+`${game_time}` `${weather}` `${dimension}` `${mainhand_item}` `${offhand_item}`
+`${inventory_items}` `${output_json_format}` `${chat_language}` `${tts_language}`
+`${healthy}` `${owner_healthy}` `${armor_items}` `${effects}` `${biome}`
+`${owner_name}` `${custom_setting}`
+
+`setting` 里 `#` 开头的行与空行会被丢掉，其余按行拼接。
+**模型没有对应设定文件就不能聊天**（提示 `ai.touhou_little_maid.chat.no_setting`）。
+
+内置只有 geckolib 的两个设定（`winefox` / `zhiban`），所以**默认只有这两只女仆能聊天**。
+这是上游行为，不是缺功能：给 `touhou_little_maid:hakurei_reimu` 写一份就能聊。
+
+### 输出契约：模型必须返回 JSON
+
+请求里带 `response_format: {"type":"json_object"}`，并要求模型只返回
+`{"chat_text": "…", "tts_text": "…"}`。两者都为空或解析失败都会给主人发一条红字错误。
+
+`tts_text` 本轮**不播放**（TTS 未移植），但**字段不能删**。
+`${output_json_format}` 就是用 `ResponseChat` 的空实例序列化出来的，
+少一个字段模型就不会返回它，将来的 TTS 还得再改 prompt。
+
+### 与上游的差异（都是框架差异）
+
+| 位置 | 上游 | 本移植版 | 原因 |
+|---|---|---|---|
+| 说话 / 保存 / 请求设置的包 | `SimpleChannel` + 7 个 `IMessage` | 4 个独立 `ResourceLocation` 通道 + 5 个类 | Fabric 没有 `SimpleChannel` |
+| 按 T 的拦截 | `InputEvent.KeyInputEvent`（GLFW 回调里就判定） | `ClientTickEvents.START_CLIENT_TICK` | Fabric 没有按键事件 |
+| 每只女仆的设置界面 | Cloth Config（`PartAIIntegration`） | 手写 `MaidAISettingScreen` | 没有移植 Cloth 集成 |
+| 气泡渲染类型 | 自建「关混合」的 `RenderType` | `RenderType.text` + 顶点补 `color` | 上游靠 Forge AT 打开 `RenderStateShard` 内部构造器，本移植版没有 AT |
+| 角色设定的来源 | 扫 `tlm_custom_pack/*.zip` | 扫 jar 的 `assets/<domain>/settings` + 玩家 `tlm_custom_pack` | 内置模型包在 jar 里、不在游戏目录 |
+| 聊天键的组合键判断 | `KeyModifier.getActiveModifier()` | 省略 | Fabric 无等价物 |
+
+**按键顺序很关键**: 先判 [ 准星指向的女仆能不能聊 ]，再 `consumeClick()`。
+反过来的话，玩家指着普通方块按 T 时点击已被吃掉，聊天栏就打不开了。
+
+### 聊天气泡：本轮只做了 AI 需要的那一半
+
+已移植：`ChatText` / `ChatTextType` / `MaidChatBubbles`（三个槽位 + 同步序列化器）/
+`ChatBubbleManger` 的槽位选择、过期清理、内部提示、AI 回复 / `ChatBubbleRenderer`（只画文本）。
+
+**未移植**（属于「聊天气泡子系统」那一轮）：每 60 秒的随机台本（`idle` / `sleep` / `work` /
+`morning` / `rain` / `cold` …）、受伤气泡、饰品带的 `other` 气泡、书与笔写的台本
+（`MaidScriptBookManager`）、图标气泡（需要 `SizeTexture` 贴图缓存）。
+
+所以：**如果不用 AI 聊天，女仆头顶不会有任何气泡** —— 预期行为。
+
+过期判定**两端都做**：服务端清是不再同步旧内容，客户端清是因为同步包有延迟。
+
+### 存档字段
+
+`MaidAIChatData` 下 8 项，与上游同名同序。
+`MaidAIDataSerializable` 的 `encode` / `decode` 由存档与两个网络包共用一份，所以不会错位：
+
+```
+ChatSiteName / ChatModel / ChatTemperature / TtsSiteName /
+TtsModel / TtsLanguage / OwnerName / CustomSetting
+```
+
+`ChatTemperature = -1` 表示「跟随全局配置」（默认值，见 `MaidAIChatData#getChatTemperature`）。
+
+### 全局配置（`AIConfig`，9 项，键名与默认值不改）
+
+真正生效的是 `ai.ChatEnabled` / `ai.ChatTemperature` / `ai.ChatProxyAddress` /
+`ai.MaidMaxHistoryChatSize`。
+
+`ai.TtsEnabled` / `ai.TtsLanguage` / `ai.TtsProxyAddress` / `ai.SttUrl` / `ai.SttProxyAddress`
+**填了没有效果**（TTS / STT 未移植）。保留是为了存档与配置可与上游互换，
+以及 `${tts_language}` 占位符要有值。
+
+### `/tlm ai_chat reload`
+
+重读站点表 + 角色设定，并把「哪些模型能聊天」与「有哪些站点可选」广播给全部在线玩家。
+没有它就只能重启服务器。上游同样提供这条命令。
+
+### 验证到什么程度
+
+四道闸（`build` / `check-encoding` / `check-renderers` / `validate-book`）全绿。
+
+服务端实测（`runServer` + `port/rcon.py`）：
+
+```
+[Futo] AI chat sites: 1 chat / 2 tts (only those with an api key count)
+[Futo] loaded 6 character settings for AI chat
+
+summon touhou_little_maid:maid 6 100 6            -> Summoned
+data get ... MaidAIChatData
+  -> {TtsSiteName:"", OwnerName:"", ChatModel:"", TtsModel:"",
+      TtsLanguage:"", ChatSiteName:"", ChatTemperature:-1.0d, CustomSetting:""}
+data merge ... {MaidAIChatData:{ChatSiteName:"player2",ChatModel:"default",
+      ChatTemperature:0.7d,OwnerName:"...",CustomSetting:"...",TtsLanguage:"zh_cn"}}
+data get ... -> 八个字段全部按写入值读回（中文以 UTF-8 存取正常）
+
+tlm ai_chat reload -> message.touhou_little_maid.ai_chat.reload_success
+```
+
+`run/config/touhou_little_maid/available_sites.yml` 生成正确：5 个站点，`api_type` 已补齐
+（`deepseek` 原本缺这一项，被补成 `openai`）。
+
+**没验证到的**（需要真人 + 真实 API key）：
+
+- 真实 LLM 请求与回复（玩家自行填 `api_key` 后用 `runClient` 试）；
+- 聊天界面 / 设置界面的交互，以及头顶气泡的实际绘制位置；
+- 「按 T 拦截而不弹原版聊天栏」这一步（已按 `Minecraft.tick()` 的顺序推演，但需要真按键）。
+
+### 气泡渲染为什么用 `RenderType.text`
+
+上游自建了一种「关混合、不模糊」的渲染类型，但它需要构造
+`RenderStateShard.TransparencyStateShard` 与 `RenderType.CompositeState`。
+这两个在 vanilla 里是 **protected** 内部类构造器，上游靠 Forge 的 AT 打开了它们。
+本移植版没有 AT（见 `build.gradle` 末尾的说明），因此改用原版公开的 `RenderType.text`：
+`POSITION_COLOR_TEX` + 半透明混合 + `LEQUAL` 深度测试。气泡贴图本身带 alpha，视觉上与上游一致。
+
+**代价**：顶点格式含 `COLOR`，所以 `vertex()` 必须依次写 `vertex -> color -> uv`。
+漏掉 `color` 会在写顶点时抛异常，而异常点在渲染循环里，表现是「一放女仆就崩」。

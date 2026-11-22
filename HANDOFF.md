@@ -57,6 +57,30 @@
 代码侧的数据包线程模型与服务端复核都已就位，风险只在 UI 布局。
 
 模型切换器还要确认两件事：关界面后红石脉冲仍能切换；「手持物品右击女仆」把 tooltip 从「未绑定」变成「已绑定」。
+
+### AI 聊天（本轮，B 方案：文本链路 + 最小气泡层）
+
+`ai` 包 24 个文件 + 4 个网络包 + 2 个界面 + 1 个按键事件 + 1 条命令。
+
+- **服务端链路**：`AvailableSites`（yml 站点表，只有填了 `api_key` 的才进表）/
+  `SettingReader`（角色设定，扫 `config/…/settings` 8 层 + jar 的 `assets/<domain>/settings` 1 层 +
+  玩家 `tlm_custom_pack`）/ `PapiReplacer`（16 个占位符）/ `Service`（HttpClient + 拼 prompt）/
+  `MaidAIChatManager`（回调回主线程 + 解析 `ResponseChat` + 气泡/聊天栏）。
+- **气泡层（只做 AI 需要的那一半）**：`ChatText` / `ChatTextType` / `MaidChatBubbles`
+  （三槽位 + `EntityDataSerializer`，在 `InitEntities` 静态块里注册）/ `ChatBubbleManger`
+  （槽位选择、过期清理、内部提示、AI 回复）/ `client/renderer/ai/ChatBubbleRenderer`（只画文本）。
+- **接入点**：`EntityMaid` 加 `aiChatManager` 字段 + `CHAT_BUBBLE` 同步数据 + NBT 读写 + 5 个 getter；
+  `MaidRenderer#render` 尾部画气泡；`GeneralConfig` 接 `AIConfig`；
+  `EnterServerEvent` 登录时同步站点表；`TouhouLittleMaidFuto` / `…Client` 注册包。
+- **新增依赖**：`libs/snakeyaml-2.4.jar`（从上游 Forge jar 的 `META-INF/jarjar` 解出，
+  `implementation files(...)`）。**编辑 build.gradle 时把 `modLocalRuntime files("libs/fiber-0.23.0-2.jar")`
+  误删过一次，导致 Patchouli 入口点 `NoClassDefFoundError: …fiber…ValueSerializer` —— 已恢复。**
+
+四道闸全绿；`runServer` 实测：`AI chat sites: 1 chat / 2 tts`、`loaded 6 character settings`、
+八项 `MaidAIChatData` NBT 读写通、`/tlm ai_chat reload` 通。
+
+**未做**：TTS（16 文件）/ STT（3 文件）/ Cloth 的 `GlobalAIIntegration` 与 `PartAIIntegration`
+（改成手写 `MaidAISettingScreen`）/ 气泡的随机台本与图标 / `/tlm ai_chat` 的调试子命令。
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；
@@ -81,3 +105,13 @@
 - 起 `runServer` 前先确认没有上次遗留的服务端占着 `run/world/session.lock`
   （现象是 `Failed to start the minecraft server` + `IOException`，
   但 RCON 端口其实还通 —— 那说明旧服务端还活着）。
+- **`insert_edit_into_file` 对 `EntityMaid.java`（3600 行）也是雷区**：本轮用它插一段字段声明，
+  结果它把整个文件删掉 587 行（`git diff --stat` 显示 `-587`），编译错误全是 `找不到符号`。
+  **恢复方式**：`git checkout -- <file>` 回到 HEAD，再用 Python 脚本按锚点精确插入，
+  写完立刻 `git diff --stat <file>` —— 只应看到几十行 `+`，没有 `-`。
+  规则：**超过 1000 行的文件一律只用 Python 脚本改**。
+- **判断 CRLF 再读写**：`raw = open(p,'rb').read(); crlf = b'\r\n' in raw`，
+  改完 `t.replace('\n','\r\n') if crlf else t`。`EntityMaid.java` / `README.md` / `HANDOFF.md`
+  都是 CRLF；`TouhouLittleMaidFutoClient.java` 在库里是 LF。
+- **终端回显里的 `touhoullittlemaid`（三个 l）是真故障**：编辑工具回写时出现过 3 处，
+  编译会报 `程序包不存在`。用 `grep -c touhoullittlemaid <file>` 自查。
