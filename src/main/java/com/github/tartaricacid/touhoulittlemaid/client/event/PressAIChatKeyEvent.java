@@ -20,7 +20,7 @@ import java.util.Set;
  * <h2>为什么复用原版聊天键</h2>
  * <p>上游复用的是 {@code Minecraft.options.keyChat}（默认 T），
  * 而不是新注册一个键。这样不占按键表，玩家也不用额外配置；
- * 只有「准星正指着一只已归属自己、且模型有角色设定的女仆」时才拦截，
+ * 只有「准星正指着一只已归属自己的女仆」时才拦截（与 1.20.1 一致），
  * 其余情况 T 仍然是打开聊天栏。</p>
  *
  * <h2>与上游的差异（框架差异）</h2>
@@ -30,7 +30,7 @@ import java.util.Set;
  *         {@code ClientTickEvents.START_CLIENT_TICK}：它在 {@code Minecraft.tick()} 之前执行，
  *         而原版打开聊天栏正是 {@code Minecraft.tick()} 里 {@code keyChat.consumeClick()} 做的，
  *         因此我们先把这次点击取走，原版就拿不到，聊天栏不会弹出来。</li>
- *     <li><b>顺序很关键：先判「是否命中可聊天女仆」，再 consumeClick。</b>
+ *     <li><b>顺序很关键：先判「准星是否命中自己的女仆」，再 consumeClick。</b>
  *         反过来的话，玩家指着普通方块按 T 时点击已被吃掉，聊天栏就打不开了。</li>
  *     <li>上游的 {@code KeyModifier.getActiveModifier()} 判断（Shift+T 之类）在 Fabric 没有等价物，
  *         省略：只要没有其它模组把 T 绑成组合键，行为一致。</li>
@@ -38,7 +38,8 @@ import java.util.Set;
  */
 public final class PressAIChatKeyEvent {
     /**
-     * 有角色设定的模型 id 集合。由 SyncAiSettingPacket 在登录 / reload 时填充。
+     * 拥有角色设定的模型 id 集合，由 SyncAiSettingPacket 在登录 / reload 时填充。
+     * <p>它不再参与「能不能开界面」的判断（1.20.1 允许所有女仆开界面），
      */
     public static final Set<String> CAN_CHAT_MAID_IDS = Sets.newHashSet();
 
@@ -69,7 +70,7 @@ public final class PressAIChatKeyEvent {
      * 准星指向的女仆是否可聊天。
      *
      * <p>四个条件与上游逐条一致：玩家在场且不是观察者、准星命中实体、
-     * 那个实体是女仆、她是这位玩家的、且她的模型有角色设定。</p>
+     * 那个实体是女仆、且她是这位玩家的。</p>
      */
     @Nullable
     private static EntityMaid maidCheck(Minecraft minecraft) {
@@ -87,9 +88,8 @@ public final class PressAIChatKeyEvent {
         if (!maid.isOwnedByPlayer(player)) {
             return null;
         }
-        if (!CAN_CHAT_MAID_IDS.contains(maid.getModelId())) {
-            return null;
-        }
+        // 与 1.20.1 一致：这里只要求「是自己的女仆」，不再按 model_id 白名单过滤。
+        // 没有角色设定的模型会在第一次说话时自动生成一份（见 MaidAIChatManager）。
         return maid;
     }
 

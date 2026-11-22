@@ -3697,10 +3697,23 @@ setting: |
 `${owner_name}` `${custom_setting}`
 
 `setting` 里 `#` 开头的行与空行会被丢掉，其余按行拼接。
-**模型没有对应设定文件就不能聊天**（提示 `ai.touhou_little_maid.chat.no_setting`）。
+**所有女仆都能按 T 打开聊天界面**，与 1.20.1 一致。真正缺设定时不是拒绝聊天，
+而是**第一次说话时自动生成一份**（`ai.AutoGenSettingEnabled`，默认开启）：
 
-内置只有 geckolib 的两个设定（`winefox` / `zhiban`），所以**默认只有这两只女仆能聊天**。
-这是上游行为，不是缺功能：给 `touhou_little_maid:hakurei_reimu` 写一份就能聊。
+```
+说话 -> getSetting() 为空
+     -> 气泡『角色设定为空，正在生成角色设定……』
+     -> 发一次特殊 prompt（要求只返回 setting 正文，JSON 契约与普通聊天相同）
+     -> 成功后写 config/touhou_little_maid/settings/<model_id>.yml 并 reload
+     -> 气泡『角色设定文件已经自动生成完毕』
+     -> 玩家再说一次就能正常聊（生成期间重复说话不会重复请求）
+```
+
+生成物就是普通设定文件（`meta.author` / `meta.model_id` / `setting: |`），可以直接手改。
+**同名文件已存在时绝不覆盖** —— 玩家手写的人设永远优先。
+
+内置只有 geckolib 的两个设定（`winefox` / `zhiban`），其余模型第一次说话会走上面这条路径；
+不想让模型自动写人设就把 `ai.AutoGenSettingEnabled` 关掉，那时会提示『这个模型还没有角色设定』。
 
 ### 输出契约：模型必须返回 JSON
 
@@ -3721,6 +3734,7 @@ setting: |
 | 气泡渲染类型 | 自建「关混合」的 `RenderType` | `RenderType.text` + 顶点补 `color` | 上游靠 Forge AT 打开 `RenderStateShard` 内部构造器，本移植版没有 AT |
 | 角色设定的来源 | 扫 `tlm_custom_pack/*.zip` | 扫 jar 的 `assets/<domain>/settings` + 玩家 `tlm_custom_pack` | 内置模型包在 jar 里、不在游戏目录 |
 | 聊天键的组合键判断 | `KeyModifier.getActiveModifier()` | 省略 | Fabric 无等价物 |
+| 设定为空 | 1.18.2：提示 no_setting 后什么都不做 | 1.20.1 的行为：自动生成一份并落盘 | 按用户要求贴近 TLMO |
 
 **按键顺序很关键**: 先判 [ 准星指向的女仆能不能聊 ]，再 `consumeClick()`。
 反过来的话，玩家指着普通方块按 T 时点击已被吃掉，聊天栏就打不开了。
@@ -3750,10 +3764,13 @@ TtsModel / TtsLanguage / OwnerName / CustomSetting
 
 `ChatTemperature = -1` 表示「跟随全局配置」（默认值，见 `MaidAIChatData#getChatTemperature`）。
 
-### 全局配置（`AIConfig`，9 项，键名与默认值不改）
+### 全局配置（`AIConfig`，10 项）
 
 真正生效的是 `ai.ChatEnabled` / `ai.ChatTemperature` / `ai.ChatProxyAddress` /
 `ai.MaidMaxHistoryChatSize`。
+
+`ai.AutoGenSettingEnabled`（默认 true）是 1.20.1 才有的项（1.18.2 上游没有），
+本移植版按「行为贴近 TLMO」补上。
 
 `ai.TtsEnabled` / `ai.TtsLanguage` / `ai.TtsProxyAddress` / `ai.SttUrl` / `ai.SttProxyAddress`
 **填了没有效果**（TTS / STT 未移植）。保留是为了存档与配置可与上游互换，

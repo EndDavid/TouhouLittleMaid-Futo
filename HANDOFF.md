@@ -76,6 +76,11 @@
   `implementation files(...)`）。**编辑 build.gradle 时把 `modLocalRuntime files("libs/fiber-0.23.0-2.jar")`
   误删过一次，导致 Patchouli 入口点 `NoClassDefFoundError: …fiber…ValueSerializer` —— 已恢复。**
 
+**后续修正（同一轮）**：原先用 `CAN_CHAT_MAID_IDS`（模型必须有 settings 文件）过滤按 T 的行为，
+这是 1.18.2 上游的老做法。1.20.1 是**所有女仆都能开界面**，设定为空时第一次说话自动生成一份
+（`ai.AutoGenSettingEnabled`，默认 true；实现见 `AutoGenSetting` + `SettingReader#saveGeneratedSetting`，
+同名文件不覆盖）。已按 1.20.1 改掉，三个 `ai.touhou_little_maid.chat.llm.*` 提示键也补齐了。
+
 四道闸全绿；`runServer` 实测：`AI chat sites: 1 chat / 2 tts`、`loaded 6 character settings`、
 八项 `MaidAIChatData` NBT 读写通、`/tlm ai_chat reload` 通。
 
@@ -115,3 +120,10 @@
   都是 CRLF；`TouhouLittleMaidFutoClient.java` 在库里是 LF。
 - **终端回显里的 `touhoullittlemaid`（三个 l）是真故障**：编辑工具回写时出现过 3 处，
   编译会报 `程序包不存在`。用 `grep -c touhoullittlemaid <file>` 自查。
+- **两份 `lang/*.json` 是「混合行尾」（约 458 行 CRLF + 1400 行 LF）**，
+  `crlf = b'\r\n' in raw` 这种判断对它们**必然是 True**，于是「统一转 CRLF 再写回」
+  会把整份文件算成改动（本轮 `git diff --stat` 出现了 2055 / 2017 行）。
+  正确做法：只在**目标行所在位置按字节插入**，EOL 取那一行自己的：
+  `j = base.index(b'\n', i) + 1; eol = b'\r\n' if base[j-2:j] == b'\r\n' else b'\n'`，
+  并用 `git show <上一轮提交>:<path>` 取 base 字节，改完 `git diff --stat <上一轮提交> -- <path>`
+  必须只有 `3 +++` 这种量级。

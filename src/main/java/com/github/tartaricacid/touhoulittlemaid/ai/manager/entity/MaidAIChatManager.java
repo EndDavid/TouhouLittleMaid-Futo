@@ -1,6 +1,8 @@
 package com.github.tartaricacid.touhoulittlemaid.ai.manager.entity;
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.ai.manager.response.ResponseChat;
+import com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.AutoGenSetting;
+import com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.SettingReader;
 import com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.Site;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.Service;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.ChatClient;
@@ -36,24 +38,127 @@ public final class MaidAIChatManager extends MaidAIChatData {
     public MaidAIChatManager(EntityMaid maid) {
         super(maid);
     }
+    /**
+     * 自动生成人设的请求是否正在飞行中。
+     *
+     * <p>上游用一个「等待中的气泡 id」抑制重复请求；这里用一个布尔位，效果相同，
+     * 而且不依赖气泡子系统：生成期间再说话只会再提示一次，
+     * 不会真的再发一次 HTTP 请求（那会多烧一份额度）。</p>
+     */
+    private boolean generatingSetting = false;
+
+    /**
+     * 自动生成的人设正文长度上限。上游在回调里也做过一次 substring 截断：
+     * 模型偶尔会写几千字，全部塞进 prompt 反而降低后续对话质量。
+     */
+    private static final int MAX_AUTO_SETTING_LENGTH = 2000;
+
+    /**
+     * 玩家说了一句话。
+     *
+     * <h2>与 1.18.2 上游的差异：设定为空不再等于「不能聊」</h2>
+     * <p>1.18.2 上游的做法是「这个模型没有 settings/*.yml 就提示 no_setting，什么都不做」。
+     * 1.20.1 改成了<b>所有女仆都能开界面</b>，第一次说话时若设定为空，
+     * 就带着「生成一份人设」的 prompt 发一次请求，把结果落盘成 settings 文件
+     * （见 onSettingIsEmpty）。本移植版按 1.20.1 的行为走。</p>
+     */
     public void chat(String message, String language) {
-        if (isChatEnabled()) {
-            @Nullable Site site = this.getChatSite();
-            if (site == null || StringUtils.isBlank(site.getApiKey())) {
-                ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.api_key.empty");
-            } else {
-                ChatClient chatClient = Service.getChatClient(site);
-                ChatCompletion chatCompletion = Service.getChatCompletion(this, language);
-                if (chatCompletion != null) {
-                    chatCompletion.userChat(message);
-                    chatClient.chat(chatCompletion).handle(this::onShowChatSync, this::onChatFailSync);
-                    this.addUserHistory(message);
-                } else {
-                    ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.no_setting");
-                }
-            }
-        } else {
+        if (!isChatEnabled()) {
             ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.disable");
+            return;
+        }
+        @Nullable Site site = this.getChatSite();
+        if (site == null || StringUtils.isBlank(site.getApiKey())) {
+            ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.api_key.empty");
+            return;
+        }
+        if (this.getSetting().isEmpty()) {
+            this.onSettingIsEmpty(site, language);
+            return;
+        }
+        ChatClient chatClient = Service.getChatClient(site);
+        ChatCompletion chatCompletion = Service.getChatCompletion(this, language);
+        if (chatCompletion == null) {
+            // getSetting() 刚查过非空，这里再取不到只可能是文件在这之间被删掉了
+            ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.llm.role_no_setting");
+            return;
+        }
+        chatCompletion.userChat(message);
+        chatClient.chat(chatCompletion).handle(this::onShowChatSync, this::onChatFailSync);
+        this.addUserHistory(message);
+    }
+
+    /**
+     * 这只模型的角色设定为空。
+     *
+     * <p>配置允许时自动生成（ai.AutoGenSettingEnabled，默认开启），
+     * 否则退回 1.18.2 上游的「设定为空」提示。</p>
+     */
+    private void onSettingIsEmpty(Site site, String language) {
+        if (!isAutoGenSettingEnabled()) {
+            ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.llm.role_no_setting");
+            return;
+        }
+        this.autoGenSetting(site, language);
+    }
+
+    /**
+     * 让模型写一份人设，成功后落盘成 config/touhou_little_maid/settings/<model>.yml。
+     */
+    private void autoGenSetting(Site site, String language) {
+        // 提示先弹：这一步可能要等十几秒，玩家需要知道正在处理
+        ChatBubbleManger.addInnerChatText(maid,
+                "ai.touhou_little_maid.chat.llm.role_no_setting_and_gen_setting");
+        if (this.generatingSetting) {
+            return;
+        }
+        this.generatingSetting = true;
+        ChatCompletion completion = AutoGenSetting.build(this, language);
+        Service.getChatClient(site).chat(completion).handle(this::onAutoGenSuccess, this::onAutoGenFail);
+    }
+
+    private void onAutoGenSuccess(ChatCompletionResponse result) {
+        String body = AutoGenSetting.stripCodeFence(result.getFirstChoiceMessage());
+        runOnServer(() -> {
+            this.generatingSetting = false;
+            if (StringUtils.isBlank(body)) {
+                TouhouLittleMaid.LOGGER.error("[Futo] empty auto generated AI setting");
+                ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.llm.role_no_setting");
+                return;
+            }
+            String trimmed = body.length() > MAX_AUTO_SETTING_LENGTH
+                    ? body.substring(0, MAX_AUTO_SETTING_LENGTH) : body;
+            if (SettingReader.saveGeneratedSetting(maid.getModelId(), trimmed)) {
+                ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.llm.auto_gen_setting");
+            } else {
+                // 已有同名文件（玩家手写）或写盘失败：不覆盖，提示仍然缺设定
+                ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.llm.role_no_setting");
+            }
+        });
+    }
+
+    private void onAutoGenFail(Throwable throwable) {
+        runOnServer(() -> this.generatingSetting = false);
+        this.onChatFailSync(throwable);
+    }
+
+    /**
+     * 把一段逻辑投递到服务端主线程：落盘、写同步数据、发消息都只能在主线程做。
+     */
+    private void runOnServer(Runnable task) {
+        if (!(maid.level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        serverLevel.getServer().submit(task);
+    }
+
+    private static boolean isAutoGenSettingEnabled() {
+        try {
+            return AIConfig.AUTO_GEN_SETTING_ENABLED == null
+                    || Boolean.TRUE.equals(AIConfig.AUTO_GEN_SETTING_ENABLED.get());
+        } catch (Exception ignored) {
+            // 配置尚未加载：按默认（开启）处理
+            return true;
         }
     }
     /**

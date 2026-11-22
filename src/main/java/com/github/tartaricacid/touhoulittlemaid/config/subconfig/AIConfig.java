@@ -23,6 +23,10 @@ public class AIConfig {
     public static ForgeConfigSpec.ConfigValue<String> STT_URL;
     public static ForgeConfigSpec.ConfigValue<String> STT_PROXY_ADDRESS;
     public static ForgeConfigSpec.IntValue MAID_MAX_HISTORY_CHAT_SIZE;
+    /**
+     * 角色设定为空时自动生成一份（1.20.1 TLMO 的特性，1.18.2 上游还没有）。
+     */
+    public static ForgeConfigSpec.BooleanValue AUTO_GEN_SETTING_ENABLED;
     public static void init(ForgeConfigSpec.Builder builder) {
         // 读取网站列表（jar 内置的 + config/touhou_little_maid/available_sites.yml）
         AvailableSites.readSites();
@@ -43,6 +47,8 @@ public class AIConfig {
         STT_URL = builder.define("STTUrl", "http://127.0.0.1:4315/v1/stt");
         builder.comment("STT Proxy Address, such as 127.0.0.1:1080, empty is no proxy, SOCKS proxies are not supported");
         STT_PROXY_ADDRESS = builder.define("STTProxyAddress", "");
+        builder.comment("Generate a character setting automatically when the maid's model has none");
+        AUTO_GEN_SETTING_ENABLED = builder.define("AutoGenSettingEnabled", true);
         builder.comment("The maximum historical conversation length cached by the maid");
         MAID_MAX_HISTORY_CHAT_SIZE = builder.defineInRange("MaidMaxHistoryChatSize", 16, 1, 128);
         builder.pop();

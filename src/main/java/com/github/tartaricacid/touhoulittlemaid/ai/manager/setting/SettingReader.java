@@ -3,6 +3,7 @@ import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.google.common.collect.Maps;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,6 +12,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Enumeration;
@@ -162,6 +164,53 @@ public final class SettingReader {
                 return super.visitFile(file, attributes);
             }
         });
+    }
+    /**
+     * 角色设定目录（{@code config/touhou_little_maid/settings}），供自动生成时落盘用。
+     */
+    public static Path getSettingsFolder() {
+        return SETTINGS_FOLDER;
+    }
+    /**
+     * 把自动生成的设定写成 {@code <模型 id>.yml} 并重新加载。
+     *
+     * <p><b>已存在同名文件时直接返回 {@code false}，绝不覆盖</b>：玩家手写的设定永远优先于
+     * 模型生成的，覆盖一次就是永久丢失。</p>
+     *
+     * <p>写出的结构与手写文件完全一致（{@code meta.author} / {@code meta.model_id} /
+     * {@code setting: |}），因此生成物可以被人直接编辑，也可以被 {@link #reloadSettings()}
+     * 当普通文件读回来。</p>
+     *
+     * @return 是否真的写出了新文件
+     */
+    public static boolean saveGeneratedSetting(String modelId, String settingText) {
+        if (StringUtils.isBlank(modelId) || StringUtils.isBlank(settingText)) {
+            return false;
+        }
+        String fileName = modelId.replace(':', '_').replace('/', '_') + YAML_SUFFIX;
+        Path target = SETTINGS_FOLDER.resolve(fileName);
+        if (Files.exists(target)) {
+            TouhouLittleMaid.LOGGER.info("[Futo] AI setting for {} already exists, not overwriting", modelId);
+            return false;
+        }
+        try {
+            Files.createDirectories(SETTINGS_FOLDER);
+            StringBuilder builder = new StringBuilder();
+            builder.append("meta:\n");
+            builder.append("  author: touhou_little_maid\n");
+            builder.append("  model_id: [").append(modelId).append("]\n");
+            builder.append("setting: |\n");
+            for (String line : settingText.split("\n")) {
+                builder.append("  ").append(line).append('\n');
+            }
+            Files.write(target, builder.toString().getBytes(StandardCharsets.UTF_8));
+            reloadSettings();
+            TouhouLittleMaid.LOGGER.info("[Futo] auto generated AI setting saved to {}", target);
+            return true;
+        } catch (IOException e) {
+            TouhouLittleMaid.LOGGER.error("[Futo] failed to save auto generated AI setting", e);
+            return false;
+        }
     }
     public static Optional<CharacterSetting> getSetting(@NotNull String name) {
         return Optional.ofNullable(SETTINGS.get(name));
