@@ -124,6 +124,24 @@ public final class MaidAIChatManager extends MaidAIChatData {
         Service.getChatClient(site).chat(completion).handle(this::onAutoGenSuccess, this::onAutoGenFail);
     }
 
+    /**
+     * 从「角色设定编辑器」发起的重新生成。
+     *
+     * <p>与首次聊天时的自动生成走同一条链路，区别只有两点：</p>
+     * <ul>
+     *     <li>不需要先说话，可以直接点；</li>
+     *     <li>不看 {@code AutoGenSettingEnabled}（这是玩家的显式请求）。</li>
+     * </ul>
+     * <p>已有设定文件时仍然不覆盖（见 {@code SettingReader#saveGeneratedSetting}）。</p>
+     */
+    public void regenerateSetting(String language) {
+        @Nullable Site site = this.getChatSite();
+        if (site == null || StringUtils.isBlank(site.getApiKey())) {
+            ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.api_key.empty");
+            return;
+        }
+        this.autoGenSetting(site, language);
+    }
     private void onAutoGenSuccess(ChatCompletionResponse result) {
         String body = AutoGenSetting.stripCodeFence(result.getFirstChoiceMessage());
         this.addTokens(result);

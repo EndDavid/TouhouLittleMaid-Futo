@@ -98,12 +98,15 @@ public class AIChatScreen extends Screen {
 
         int buttonY = inputY - 26;
         int step = BUTTON_SIZE + BUTTON_GAP;
-        addSideButton(inputX, buttonY, "\uD83D\uDD51", () -> openHistory());
-        addSideButton(inputX + step, buttonY, "\u2699", this::openSetting);
-        addSideButton(inputX + step * 2, buttonY, "\u270E", this::openSetting);
+        // 字形全部限定在 BMP 内：1.20.1 用的 U+1F551 / U+1F50A / U+1F310 属于增补平面，
+        // 1.18.2 自带的 unifont 没有这些字形，会渲染成方框。这里换成语义等价的 BMP 符号：
+        // U+2261 列表 / U+2699 设定 / U+270E 设置 / U+2726 星形 / U+266A 音符 / "Aa" 语种。
+        addSideButton(inputX, buttonY, "\u2261", this::openHistory);
+        addSideButton(inputX + step, buttonY, "\u2699", this::openSettingEditor);
+        addSideButton(inputX + step * 2, buttonY, "\u270E", this::openConfig);
         int right = inputX + inputWidth - BUTTON_SIZE;
-        addSideButton(right, buttonY, "\uD83C\uDF10", () -> togglePopup(PopupType.LANGUAGE, right, buttonY));
-        addSideButton(right - step, buttonY, "\uD83D\uDD0A",
+        addSideButton(right, buttonY, "Aa", () -> togglePopup(PopupType.LANGUAGE, right, buttonY));
+        addSideButton(right - step, buttonY, "\u266A",
                 () -> togglePopup(PopupType.TTS, right - step, buttonY));
         addSideButton(right - step * 2, buttonY, "\u2726",
                 () -> togglePopup(PopupType.LLM, right - step * 2, buttonY));
@@ -122,7 +125,16 @@ public class AIChatScreen extends Screen {
         GetMaidAIHistoryPacket.send(this.maid.getId());
     }
 
-    private void openSetting() {
+    /**
+     * U+2699 = 角色设定编辑器（1.20.1 的 SettingEditScreen）：人设正文 / 主人称呼 / 自定义设定。
+     */
+    private void openSettingEditor() {
+        Minecraft.getInstance().setScreen(new AISettingEditScreen(this.maid));
+    }
+    /**
+     * U+270E = 设置（1.20.1 的 config，本版是这只女仆的站点 / 模型 / 温度）。
+     */
+    private void openConfig() {
         PENDING_SETTING_SCREEN = true;
         GetMaidAIDataPacket.send(this.maid.getId());
     }
@@ -241,7 +253,7 @@ public class AIChatScreen extends Screen {
         poseStack.pushPose();
         poseStack.translate(this.width / 2.0F, y, 0.0F);
         poseStack.scale(0.75F, 0.75F, 1.0F);
-        drawCenteredString(poseStack, this.font, new TextComponent(text), 0, 0, 0xFFD700);
+        drawCenteredString(poseStack, this.font, new TextComponent(text), 0, 0, 0xAAAAAA);
         poseStack.popPose();
     }
 

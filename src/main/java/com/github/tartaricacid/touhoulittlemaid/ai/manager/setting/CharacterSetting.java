@@ -103,6 +103,13 @@ public class CharacterSetting {
     public String getSetting(EntityMaid maid, String language) {
         return PapiReplacer.replace(rawSetting, maid, language);
     }
+    /**
+     * 原始设定正文（已去掉注释与空行，各行以换行分隔）。
+     */
+    public String getRawSetting() {
+        return rawSetting;
+    }
+
     public String getAuthor() {
         return author;
     }
