@@ -86,6 +86,8 @@
 
 **未做**：TTS（16 文件）/ STT（3 文件）/ Cloth 的 `GlobalAIIntegration` 与 `PartAIIntegration`
 （改成手写 `MaidAISettingScreen`）/ 气泡的随机台本与图标 / `/tlm ai_chat` 的调试子命令。
+**后续修正（同一轮）**：气泡渲染原来只写 `vertex → color → uv`，而 `RenderType.text` 的顶点格式是 `POSITION_COLOR_TEX_LIGHTMAP`，缺 `uv2` 会让客户端在 `BufferBuilder#endVertex` 抛 `Not filled all elements of the vertex` —— 现象就是「一发消息就崩」（`run/crash-reports/crash-2026-11-22_20.19.15-client.txt`）。已补 `uv2(LightTexture.FULL_BRIGHT)`，并把布局按上游重新对齐（左右两条各让开 5、箭头按 0/1/2 列、去掉多余的 `max(1, width/20)`）。
+
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；
@@ -127,3 +129,4 @@
   `j = base.index(b'\n', i) + 1; eol = b'\r\n' if base[j-2:j] == b'\r\n' else b'\n'`，
   并用 `git show <上一轮提交>:<path>` 取 base 字节，改完 `git diff --stat <上一轮提交> -- <path>`
   必须只有 `3 +++` 这种量级。
+- **气泡背景必须给光照图坐标（`uv2`）**：`RenderType.text` 的格式是 `POSITION_COLOR_TEX_LIGHTMAP`（元素顺序 position → color → uv0 → uv2，已用 javap 从映射后的 1.18.2 jar 核实），少写一个就在 `endVertex` 抛 `Not filled all elements of the vertex`。`ChatBubbleRenderer#vertex` 末尾的 `uv2(LightTexture.FULL_BRIGHT)` 不是冗余，别删。上游靠 Forge AT 自建 `POSITION_TEX` 渲染类型，本仓库没有 AT，所以只能走 `RenderType.text`。
