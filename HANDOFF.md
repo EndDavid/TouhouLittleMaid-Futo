@@ -119,6 +119,35 @@
 `SoundEngineMixin` 的 `defaultRequire: 1` 意味着没打上会直接崩，所以这条日志等于「mixin 生效」。
 **未验证**：真实 TTS 合成与播放（需要 key / 本地 GPT-SoVITS）、系统旁白是否出声、音质。
 
+### 气泡样式按 1.20.1 重写（同一轮，真人反馈后）
+
+真机截图暴露了三个问题，都出在「沿用 1.18.2 那套 3x2 小方格」上：
+
+1. **不换行**：长回复被拉成一条横贯屏幕的白条；
+2. **坐下时太高**：碰撞箱不变，但模型蹲下去了，气泡顶在头发上；
+3. **贴图是旧的**：1.20.1 换成了 `textures/entity/chat_bubble/type1.png`。
+
+`client/renderer/ai/ChatBubbleRenderer` 因此整体重写（321 行）：
+
+- 贴图 `type1.png` / `type2.png` 从 TLMO 1.20.1 jar 复制到
+  `assets/touhou_little_maid/textures/entity/chat_bubble/`（256x256，气泡主体在左上
+  48x24，8 px 九宫格边距，三个 16x16 尾巴在 v=24 那一行）；
+- 背景改九宫格拉伸（四角原样 / 四边单向 / 中间双向），尺寸随文字走；
+- 文字用 `font.split` 折行：居中 200 px、左右两列 120 px；每行 9 px，
+  气泡高 = 行数 x 9 + 上下各 5 px；
+- 布局改为 1.20.1 的「右、左、右、左」交替两列向下堆叠（间距 16 px），
+  奇数时最后一条居中对齐到较长那一列的底部；
+- `isMaidInSittingPose()` 时基线下移 0.25 格；睡着时下移 1.2 格（= 旧的 48 px，
+  保证改造前后底边位置一致）。
+
+调试用命令 `/tlm ai_chat say <targets> <text>`：不走 HTTP，直接往女仆头顶塞气泡，
+用来验收换行 / 堆叠 / 坐姿偏移 / 九宫格。`runServer` + RCON 实测通过
+（`chat bubble sent to 1 maid(s)`），`runClient` 连进去后两条长文本都没有崩溃、
+`run/crash-reports` 为空。
+
+**仍需真人确认**：气泡的**视觉效果**（尾巴位置、文字与边框的间距、坐下时的落点）。
+自动检查只能证明「不崩」，证明不了「好看」。
+
 ### DeepSeek 400 修复（同一轮，真人实测后）
 
 实测日志里出现：

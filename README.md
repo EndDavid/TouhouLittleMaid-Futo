@@ -3739,6 +3739,7 @@ DeepSeek（以及一些兼容 OpenAI 的网关）有一条硬校验：只要请�
 `response_format: json_object`，**prompt 里就必须出现 `json` 字样**，否则直接拒绝：
 
 ```
+
 HTTP 400 Prompt must contain the word 'json' in some form to use 'response_format' of type 'json_object'
 ```
 
@@ -3775,6 +3776,35 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 所以：**如果不用 AI 聊天，女仆头顶不会有任何气泡** —— 预期行为。
 
 过期判定**两端都做**：服务端清是不再同步旧内容，客户端清是因为同步包有延迟。
+
+### 气泡的样式（按 1.20.1 重写）
+
+1.18.2 上游那套是「3x2 张 20x20 的小方格拼起来」，**文字不换行**：一句长回复会拉成一条
+横贯屏幕的白条（真人截图里就是这样）。现在按 TLMO 1.20.1 重写：
+
+| 项 | 旧实现（1.18.2 上游） | 现在（= 1.20.1） |
+|---|---|---|
+| 贴图 | `textures/chat_bubble/bg/default1.png`（3x2 网格） | `textures/entity/chat_bubble/type1.png`（256x256，内容在左上 48x24，8 px 九宫格边距） |
+| 绘制 | 左右两张 + 中间重复 N 张 | 九宫格：四角原样、四边单向拉伸、中间双向拉伸 |
+| 换行 | 不换行 | `font.split`：居中 200 px、左右两列 120 px |
+| 多行 | 不可能 | 每行 9 px；气泡高度 = 行数 x 9 + 上下各 5 px |
+| 布局 | 1 条居中、2 条左右、3 条再来一条居中偏上 | 「右、左、右、左……」交替两列向下堆叠（间距 16 px），奇数时最后一条居中，对齐到较长那一列的底部 |
+| 尾巴 | 20x20 的小三角 | 16x16，u = 0 / 16 / 32（右 / 中 / 左），v = 24 |
+| 坐姿 | 无偏移（气泡顶在头发上） | 基线下移 **0.25 格**（1.20.1 的 `isMaidInSittingPose` 分支） |
+| 睡姿 | 下移 48 px | 换算成 0.9 格，底边与改造前一致 |
+
+`type2.png` 也一并搬进来了（1.20.1 用它画内部提示），但**暂时统一用 type1**：
+`ChatTextType` 里没有「内部提示」这一档，加值会改动同步数据的枚举序，
+留给「聊天气泡子系统」那一轮。
+
+### 调试命令：`/tlm ai_chat say`
+
+```
+/tlm ai_chat say @e[type=touhou_little_maid:maid,limit=1] Maids are here! ...
+```
+
+不走任何 HTTP，直接把文本塞进选中的女仆头顶的气泡。用来验收换行、多条堆叠、
+坐下时的下移与九宫格贴图；真人验 AI 回复时不必为每一句等一次网络往返。
 
 ### 存档字段
 
@@ -3841,11 +3871,11 @@ tlm ai_chat reload -> message.touhou_little_maid.ai_chat.reload_success
 `RenderStateShard.TransparencyStateShard` 与 `RenderType.CompositeState`。
 这两个在 vanilla 里是 **protected** 内部类构造器，上游靠 Forge 的 AT 打开了它们。
 本移植版没有 AT（见 `build.gradle` 末尾的说明），因此改用原版公开的 `RenderType.text`：
-`POSITION_COLOR_TEX` + 半透明混合 + `LEQUAL` 深度测试。气泡贴图本身带 alpha，视觉上与上游一致。
+`POSITION_COLOR_TEX_LIGHTMAP` + 半透明混合。气泡贴图本身带 alpha，视觉上与上游一致。
 
-**代价**：顶点格式含 `COLOR`，所以 `vertex()` 必须依次写 `vertex -> color -> uv`。
-漏掉 `color` 会在写顶点时抛异常，而异常点在渲染循环里，表现是「一放女仆就崩」。
-
+**代价**：顶点格式含 `COLOR` 与 `LIGHTMAP`，所以 `vertex()` 必须依次写
+`vertex -> color -> uv -> uv2`。少任何一个都会在 `BufferBuilder#endVertex` 抛 `Not filled all elements of the vertex`。
+异常点在渲染循环里，表现是「一放女仆就崩」。
 ---
 
 ## AI 语音（TTS）

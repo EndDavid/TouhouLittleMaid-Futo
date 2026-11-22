@@ -68,7 +68,13 @@ public final class MaidCommand {
                                 .requires(source -> source.hasPermission(2))
                                 .then(Commands.literal("ai_chat")
                                         .then(Commands.literal("reload")
-                                                .executes(MaidCommand::reloadAiChat)))
+                                                .executes(MaidCommand::reloadAiChat))
+                                        // 调试用：让选中的女仆头顶直接冒一条气泡，
+                                        // 不经过任何 HTTP。/tlm ai_chat say @e[type=...] "很长的句子"
+                                        .then(Commands.literal("say")
+                                                .then(Commands.argument("targets", EntityArgument.entities())
+                                                        .then(Commands.argument("text", StringArgumentType.greedyString())
+                                                                .executes(MaidCommand::debugSay)))))
                                 .then(Commands.literal("task")
                                         .then(Commands.argument("targets", EntityArgument.entities())
                                                 .executes(MaidCommand::queryTask)
@@ -160,6 +166,24 @@ public final class MaidCommand {
         return 1;
     }
 
+    /**
+     * /tlm ai_chat say &lt;targets&gt; &lt;text&gt;：让女仆头顶直接冒一条气泡。
+     *
+     * <p>纯调试入口：不校验站点、不发 HTTP，用来检查<b>气泡渲染</b>本身 ——
+     * 换行宽度、多条堆叠、坐下时的下移、贴图九宫格。真人验收 AI 回复时
+     * 不必为每一句都等一次网络往返。</p>
+     */
+    private static int debugSay(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String text = StringArgumentType.getString(ctx, "text");
+        int count = 0;
+        for (EntityMaid maid : maids(ctx)) {
+            com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger
+                    .addAiChatText(maid, text);
+            count++;
+        }
+        reply(ctx, "chat bubble sent to " + count + " maid(s)");
+        return count;
+    }
     private static int queryTask(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         for (EntityMaid maid : maids(ctx)) {
             reply(ctx, maid.getDisplayName().getString() + " task = " + maid.getTask().getUid());
