@@ -24,6 +24,9 @@ public final class InitSounds {
     public static final SoundEvent MAID_HURT_FIRE = register("maid.ai.hurt_fire");
     public static final SoundEvent MAID_ITEM_GET = register("maid.ai.item_get");
     public static final SoundEvent MAID_FIND_TARGET = register("maid.ai.find_target");
+    /** AI 聊天的语音占位音效：sounds.json 里指向极短的静音 ogg 且 {@code stream: true}，
+     * 只为让声音引擎走流式分支，真正的音频由客户端的 {@code MaidAISoundInstance} 提供。 */
+    public static final SoundEvent MAID_AI_CHAT = register("maid.ai_chat");
 
     // ------------------------------------------------------------------ 工作模式语音
     public static final SoundEvent MAID_MODE_IDLE = register("maid.mode.idle");

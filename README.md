@@ -95,7 +95,7 @@ loom_version=1.15.5
 | **棋类（象棋 / 五子棋 / 国际象棋：各 3×3 多方块 + 对局 AI）** | **完成**（三块棋盘全部可玩） |
 | 骑乘模型倒置 | **完成**（钓鱼已回归上游的「坐船 / 坐垫再抛钩」） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | **完成**（挂在御币上，效果走弹幕链路） |
-| **AI 聊天（LLM 对话 + 头顶气泡 + 设置界面）** | **完成**（TTS / STT 未做） |
+| **AI 聊天（LLM 对话 + 头顶气泡 + TTS 语音 + 设置界面）** | **完成**（STT 未做） |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
 | **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
 
@@ -3641,7 +3641,8 @@ if (!switcher.isPowered()) return;               // 掉电不换模式
 对着自己的女仆按聊天键（默认 T）输入一句话，服务端把它连同角色设定与对话历史发给
 OpenAI 兼容接口，回复以**头顶气泡 + 聊天栏**两种形式送到玩家眼前。
 
-`ai` 包共 24 个文件。上游 44 个里去掉 TTS 16 个与 STT 3 个，其余逐个移植。
+`ai` 包共 42 个文件（其中 TTS 16 个，见下面的「AI 语音」一节）。
+上游 44 个里只剩 STT 3 个未移植。
 
 ### 数据流
 
@@ -3720,7 +3721,7 @@ setting: |
 请求里带 `response_format: {"type":"json_object"}`，并要求模型只返回
 `{"chat_text": "…", "tts_text": "…"}`。两者都为空或解析失败都会给主人发一条红字错误。
 
-`tts_text` 本轮**不播放**（TTS 未移植），但**字段不能删**。
+`tts_text` 用于 TTS 合成（见下一节「AI 语音」），**字段不能删**。
 `${output_json_format}` 就是用 `ResponseChat` 的空实例序列化出来的，
 少一个字段模型就不会返回它，将来的 TTS 还得再改 prompt。
 
@@ -3772,9 +3773,9 @@ TtsModel / TtsLanguage / OwnerName / CustomSetting
 `ai.AutoGenSettingEnabled`（默认 true）是 1.20.1 才有的项（1.18.2 上游没有），
 本移植版按「行为贴近 TLMO」补上。
 
-`ai.TtsEnabled` / `ai.TtsLanguage` / `ai.TtsProxyAddress` / `ai.SttUrl` / `ai.SttProxyAddress`
-**填了没有效果**（TTS / STT 未移植）。保留是为了存档与配置可与上游互换，
-以及 `${tts_language}` 占位符要有值。
+`ai.TtsEnabled` / `ai.TtsLanguage` / `ai.TtsProxyAddress` 已经生效（见「AI 语音」一节）。
+`ai.SttUrl` / `ai.SttProxyAddress` **填了没有效果**（STT 未移植），
+保留是为了配置可与上游互换。
 
 ### `/tlm ai_chat reload`
 
@@ -3821,3 +3822,63 @@ tlm ai_chat reload -> message.touhou_little_maid.ai_chat.reload_success
 
 **代价**：顶点格式含 `COLOR`，所以 `vertex()` 必须依次写 `vertex -> color -> uv`。
 漏掉 `color` 会在写顶点时抛异常，而异常点在渲染循环里，表现是「一放女仆就崩」。
+
+---
+
+## AI 语音（TTS）
+
+AI 回复里的 `tts_text` 现在会被真的念出来。链路与上游一致，只有「怎么让原版声音引擎
+播放内存里的字节」这一步因为 1.18.2 Fabric 没有对应的 Forge 补丁，改用了一个 mixin。
+
+### 数据流
+
+```
+服务端  解析 ResponseChat{chat_text, tts_text}
+          -> ai.TtsEnabled && 存在可用 tts 站点（必须有 api_key）？
+               ├─ api_type: system -> TTSSystemAudioToClientPacket ［只发给主人］
+               └─ 其它             -> Service.getTtsClient / getTtsRequest
+                                      -> HttpClient.sendAsync ［异步，20 秒超时］
+                                      -> TTSAudioToClientPacket ［16 格内广播］
+          -> 无论成败都照常显示气泡（语音失败不吞掉文字）
+客户端  收包 -> MaidAISoundInstance（EntityBoundSoundInstance 子类）
+          -> OggReader 判断容器：Opus 走 OpusAudioStream，Vorbis 走原版 OggAudioStream
+          -> SoundEngine 流式通道播放
+```
+
+### 支持的站点类型
+
+| `api_type` | 地址写法 | 备注 |
+|---|---|---|
+| `fish-audio` | base 地址，自动补 `/tts` | 固定 `format: opus` + `opus_bitrate: 24`；`reference_id` 取站点的模型名 |
+| `gpt-sovits` | 完整端点（如 `http://127.0.0.1:9880/tts`） | 参考音频 / prompt 从站点的 `extra_args` 读 |
+| `system` | 不需要地址 | 客户端旁白朗读，不经过任何 HTTP |
+
+### 与上游的差异
+
+| 位置 | 上游（Forge 1.18.2） | 本移植版 | 原因 |
+|---|---|---|---|
+| 播放内存音频 | 覆写 `SoundInstance#getStream` | `SoundEngineMixin` 重定向 `SoundBufferLibrary#getStream` | `SoundInstance#getStream` 是 Forge 打在 `SoundInstance` 上的补丁方法，Fabric 原版接口没有 |
+| 系统旁白 | AT 打开 `NarratorChatListener#narrator` | `NarratorChatListenerAccessor`（`@Accessor`） | 同上：本仓库没有 AT |
+| `OggReader` | 还负责读自定义音色包（文件 / zip） | 只保留「识别 Vorbis / Opus」 | 音色包属于「女仆音色包」子系统 |
+| `OpusAudioStream#read` | 按帧读，整帧写入缓冲区 | 整段 PCM + 读指针 | 上游末尾会混进上一帧的残留字节（一声杂音），且 `size < frameSize` 时会误判为播放结束 |
+
+### 新增依赖
+
+`libs/concentus-1.0.2.jar`（纯 Java 的 Opus 解码器）与 `libs/vorbis-java-core-0.8.jar`
+（ogg 容器解析）。两者都从上游 Forge jar 的 `META-INF/jarjar` 里解出来，用
+`implementation files(...)` 引入 —— 与 `snakeyaml` 同一套做法：离线可用、版本钉死。
+
+### 音效注册
+
+`InitSounds.MAID_AI_CHAT` 注册的 `maid.ai_chat` 在 `sounds.json` 里指向
+`touhou_little_maid:maid/empty`（约 2 KB 的静音 ogg）且带 `"stream": true`。
+它只是**占位**：`stream: true` 让声音引擎走流式分支，真正的字节由
+`MaidAISoundInstance#createStream()` 提供。解码失败时退回这段静音，而不是崩溃。
+
+### 验证到什么程度
+
+- `./gradlew.bat build` = BUILD SUCCESSFUL；`check-encoding.ps1` = `FFFD_CHARS=0`。
+- `runClient` 到主菜单：`Sound engine started` 正常打印、`run/crash-reports` 为空 ——
+  说明 `SoundEngineMixin` 已成功应用到 `SoundEngine#play`（`defaultRequire: 1`，失败会直接崩溃）。
+- **未验证**：真实 TTS 站点的合成与播放（需要玩家的 `api_key` 或本地 GPT-SoVITS）、
+  系统旁白在 Windows 上是否真的出声、Opus 解码后的音质。

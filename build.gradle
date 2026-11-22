@@ -92,6 +92,13 @@ dependencies {
 	// 与 night-config 的做法一致：离线可用、版本钉死。
 	// 它不是一个 mod（没有 fabric.mod.json），所以用 implementation 而不是 modImplementation。
 	implementation files("libs/snakeyaml-2.4.jar")
+	// concentus：纯 Java 的 Opus 解码器（上游 Forge 版通过 JiJ 内嵌 1.0.2）。
+	// vorbis-java-core：拆 ogg 容器，负责把 opus 的音频包一个个喂给 concentus。
+	// 两者都是 TTS 播放链路（ai/service/tts + client/sound）的硬依赖，
+	// 同样从上游 Forge jar 的 META-INF/jarjar 里解出来放进 libs/，离线可用。
+	// 它们不是 mod（没有 fabric.mod.json），因此用 implementation。
+	implementation files("libs/concentus-1.0.2.jar")
+	implementation files("libs/vorbis-java-core-0.8.jar")
 }
 
 processResources {

@@ -8,9 +8,14 @@ import com.github.tartaricacid.touhoulittlemaid.ai.service.Service;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.ChatClient;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.request.ChatCompletion;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.response.ChatCompletionResponse;
+import com.github.tartaricacid.touhoulittlemaid.ai.service.tts.TTSApiType;
+import com.github.tartaricacid.touhoulittlemaid.ai.service.tts.TTSClient;
+import com.github.tartaricacid.touhoulittlemaid.ai.service.tts.TTSRequest;
 import com.github.tartaricacid.touhoulittlemaid.config.subconfig.AIConfig;
 import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger;
 import com.github.tartaricacid.touhoulittlemaid.network.SyncChatTokensPacket;
+import com.github.tartaricacid.touhoulittlemaid.network.TTSAudioToClientPacket;
+import com.github.tartaricacid.touhoulittlemaid.network.TTSSystemAudioToClientPacket;
 import com.github.tartaricacid.touhoulittlemaid.data.ChatTokensData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.ChatFormatting;
@@ -28,13 +33,12 @@ import org.jetbrains.annotations.Nullable;
  * <p>流程：配置开关 → 找站点（必须有 key）→ 组装 prompt（必须有角色设定）→
  * 异步 HTTP → 回到主线程解析 {@code ResponseChat} → 头顶气泡 + 聊天栏。</p>
  *
- * <h2>与上游的差异（TTS 未移植）</h2>
- * <p>上游解析出 {@code chatText} / {@code ttsText} 后，若 {@code TTS_ENABLED} 且有可用
- * TTS 站点，会调用 {@code tts(...)} 走语音合成，播放的同时再显示气泡；失败才回退到
- * {@code addAiChatTextSync}。本移植版没有 TTS 客户端，所以<b>直接显示气泡</b>，
- * 不再判断 {@code TTS_ENABLED} —— 否则一份默认配置（{@code tts: true}）会让
- * AI 回复永远卡在「等语音」上。</p>
- * <p>因此 {@code ttsText} 仍然被解析和校验（模型输出契约里必须有它），只是不播放。</p>
+ * <h2>TTS 分支</h2>
+ * <p>与上游一致：解析出 {@code chatText} / {@code ttsText} 后，若 {@code TTS_ENABLED}
+ * 且存在可用的 TTS 站点，就先走 {@code tts(...)} 合成语音（气泡与语音同时出现）；
+ * TTS 关闭、站点缺失或合成失败时，才回退到 {@code addAiChatTextSync} 只显示气泡。</p>
+ * <p>{@code api_type: system} 不走 HTTP：直接把 {@code ttsText} 发给主人，
+ * 由客户端的系统旁白朗读（上游同样如此）。</p>
  */
 public final class MaidAIChatManager extends MaidAIChatData {
     public MaidAIChatManager(EntityMaid maid) {
@@ -253,10 +257,100 @@ public final class MaidAIChatManager extends MaidAIChatData {
             }
             this.addAssistantHistory(rawMessage);
             this.addTokens(result);
-            // TTS 未移植：直接气泡 + 聊天栏（上游在 TTS 关闭时也走这一支）
-            ChatBubbleManger.addAiChatTextSync(maid, chatText);
+            Site ttsSite = this.getTtsSite();
+            if (isTtsEnabled() && ttsSite != null && StringUtils.isNotBlank(ttsSite.getApiKey())) {
+                this.tts(ttsSite, chatText, ttsText);
+            } else {
+                // TTS 关闭、没有 tts 站点或站点没填 key：与上游一样直接显示气泡
+                ChatBubbleManger.addAiChatTextSync(maid, chatText);
+            }
         } catch (Exception e) {
             TouhouLittleMaid.LOGGER.error("[Futo] failed to handle AI chat response", e);
+        }
+    }
+    /**
+     * 走 TTS：{@code api_type: system} 走系统旁白，其余类型走 HTTP 合成。
+     */
+    private void tts(Site site, String chatText, String ttsText) {
+        if (TTSApiType.SYSTEM.getName().equals(site.getApiType())) {
+            onPlaySoundLocal(chatText, ttsText);
+            return;
+        }
+        TTSClient<?> ttsClient = Service.getTtsClient(site);
+        TTSRequest ttsRequest = Service.getTtsRequest(site, ttsText, ttsLang(), this.getTtsModel());
+        if (ttsClient == null || ttsRequest == null) {
+            // 站点里写了不认识的 api_type：别让语音把这条回复吞掉
+            TouhouLittleMaid.LOGGER.warn("[Futo] unsupported TTS api type: {}", site.getApiType());
+            ChatBubbleManger.addAiChatTextSync(maid, chatText);
+            return;
+        }
+        requestTts(ttsClient, ttsRequest, chatText);
+    }
+    /**
+     * 发起一次 TTS 请求。
+     *
+     * <p>{@link TTSClient} 的泛型参数由 {@link TTSRequest} 的具体实现决定，
+     * 而 {@code Service} 只保证「客户端与请求体来自同一个站点」，编译期无法表达这层对应关系。
+     * 因此这里把客户端按 {@code TTSClient<TTSRequest>} 使用 —— 两种实现的
+     * {@code request(...)} 在擦除后本就接受任意 {@code TTSRequest}。</p>
+     */
+    @SuppressWarnings("unchecked")
+    private void requestTts(TTSClient<?> ttsClient, TTSRequest ttsRequest, String chatText) {
+        TTSClient<TTSRequest> client = (TTSClient<TTSRequest>) ttsClient;
+        client.request(ttsRequest).handle(data -> onPlaySoundSync(chatText, data),
+                throwable -> onTtsFailSync(chatText, throwable));
+    }
+    /**
+     * 把配置里的 {@code TtsLanguage}（如 {@code zh_cn}）取前半段当作 BCP-47 主语言；
+     * 缺省 {@code en} —— 与上游一致。
+     */
+    private String ttsLang() {
+        String ttsLanguage = this.getTtsLanguage();
+        if (StringUtils.isBlank(ttsLanguage)) {
+            return "en";
+        }
+        String[] split = ttsLanguage.split("_");
+        return split.length >= 2 ? split[0] : "en";
+    }
+    /**
+     * 系统旁白：只发给主人本人，同时照常显示气泡。
+     */
+    private void onPlaySoundLocal(String chatText, String ttsText) {
+        runOnServer(() -> {
+            if (maid.getOwner() instanceof ServerPlayer player) {
+                TTSSystemAudioToClientPacket.sendTo(player, ttsText);
+            }
+            ChatBubbleManger.addAiChatText(maid, chatText);
+        });
+    }
+    /**
+     * HTTP TTS 成功：把音频广播给附近玩家，同时显示气泡。
+     */
+    private void onPlaySoundSync(String chatText, byte[] data) {
+        runOnServer(() -> {
+            TTSAudioToClientPacket.sendNearby(maid, data);
+            ChatBubbleManger.addAiChatText(maid, chatText);
+        });
+    }
+    /**
+     * TTS 失败不能连累聊天：气泡照常显示，另外给主人一条红色提示。
+     */
+    private void onTtsFailSync(String chatText, Throwable throwable) {
+        runOnServer(() -> {
+            ChatBubbleManger.addAiChatText(maid, chatText);
+            String cause = throwable == null ? "" : StringUtils.defaultString(throwable.getLocalizedMessage());
+            if (maid.getOwner() instanceof ServerPlayer player) {
+                player.sendMessage(new TranslatableComponent("ai.touhou_little_maid.tts.connect.fail")
+                        .append(cause).withStyle(ChatFormatting.RED), Util.NIL_UUID);
+            }
+        });
+    }
+    private static boolean isTtsEnabled() {
+        try {
+            return AIConfig.TTS_ENABLED == null || Boolean.TRUE.equals(AIConfig.TTS_ENABLED.get());
+        } catch (Exception ignored) {
+            // 配置尚未加载：按「开启」处理（没有 tts 站点时仍然只显示气泡）
+            return true;
         }
     }
     private void onChatFailSync(Throwable throwable) {

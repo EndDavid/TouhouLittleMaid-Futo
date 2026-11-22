@@ -6,6 +6,9 @@ import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.ChatClien
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.request.ChatCompletion;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.request.ResponseFormat;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.request.Role;
+import com.github.tartaricacid.touhoulittlemaid.ai.service.tts.TTSClient;
+import com.github.tartaricacid.touhoulittlemaid.ai.service.tts.TTSFactory;
+import com.github.tartaricacid.touhoulittlemaid.ai.service.tts.TTSRequest;
 import com.github.tartaricacid.touhoulittlemaid.config.subconfig.AIConfig;
 import com.github.tartaricacid.touhoulittlemaid.util.CappedQueue;
 import com.google.gson.Gson;
@@ -16,9 +19,10 @@ import java.time.Duration;
  * HTTP 客户端与请求组装的集中入口，移植自上游 {@code ai/service/Service}。
  *
  * <p><b>与上游的差异：</b>上游这里有三个 {@link HttpClient}（聊天 / TTS / STT）和
- * {@code getTtsClient} / {@code getTtsRequest} / {@code getSttClient}。本轮只移植聊天链路，
- * 因此只保留 {@code CHAT_HTTP_CLIENT} 与 {@code getChatClient} / {@code getChatCompletion}。
- * TTS / STT 客户端属于独立的语音子系统（需要音频流解码与麦克风采集），另行一轮。</p>
+ * {@code getTtsClient} / {@code getTtsRequest} / {@code getSttClient}。
+ * 本移植版已经接上「聊天」与「TTS」两条链路，因此保留 {@code CHAT_HTTP_CLIENT} /
+ * {@code TTS_HTTP_CLIENT} 与对应的工厂方法；STT（麦克风采集 + 语音转文字）
+ * 属于独立子系统，仍是后续工作。</p>
  *
  * <p><b>为什么 {@code GSON} 放在这里：</b>聊天、角色设定、语音三条链路都要序列化，
  * 上游用一个共享实例；不同实例对同一份 DTO 的输出可能因字段策略差异而不一致，
@@ -29,6 +33,10 @@ public final class Service {
     private static final HttpClient CHAT_HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .proxy(new ConfigProxySelector(AIConfig.CHAT_PROXY_ADDRESS))
+            .build();
+    private static final HttpClient TTS_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .proxy(new ConfigProxySelector(AIConfig.TTS_PROXY_ADDRESS))
             .build();
     public static ChatClient getChatClient(Site site) {
         String chatApiKey = site.getApiKey();
@@ -73,6 +81,20 @@ public final class Service {
             chatCompletion.userChat(String.format("请用%s语言回复 chat_text 部分！并用%s语言回复 tts_text 部分！", language, chatManager.getTtsLanguage()));
             return chatCompletion;
         }).orElse(null);
+    }
+    /**
+     * 造出对应站点的 TTS 客户端；站点类型不认识时返回 {@code null}。
+     */
+    @Nullable
+    public static TTSClient<?> getTtsClient(Site site) {
+        return TTSFactory.getTtsClient(TTS_HTTP_CLIENT, site);
+    }
+    /**
+     * 造出对应站点的 TTS 请求体；站点类型不认识时返回 {@code null}。
+     */
+    @Nullable
+    public static TTSRequest getTtsRequest(Site site, String ttsText, String ttsLang, String model) {
+        return TTSFactory.getTtsRequest(site, ttsText, ttsLang, model);
     }
     private Service() {
     }

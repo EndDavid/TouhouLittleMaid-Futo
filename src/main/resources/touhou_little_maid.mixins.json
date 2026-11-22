@@ -25,7 +25,9 @@
     "client.ItemInHandRendererMixin",
     "client.ItemInHandLayerMixin",
     "client.ItemRendererMixin",
-    "client.ClientTooltipComponentMixin"
+    "client.ClientTooltipComponentMixin",
+    "client.NarratorChatListenerAccessor",
+    "client.SoundEngineMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -84,10 +84,46 @@
 四道闸全绿；`runServer` 实测：`AI chat sites: 1 chat / 2 tts`、`loaded 6 character settings`、
 八项 `MaidAIChatData` NBT 读写通、`/tlm ai_chat reload` 通。
 
-**未做**：TTS（16 文件）/ STT（3 文件）/ Cloth 的 `GlobalAIIntegration` 与 `PartAIIntegration`
+**未做**：~~TTS（16 文件）~~（本轮已补，见下一节）/ STT（3 文件）/ Cloth 的 `GlobalAIIntegration` 与 `PartAIIntegration`
 （改成手写 `MaidAISettingScreen`）/ 气泡的随机台本与图标 / `/tlm ai_chat` 的调试子命令。
 **后续修正（同一轮）**：气泡渲染原来只写 `vertex → color → uv`，而 `RenderType.text` 的顶点格式是 `POSITION_COLOR_TEX_LIGHTMAP`，缺 `uv2` 会让客户端在 `BufferBuilder#endVertex` 抛 `Not filled all elements of the vertex` —— 现象就是「一发消息就崩」（`run/crash-reports/crash-2026-11-22_20.19.15-client.txt`）。已补 `uv2(LightTexture.FULL_BRIGHT)`，并把布局按上游重新对齐（左右两条各让开 5、箭头按 0/1/2 列、去掉多余的 `max(1, width/20)`）。
 
+
+### AI 语音（TTS，本轮）
+
+上游 `ai/service/tts` 的 16 个文件已全部移植，加上客户端的播放链路（4 个类 + 1 个 util
++ 2 个网络包 + 2 个 mixin）。
+
+- **服务端**：`TTSRequest` / `TTSClient<T>` / `TTSFactory`（按 `api_type` 造客户端与请求体）
+  + `fishaudio/`（9 个：client / 6 个请求小类 / request / callback）
+  + `gptsovits/`（3 个）。`Service` 补上 `TTS_HTTP_CLIENT` / `getTtsClient` / `getTtsRequest`。
+- **编排**：`MaidAIChatManager#onShowChatSync` 解析出 `chatText` / `ttsText` 后，
+  若 `TTS_ENABLED` 且有可用 TTS 站点就走 `tts(...)`；`api_type: system` 走本地旁白，
+  其余走 HTTP。**任何失败都回退到只显示气泡**，语音不会吞掉文字。
+- **网络**：`TTSAudioToClientPacket`（16 格内广播，`maidId + byte[]`）/
+  `TTSSystemAudioToClientPacket`（只发给主人，一段文本）。
+- **客户端**：`client/sound/data/OpusAudioStream`（Opus → PCM）、`MaidAISoundInstance`
+  （`EntityBoundSoundInstance` 子类）、`client/sound/OggReader`（识别 Vorbis / Opus）、
+  `client/sound/SystemNarrator`、`util/OpusDecoderUtil`。
+- **两个 mixin**：`client/SoundEngineMixin` 把 `SoundEngine#play` 里的
+  `SoundBufferLibrary#getStream` 换成「先问实例」——因为 Forge 的
+  `SoundInstance#getStream` 补丁在 Fabric 1.18.2 不存在；
+  `client/NarratorChatListenerAccessor` 用 `@Accessor` 取 `narrator` 字段（同样是没有 AT）。
+- **新增依赖**：`libs/concentus-1.0.2.jar`、`libs/vorbis-java-core-0.8.jar`，
+  从上游 Forge jar 的 `META-INF/jarjar` 解出，`implementation files(...)`。
+  `InitSounds.MAID_AI_CHAT` 注册 `maid.ai_chat`（`sounds.json` 里指向静音 ogg 且
+  `stream: true`，只是让引擎走流式分支的占位）。
+
+**验证**：`build` = BUILD SUCCESSFUL；`check-encoding.ps1` = `FFFD_CHARS=0`；
+`runClient` 到主菜单出现 `Sound engine started` 且 `run/crash-reports` 为空 ——
+`SoundEngineMixin` 的 `defaultRequire: 1` 意味着没打上会直接崩，所以这条日志等于「mixin 生效」。
+**未验证**：真实 TTS 合成与播放（需要 key / 本地 GPT-SoVITS）、系统旁白是否出声、音质。
+
+### 构建修复（本轮开头）
+
+上一轮留下的 4 个脏文件里，`ai/service/chat/openai/ChatClient.java` 被删掉了
+`import ...TouhouLittleMaid;` 但仍在用 `TouhouLittleMaid.LOGGER`，导致 `compileJava` 失败。
+已用 `git checkout --` 复原该 import（另三个只是文件末尾换行）。
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；
