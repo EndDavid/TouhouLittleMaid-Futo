@@ -119,6 +119,33 @@
 `SoundEngineMixin` 的 `defaultRequire: 1` 意味着没打上会直接崩，所以这条日志等于「mixin 生效」。
 **未验证**：真实 TTS 合成与播放（需要 key / 本地 GPT-SoVITS）、系统旁白是否出声、音质。
 
+### DeepSeek 400 修复（同一轮，真人实测后）
+
+实测日志里出现：
+
+```
+[Futo] AI chat POST https://api.deepseek.com/chat/completions
+HTTP 400 Prompt must contain the word 'json' in some form to use 'response_format' of type 'json_object'
+```
+
+两个根因，都修了：
+
+1. **`Service#getChatCompletion` 的最后一条 user 指令里没有 `json` 字样。**
+   DeepSeek 在 `response_format: json_object` 下强制要求 prompt 里出现这个词。
+   上游靠角色设定模板的「输出格式为 JSON 格式：`${output_json_format}`」满足它，
+   玩家自写 / 自动生成的人设不一定有。已在那条指令后面补
+   「只返回一个 json 对象（json_object），形如 {"chat_text":…,"tts_text":…}」。
+2. **`AutoGenSetting` 把整段 JSON 当成 YAML 正文写盘。** 上游 1.20.1 的
+   `AutoGenSettingCallback` 只取 `ResponseChat#getChatText()`。已补 `extractSettingBody`：
+   先 GSON 解析取 `chat_text`，失败时手工从 `"chat_text":"` 取到结尾（应对截断），
+   再不行才退回 `stripCodeFence`。
+
+顺带修掉截断本身：`ChatCompletion#maxTokens` 默认 256，生成人设必被切断，
+`AutoGenSetting.build` 现在显式 `maxTokens(1024)`。
+
+**注意**：`run/config/touhou_little_maid/settings/touhou_little_maid_cirno_maid.yml` 里存的
+是旧逻辑写坏的半截 JSON，已删除；下次说话会按新逻辑重新生成（同名文件不覆盖）。
+
 ### 构建修复（本轮开头）
 
 上一轮留下的 4 个脏文件里，`ai/service/chat/openai/ChatClient.java` 被删掉了

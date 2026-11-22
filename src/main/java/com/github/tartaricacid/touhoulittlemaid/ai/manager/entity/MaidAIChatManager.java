@@ -147,7 +147,8 @@ public final class MaidAIChatManager extends MaidAIChatData {
         this.autoGenSetting(site, language);
     }
     private void onAutoGenSuccess(ChatCompletionResponse result) {
-        String body = AutoGenSetting.stripCodeFence(result.getFirstChoiceMessage());
+        // 正文在 JSON 的 chat_text 字段里（上游 AutoGenSettingCallback 同样只取这一项）
+        String body = AutoGenSetting.extractSettingBody(result.getFirstChoiceMessage());
         this.addTokens(result);
         runOnServer(() -> {
             this.generatingSetting = false;

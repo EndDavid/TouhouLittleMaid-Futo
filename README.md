@@ -3716,6 +3716,14 @@ setting: |
 内置只有 geckolib 的两个设定（`winefox` / `zhiban`），其余模型第一次说话会走上面这条路径；
 不想让模型自动写人设就把 `ai.AutoGenSettingEnabled` 关掉，那时会提示『这个模型还没有角色设定』。
 
+自动生成的响应同样是一个 `{"chat_text":…,"tts_text":…}` 的 JSON，**正文只取 `chat_text`**
+（上游 1.20.1 的 `AutoGenSettingCallback` 也只取这一项）。两处与上游的差异：
+
+- `max_tokens` 从默认的 256 提到 1024。256 会把 JSON 从中间切断，
+  之前就出现过 `settings/<model>.yml` 里只写进半句话的事故；
+- 万一还是被截断（GSON 解析失败），会退化为「手工从 `"chat_text":"` 之后取到结尾」，
+  再不行才退回「去掉代码围栏的原文」。
+
 ### 输出契约：模型必须返回 JSON
 
 请求里带 `response_format: {"type":"json_object"}`，并要求模型只返回
@@ -3724,6 +3732,21 @@ setting: |
 `tts_text` 用于 TTS 合成（见下一节「AI 语音」），**字段不能删**。
 `${output_json_format}` 就是用 `ResponseChat` 的空实例序列化出来的，
 少一个字段模型就不会返回它，将来的 TTS 还得再改 prompt。
+
+#### 为什么最后一条 user 消息里必须出现 `json`
+
+DeepSeek（以及一些兼容 OpenAI 的网关）有一条硬校验：只要请求里带了
+`response_format: json_object`，**prompt 里就必须出现 `json` 字样**，否则直接拒绝：
+
+```
+HTTP 400 Prompt must contain the word 'json' in some form to use 'response_format' of type 'json_object'
+```
+
+上游不额外加这句话，因为它的角色设定模板里本来就有「输出格式为 JSON 格式：${output_json_format}」。
+但**玩家自己写的人设**、以及**自动生成的人设**不一定有那句话，于是第一次能对话、之后必挂（HTTP 400）。
+本移植版因此在最后那条「请用 X 语言回复」的指令里补了一句
+「只返回一个 json 对象（json_object）……」，见 `Service#getChatCompletion`。
+这是与上游的**有意差异**，原因就是上面的校验。
 
 ### 与上游的差异（都是框架差异）
 

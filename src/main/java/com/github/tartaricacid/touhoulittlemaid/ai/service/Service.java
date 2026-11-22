@@ -77,8 +77,18 @@ public final class Service {
                     chatCompletion.assistantChat(message);
                 }
             });
-            // 最后强调一下语言类型
-            chatCompletion.userChat(String.format("请用%s语言回复 chat_text 部分！并用%s语言回复 tts_text 部分！", language, chatManager.getTtsLanguage()));
+            // 最后强调一下语言类型与输出格式。
+            //
+            // 「JSON」这个词是硬性要求：请求里一旦带 response_format: json_object，
+            // DeepSeek 之类的服务会检查 prompt 里有没有 json 字样，没有就直接 400
+            // （Prompt must contain the word 'json' in some form ...）。
+            // 上游靠角色设定模板里的「输出格式为 JSON 格式：${output_json_format}」满足它，
+            // 但玩家自己写的人设、以及 auto-gen 生成的人设不一定带那句话，所以这里兜一句。
+            chatCompletion.userChat(String.format(
+                    "请用%s语言回复 chat_text 部分！并用%s语言回复 tts_text 部分！"
+                            + "只返回一个 json 对象（json_object），"
+                            + "形如 {\"chat_text\":\"…\",\"tts_text\":\"…\"}，不要输出其它内容。",
+                    language, chatManager.getTtsLanguage()));
             return chatCompletion;
         }).orElse(null);
     }
