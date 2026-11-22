@@ -10,6 +10,8 @@ import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.request.C
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.response.ChatCompletionResponse;
 import com.github.tartaricacid.touhoulittlemaid.config.subconfig.AIConfig;
 import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger;
+import com.github.tartaricacid.touhoulittlemaid.network.SyncChatTokensPacket;
+import com.github.tartaricacid.touhoulittlemaid.data.ChatTokensData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
@@ -72,6 +74,11 @@ public final class MaidAIChatManager extends MaidAIChatData {
             ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.api_key.empty");
             return;
         }
+        if (!withinTokenLimit()) {
+            sendToOwner(new TranslatableComponent(
+                    "message.touhou_little_maid.ai_chat.max_tokens_limit").withStyle(ChatFormatting.RED));
+            return;
+        }
         if (this.getSetting().isEmpty()) {
             this.onSettingIsEmpty(site, language);
             return;
@@ -119,6 +126,7 @@ public final class MaidAIChatManager extends MaidAIChatData {
 
     private void onAutoGenSuccess(ChatCompletionResponse result) {
         String body = AutoGenSetting.stripCodeFence(result.getFirstChoiceMessage());
+        this.addTokens(result);
         runOnServer(() -> {
             this.generatingSetting = false;
             if (StringUtils.isBlank(body)) {
@@ -152,6 +160,50 @@ public final class MaidAIChatManager extends MaidAIChatData {
         serverLevel.getServer().submit(task);
     }
 
+    /**
+     * 把这次响应的 token 用量记到主人头上，并把新值同步给客户端。
+     *
+     * <p>对应 1.20.1 的 {@code ChatTokensAttachment} + {@code AIConfig.MAX_TOKENS_PER_PLAYER}：
+     * 用量取响应里的 {@code usage.total_tokens}，缺这个字段就不计（自建网关常常不返回）。</p>
+     */
+    private void addTokens(ChatCompletionResponse result) {
+        if (result == null || result.getUsage() == null) {
+            return;
+        }
+        int total = result.getUsage().getTotalTokens();
+        if (total <= 0) {
+            return;
+        }
+        runOnServer(() -> {
+            if (maid.getOwner() instanceof ServerPlayer player) {
+                ChatTokensData.get(player.getServer()).add(player.getUUID(), total);
+                SyncChatTokensPacket.sendTo(player);
+            }
+        });
+    }
+    /**
+     * 主人是否还没用完 token 额度。
+     *
+     * <p>{@code MAX_TOKENS_PER_PLAYER <= 0} 表示不限制（配置默认值）。</p>
+     */
+    private boolean withinTokenLimit() {
+        try {
+            if (AIConfig.MAX_TOKENS_PER_PLAYER == null) {
+                return true;
+            }
+            Integer max = AIConfig.MAX_TOKENS_PER_PLAYER.get();
+            if (max == null || max <= 0) {
+                return true;
+            }
+            if (!(maid.getOwner() instanceof ServerPlayer player)) {
+                return true;
+            }
+            return ChatTokensData.get(player.getServer()).get(player.getUUID()) < max;
+        } catch (Exception ignored) {
+            // 配置尚未加载：放行
+            return true;
+        }
+    }
     private static boolean isAutoGenSettingEnabled() {
         try {
             return AIConfig.AUTO_GEN_SETTING_ENABLED == null
@@ -182,6 +234,7 @@ public final class MaidAIChatManager extends MaidAIChatData {
                 return;
             }
             this.addAssistantHistory(rawMessage);
+            this.addTokens(result);
             // TTS 未移植：直接气泡 + 聊天栏（上游在 TTS 关闭时也走这一支）
             ChatBubbleManger.addAiChatTextSync(maid, chatText);
         } catch (Exception e) {

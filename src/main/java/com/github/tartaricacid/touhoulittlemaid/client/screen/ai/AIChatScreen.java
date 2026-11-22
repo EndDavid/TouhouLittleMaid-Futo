@@ -1,9 +1,13 @@
 package com.github.tartaricacid.touhoulittlemaid.client.screen.ai;
 
+import com.github.tartaricacid.touhoulittlemaid.ai.manager.entity.MaidAIDataSerializable;
 import com.github.tartaricacid.touhoulittlemaid.client.gui.widget.button.FlatColorButton;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIDataPacket;
+import com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIHistoryPacket;
+import com.github.tartaricacid.touhoulittlemaid.network.SaveMaidAIDataPacket;
 import com.github.tartaricacid.touhoulittlemaid.network.SendUserChatPacket;
+import com.github.tartaricacid.touhoulittlemaid.network.SyncChatTokensPacket;
 import com.google.common.collect.Maps;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.ChatFormatting;
@@ -18,39 +22,59 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
- * AI 聊天输入界面，移植自上游 client/gui/entity/maid/ai/AIChatScreen。
+ * AI 聊天主界面，按 TLMO 1.20.1 的版式重做（1.18.2 上游只有一个输入框）。
  *
- * <p>它只是一个输入框：写一句话、按回车，然后由服务端发起请求并把回复
- * 画到女仆头顶的气泡上（同时给主人发一条聊天栏消息）。
- * 界面上不显示历史，也不显示回复。
- * 上游也是这么做的，理由很实际：回复是异步的，最长可能二十秒，
- * 界面早就被玩家关掉了。
+ * <p>自上而下：Token 计数、左右各三个圆形按钮、输入条、底部两条摘要。
+ * 左三为历史 / 角色设定 / 设置，右三为选大语言站点与模型 / 选语音站点与模型 / 选语种；
+ * 后三个按钮弹出的是自绘可滚动列表（1.20.1 也没用原版下拉框）。</p>
  *
- * <h2>两个静态表</h2>
- * <p>CLIENT_CHAT_SITES 与 CLIENT_TTS_SITES 由 SyncAiSettingPacket 填充，
- * 只有站点名与模型列表，不含密钥。它们同时被设置界面用来做下拉选项。
- *
- * <h2>与上游的差异</h2>
- * <ul>
- *     <li>configButton 不设 tooltip：本移植版的 FlatColorButton 没有 setTooltips，
- *         那套挂起 tooltip 的渲染还没移植。按钮内容仍是同一个铅笔符号。</li>
- *     <li>不再调用 NetworkHandler.CHANNEL，改用 SendUserChatPacket / GetMaidAIDataPacket。</li>
- * </ul>
+ * <p>按钮字形与 1.20.1 一致（时钟、齿轮、铅笔、星形、喇叭、地球），
+ * 它们是 Unifont 自带的 emoji 码位，不需要额外贴图资源。</p>
  */
 public class AIChatScreen extends Screen {
+    /** 服务端发下来的「站点名 → 模型列表」，只有填了 api_key 的站点才会出现。 */
     public static final Map<String, List<String>> CLIENT_CHAT_SITES = Maps.newLinkedHashMap();
     public static final Map<String, List<String>> CLIENT_TTS_SITES = Maps.newLinkedHashMap();
 
+    /** 这只女仆的 AI 设置副本，由 GetMaidAIDataPacket 的回复填充。 */
+    @Nullable
+    public static MaidAIDataSerializable CLIENT_DATA = null;
+
+    /** 下次收到设置数据时是切到设置界面，还是只刷新摘要。 */
+    public static boolean PENDING_SETTING_SCREEN = false;
+
+    /** 语音合成支持的语种（对应 1.20.1 的 SupportLanguage）。 */
+    public static final String[] TTS_LANGUAGES = {"en_us", "zh_cn", "ja_jp", "ko_kr", "ru_ru"};
+
+    private static final int BUTTON_SIZE = 20;
+    private static final int BUTTON_GAP = 2;
+    private static final int POPUP_ROW_HEIGHT = 12;
+    private static final int POPUP_MAX_ROWS = 9;
+    private static final int POPUP_WIDTH = 168;
+
     private final EntityMaid maid;
     private EditBox input;
-    private FlatColorButton configButton;
+
+    @Nullable
+    private PopupType openPopup = null;
+    private int popupScroll = 0;
+    private int popupX = 0;
+    private int popupY = 0;
     private int tickCounter = 0;
+
+    private enum PopupType {LLM, TTS, LANGUAGE}
+
+    private record PopupEntry(String label, boolean header, Runnable action) {
+    }
 
     public AIChatScreen(EntityMaid maid) {
         super(new TextComponent("Maid AI Chat Screen"));
@@ -59,50 +83,261 @@ public class AIChatScreen extends Screen {
 
     @Override
     protected void init() {
-        int posX = this.width / 2;
-        int posY = this.height / 2;
+        int inputWidth = Math.min(700, Math.max(200, this.width - 100));
+        int inputX = this.width / 2 - inputWidth / 2;
+        int inputY = this.height - 92;
 
-        this.input = new EditBox(Minecraft.getInstance().font, posX - 165, posY + 64,
-                300, 20, new TranslatableComponent("chat.editBox"));
-        // 128 与服务端那一侧的裁剪上限一致：界面能打多少，服务端就收多少
-        this.input.setMaxLength(128);
+        this.input = new EditBox(this.font, inputX, inputY, inputWidth, 20,
+                new TranslatableComponent("chat.editBox"));
+        this.input.setMaxLength(512);
         this.input.setBordered(false);
         this.input.setValue("");
         this.input.setCanLoseFocus(false);
         this.addWidget(this.input);
         this.setInitialFocus(this.input);
 
-        this.configButton = new FlatColorButton(posX + 142, posY + 58, 20, 20, new TextComponent("✎"),
-                b -> GetMaidAIDataPacket.send(this.maid.getId()));
-        this.addRenderableWidget(this.configButton);
+        int buttonY = inputY - 26;
+        int step = BUTTON_SIZE + BUTTON_GAP;
+        addSideButton(inputX, buttonY, "\uD83D\uDD51", () -> openHistory());
+        addSideButton(inputX + step, buttonY, "\u2699", this::openSetting);
+        addSideButton(inputX + step * 2, buttonY, "\u270E", this::openSetting);
+        int right = inputX + inputWidth - BUTTON_SIZE;
+        addSideButton(right, buttonY, "\uD83C\uDF10", () -> togglePopup(PopupType.LANGUAGE, right, buttonY));
+        addSideButton(right - step, buttonY, "\uD83D\uDD0A",
+                () -> togglePopup(PopupType.TTS, right - step, buttonY));
+        addSideButton(right - step * 2, buttonY, "\u2726",
+                () -> togglePopup(PopupType.LLM, right - step * 2, buttonY));
+
+        // 打开界面时拉一份设置来画底部摘要（不切界面）
+        PENDING_SETTING_SCREEN = false;
+        GetMaidAIDataPacket.send(this.maid.getId());
     }
 
-    @Override
-    public void resize(Minecraft mc, int pWidth, int pHeight) {
-        String chatText = this.input.getValue();
-        super.resize(mc, pWidth, pHeight);
-        this.input.setValue(chatText);
+    private void addSideButton(int x, int y, String glyph, Runnable action) {
+        this.addRenderableWidget(new FlatColorButton(x, y, BUTTON_SIZE, BUTTON_SIZE,
+                new TextComponent(glyph), b -> action.run()));
+    }
+
+    private void openHistory() {
+        GetMaidAIHistoryPacket.send(this.maid.getId());
+    }
+
+    private void openSetting() {
+        PENDING_SETTING_SCREEN = true;
+        GetMaidAIDataPacket.send(this.maid.getId());
+    }
+
+    private void togglePopup(PopupType type, int anchorX, int anchorY) {
+        if (this.openPopup == type) {
+            this.openPopup = null;
+            return;
+        }
+        List<PopupEntry> entries = this.buildEntries(type);
+        if (entries.isEmpty()) {
+            this.openPopup = null;
+            return;
+        }
+        this.openPopup = type;
+        this.popupScroll = 0;
+        this.popupX = Math.max(4, Math.min(anchorX, this.width - POPUP_WIDTH - 4));
+        this.popupY = anchorY - 6 - Math.min(entries.size(), POPUP_MAX_ROWS) * POPUP_ROW_HEIGHT;
+        if (this.popupY < 4) {
+            this.popupY = anchorY + BUTTON_SIZE + 6;
+        }
+    }
+
+    private List<PopupEntry> buildEntries(PopupType type) {
+        List<PopupEntry> entries = new ArrayList<>();
+        switch (type) {
+            case LLM -> CLIENT_CHAT_SITES.forEach((site, models) -> {
+                entries.add(new PopupEntry(site, true, null));
+                for (String model : models) {
+                    entries.add(new PopupEntry("  " + model, false, () -> applySiteModel(site, model)));
+                }
+            });
+            case TTS -> {
+                entries.add(new PopupEntry("ai.touhou_little_maid.chat.site.none.name", false,
+                        () -> applyTts("", "")));
+                CLIENT_TTS_SITES.forEach((site, models) -> {
+                    entries.add(new PopupEntry(site, true, null));
+                    for (String model : models) {
+                        entries.add(new PopupEntry("  " + model, false, () -> applyTts(site, model)));
+                    }
+                });
+            }
+            case LANGUAGE -> {
+                for (String code : TTS_LANGUAGES) {
+                    entries.add(new PopupEntry(code, false, () -> applyLanguage(code)));
+                }
+            }
+        }
+        return entries;
+    }
+
+    private void applySiteModel(String site, String model) {
+        this.openPopup = null;
+        MaidAIDataSerializable data = currentData();
+        data.setChatSiteName(site);
+        data.setChatModel(model);
+        SaveMaidAIDataPacket.send(this.maid.getId(), data);
+    }
+
+    private void applyTts(String site, String model) {
+        this.openPopup = null;
+        MaidAIDataSerializable data = currentData();
+        data.setTtsSiteName(site);
+        data.setTtsModel(model);
+        SaveMaidAIDataPacket.send(this.maid.getId(), data);
+    }
+
+    private void applyLanguage(String code) {
+        this.openPopup = null;
+        MaidAIDataSerializable data = currentData();
+        data.setTtsLanguage(code);
+        SaveMaidAIDataPacket.send(this.maid.getId(), data);
+    }
+
+    private MaidAIDataSerializable currentData() {
+        if (CLIENT_DATA == null) {
+            CLIENT_DATA = new MaidAIDataSerializable();
+        }
+        return CLIENT_DATA;
+    }
+
+    /** 服务端回设置数据时调用，摘要每帧现读 CLIENT_DATA，这里无需额外动作。 */
+    public void refreshData() {
     }
 
     @Override
     public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks) {
         int xOffset = 5;
         int yOffset = 6;
-        fill(poseStack, input.x - xOffset,
-                input.y - yOffset,
+        fill(poseStack, input.x - xOffset, input.y - yOffset,
                 input.x + input.getInnerWidth() + xOffset,
-                input.y + input.getHeight() - yOffset,
-                0x9f_000000);
+                input.y + input.getHeight() - yOffset, 0x9f_000000);
         input.render(poseStack, mouseX, mouseY, partialTicks);
 
         if (StringUtils.isEmpty(input.getValue())) {
             MutableComponent text = new TranslatableComponent("ai.touhou_little_maid.chat.input.tip")
                     .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC);
-            int xPos = input.x + input.getInnerWidth() / 2 - xOffset;
-            drawCenteredString(poseStack, font, text, xPos, input.y, 0xFFFFFF);
+            drawCenteredString(poseStack, this.font, text,
+                    input.x + input.getInnerWidth() / 2 - xOffset, input.y + 2, 0xFFFFFF);
         }
 
+        renderTokenUsage(poseStack);
+        renderSummaries(poseStack);
         super.render(poseStack, mouseX, mouseY, partialTicks);
+        renderPopup(poseStack, mouseX, mouseY);
+    }
+
+    private void renderTokenUsage(PoseStack poseStack) {
+        int current = SyncChatTokensPacket.CLIENT_CURRENT;
+        int max = SyncChatTokensPacket.CLIENT_MAX;
+        String text = max > 0
+                ? String.format("Token: %s / %s (%.1f%%)", formatTokenCount(current),
+                formatTokenCount(max), current * 100.0D / max)
+                : String.format("Token: %s / \u221E", formatTokenCount(current));
+        int y = this.height - 92 - 26 - 12;
+        poseStack.pushPose();
+        poseStack.translate(this.width / 2.0F, y, 0.0F);
+        poseStack.scale(0.75F, 0.75F, 1.0F);
+        drawCenteredString(poseStack, this.font, new TextComponent(text), 0, 0, 0xFFD700);
+        poseStack.popPose();
+    }
+
+    private void renderSummaries(PoseStack poseStack) {
+        MaidAIDataSerializable data = CLIENT_DATA;
+        String llmSite = data == null ? "" : StringUtils.defaultString(data.getChatSiteName());
+        String llmModel = data == null ? "" : StringUtils.defaultString(data.getChatModel());
+        String ttsSite = data == null ? "" : StringUtils.defaultString(data.getTtsSiteName());
+        String ttsModel = data == null ? "" : StringUtils.defaultString(data.getTtsModel());
+        String ttsLang = data == null ? "" : StringUtils.defaultString(data.getTtsLanguage());
+
+        String llm = new TranslatableComponent("ai.touhou_little_maid.chat.summary.llm",
+                joinOrDash(llmSite, llmModel)).getString();
+        String tts = new TranslatableComponent("ai.touhou_little_maid.chat.summary.tts",
+                joinOrDash(ttsSite, ttsModel), languageName(ttsLang)).getString();
+
+        int y = this.height - 92 + 24;
+        poseStack.pushPose();
+        poseStack.scale(0.75F, 0.75F, 1.0F);
+        drawString(poseStack, this.font, llm, (int) (52 / 0.75F), (int) (y / 0.75F), 0xAAAAAA);
+        int ttsWidth = this.font.width(tts);
+        drawString(poseStack, this.font, tts,
+                (int) ((this.width - 52) / 0.75F) - ttsWidth, (int) (y / 0.75F), 0xAAAAAA);
+        poseStack.popPose();
+    }
+
+    private static String joinOrDash(String site, String model) {
+        return (StringUtils.isBlank(site) ? "-" : site) + " / "
+                + (StringUtils.isBlank(model) ? "-" : model);
+    }
+
+    /** 语种代码转显示名（en_us → English (US)），读不到就原样显示。 */
+    private static String languageName(String code) {
+        if (StringUtils.isBlank(code)) {
+            return "-";
+        }
+        Locale locale = Locale.forLanguageTag(code.replace('_', '-'));
+        String language = locale.getDisplayLanguage(Locale.ENGLISH);
+        if (StringUtils.isBlank(language) || language.equalsIgnoreCase(code)) {
+            return code;
+        }
+        String country = locale.getDisplayCountry(Locale.ENGLISH);
+        return StringUtils.isBlank(country) ? language : language + " (" + country + ")";
+    }
+
+    private static String formatTokenCount(int count) {
+        if (count < 1000) {
+            return String.valueOf(count);
+        }
+        if (count < 1_000_000) {
+            return String.format("%.1fK", count / 1000.0D);
+        }
+        if (count < 1_000_000_000) {
+            return String.format("%.1fM", count / 1_000_000.0D);
+        }
+        return String.format("%.1fG", count / 1_000_000_000.0D);
+    }
+
+    private void renderPopup(PoseStack poseStack, int mouseX, int mouseY) {
+        if (this.openPopup == null) {
+            return;
+        }
+        List<PopupEntry> entries = this.buildEntries(this.openPopup);
+        int visible = Math.min(entries.size(), POPUP_MAX_ROWS);
+        fill(poseStack, popupX, popupY, popupX + POPUP_WIDTH,
+                popupY + visible * POPUP_ROW_HEIGHT + 2, 0xf0_101010);
+        for (int i = 0; i < visible; i++) {
+            int index = i + popupScroll;
+            if (index >= entries.size()) {
+                break;
+            }
+            PopupEntry entry = entries.get(index);
+            int rowY = popupY + 1 + i * POPUP_ROW_HEIGHT;
+            boolean hover = mouseX >= popupX && mouseX <= popupX + POPUP_WIDTH
+                    && mouseY >= rowY && mouseY < rowY + POPUP_ROW_HEIGHT;
+            if (hover && !entry.header()) {
+                fill(poseStack, popupX + 1, rowY, popupX + POPUP_WIDTH - 1,
+                        rowY + POPUP_ROW_HEIGHT - 1, 0x60ffffff);
+            }
+            String label = entry.label();
+            if (label.startsWith("ai.touhou_little_maid.")) {
+                label = new TranslatableComponent(label).getString();
+            }
+            drawString(poseStack, this.font,
+                    this.font.plainSubstrByWidth(label, POPUP_WIDTH - 6),
+                    popupX + 3, rowY + 2, entry.header() ? 0xFFD700 : 0xFFFFFF);
+        }
+    }
+
+    // ---------------------------------------------------------------- 输入
+
+    @Override
+    public void resize(Minecraft mc, int pWidth, int pHeight) {
+        String chatText = this.input.getValue();
+        super.resize(mc, pWidth, pHeight);
+        this.input.setValue(chatText);
     }
 
     @Override
@@ -113,11 +348,38 @@ public class AIChatScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.openPopup != null) {
+            List<PopupEntry> entries = this.buildEntries(this.openPopup);
+            int visible = Math.min(entries.size(), POPUP_MAX_ROWS);
+            if (mouseX >= popupX && mouseX <= popupX + POPUP_WIDTH
+                    && mouseY >= popupY && mouseY <= popupY + visible * POPUP_ROW_HEIGHT) {
+                int index = popupScroll + (int) ((mouseY - popupY - 1) / POPUP_ROW_HEIGHT);
+                if (index >= 0 && index < entries.size()) {
+                    PopupEntry entry = entries.get(index);
+                    if (entry.action() != null) {
+                        entry.action().run();
+                    }
+                    return true;
+                }
+            }
+            this.openPopup = null;
+        }
         if (this.input.mouseClicked(mouseX, mouseY, button)) {
             this.setFocused(this.input);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (this.openPopup != null) {
+            int size = this.buildEntries(this.openPopup).size();
+            int max = Math.max(0, size - POPUP_MAX_ROWS);
+            this.popupScroll = (int) Math.max(0, Math.min(max, this.popupScroll - delta));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     @Override
@@ -140,7 +402,11 @@ public class AIChatScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ENTER) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && this.openPopup != null) {
+            this.openPopup = null;
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
             sendDoneMessage();
             return true;
         }
@@ -156,13 +422,10 @@ public class AIChatScreen extends Screen {
         String value = input.getValue();
         LocalPlayer player = Minecraft.getInstance().player;
         if (StringUtils.isNotBlank(value) && player != null) {
-            // 语言用客户端当前语言的显示名（如 English (US) / 简体中文），
-            // 它会被拼进 prompt，所以只能由客户端提供
             LanguageManager languageManager = Minecraft.getInstance().getLanguageManager();
             LanguageInfo info = languageManager.getLanguage(languageManager.getSelected().getCode());
             String language = info != null ? info.toString() : "English (US)";
             SendUserChatPacket.send(this.maid.getId(), value, language);
-            // 本地立刻回显自己说的话：等到 AI 回复再显示会让玩家怀疑没发出去
             String name = player.getScoreboardName();
             String format = String.format("<%s> %s", name, value);
             player.sendMessage(new TextComponent(format).withStyle(ChatFormatting.GRAY), Util.NIL_UUID);

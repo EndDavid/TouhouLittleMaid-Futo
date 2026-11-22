@@ -110,6 +110,7 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.SendUserChatPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.SaveMaidAIDataPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIDataPacket.initServer();
+        com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIHistoryPacket.initServer();
 
         // 女仆位置留档：周期性记录，供仆从铃 / 小号处理「她在未加载区块」那一半。
         // 原版 1.18.2 没有实体卸载钩子，Fabric API 0.77 也没有对应事件，说明见该类注释。

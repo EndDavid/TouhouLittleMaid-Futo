@@ -59,8 +59,17 @@ public final class OpenMaidAIDataScreenPacket {
         if (minecraft.level == null || minecraft.player == null) {
             return;
         }
-        // 与上游一致：只有「正开着 AI 聊天界面」时才切过去
-        if (!(minecraft.screen instanceof com.github.tartaricacid.touhoulittlemaid.client.screen.ai.AIChatScreen)) {
+        // 这份数据有两个用途：界面底部摘要要用它，设置界面也要用它。
+        // 先无条件缓存，再看意图位决定要不要切界面。
+        com.github.tartaricacid.touhoulittlemaid.client.screen.ai.AIChatScreen.CLIENT_DATA = data;
+        boolean wantSetting =
+                com.github.tartaricacid.touhoulittlemaid.client.screen.ai.AIChatScreen.PENDING_SETTING_SCREEN;
+        com.github.tartaricacid.touhoulittlemaid.client.screen.ai.AIChatScreen.PENDING_SETTING_SCREEN = false;
+        if (!wantSetting) {
+            if (minecraft.screen instanceof
+                    com.github.tartaricacid.touhoulittlemaid.client.screen.ai.AIChatScreen chat) {
+                chat.refreshData();
+            }
             return;
         }
         Entity entity = minecraft.level.getEntity(entityId);

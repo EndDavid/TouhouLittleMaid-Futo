@@ -27,6 +27,11 @@ public class AIConfig {
      * 角色设定为空时自动生成一份（1.20.1 TLMO 的特性，1.18.2 上游还没有）。
      */
     public static ForgeConfigSpec.BooleanValue AUTO_GEN_SETTING_ENABLED;
+    /**
+     * 每位玩家可累计使用的 token 上限（0 或负数表示不限制）。
+     * 1.20.1 同样有这个限制，超限后用 message.touhou_little_maid.ai_chat.max_tokens_limit 提示。
+     */
+    public static ForgeConfigSpec.IntValue MAX_TOKENS_PER_PLAYER;
     public static void init(ForgeConfigSpec.Builder builder) {
         // 读取网站列表（jar 内置的 + config/touhou_little_maid/available_sites.yml）
         AvailableSites.readSites();
@@ -49,6 +54,9 @@ public class AIConfig {
         STT_PROXY_ADDRESS = builder.define("STTProxyAddress", "");
         builder.comment("Generate a character setting automatically when the maid's model has none");
         AUTO_GEN_SETTING_ENABLED = builder.define("AutoGenSettingEnabled", true);
+        builder.comment("Max tokens a single player may spend in total, 0 means unlimited");
+        MAX_TOKENS_PER_PLAYER = builder.defineInRange("MaxTokensPerPlayer", 0, 0, Integer.MAX_VALUE);
+
         builder.comment("The maximum historical conversation length cached by the maid");
         MAID_MAX_HISTORY_CHAT_SIZE = builder.defineInRange("MaidMaxHistoryChatSize", 16, 1, 128);
         builder.pop();
