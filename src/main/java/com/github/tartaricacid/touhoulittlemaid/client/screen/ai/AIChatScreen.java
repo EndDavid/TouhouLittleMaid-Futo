@@ -55,7 +55,7 @@ public class AIChatScreen extends Screen {
     /** 语音合成支持的语种（对应 1.20.1 的 SupportLanguage）。 */
     public static final String[] TTS_LANGUAGES = {"en_us", "zh_cn", "ja_jp", "ko_kr", "ru_ru"};
 
-    private static final int BUTTON_SIZE = 20;
+    private static final int BUTTON_SIZE = 18;
     private static final int BUTTON_GAP = 2;
     private static final int POPUP_ROW_HEIGHT = 12;
     private static final int POPUP_MAX_ROWS = 9;
@@ -83,9 +83,13 @@ public class AIChatScreen extends Screen {
 
     @Override
     protected void init() {
-        int inputWidth = Math.min(700, Math.max(200, this.width - 100));
-        int inputX = this.width / 2 - inputWidth / 2;
-        int inputY = this.height - 92;
+        // 坐标逐字对齐 1.20.1 的 AIChatScreen#init：
+        //   inputX = width/2 - 165, inputY = height/2 + 58, 宽 330 高 20
+        //   按钮 18x18、间距 2、y = inputY - 28
+        //   左三从 inputX - 8 开始；右三从 inputX + 330 - 18*3 + 2*2 开始
+        int inputWidth = 330;
+        int inputX = this.width / 2 - 165;
+        int inputY = this.height / 2 + 58;
 
         this.input = new EditBox(this.font, inputX, inputY, inputWidth, 20,
                 new TranslatableComponent("chat.editBox"));
@@ -96,15 +100,16 @@ public class AIChatScreen extends Screen {
         this.addWidget(this.input);
         this.setInitialFocus(this.input);
 
-        int buttonY = inputY - 26;
+        int buttonY = inputY - 28;
         int step = BUTTON_SIZE + BUTTON_GAP;
         // 字形全部限定在 BMP 内：1.20.1 用的 U+1F551 / U+1F50A / U+1F310 属于增补平面，
         // 1.18.2 自带的 unifont 没有这些字形，会渲染成方框。这里换成语义等价的 BMP 符号：
         // U+2261 列表 / U+2699 设定 / U+270E 设置 / U+2726 星形 / U+266A 音符 / "Aa" 语种。
-        addSideButton(inputX, buttonY, "\u2261", this::openHistory);
-        addSideButton(inputX + step, buttonY, "\u2699", this::openSettingEditor);
-        addSideButton(inputX + step * 2, buttonY, "\u270E", this::openConfig);
-        int right = inputX + inputWidth - BUTTON_SIZE;
+        int left = inputX - 8;
+        addSideButton(left, buttonY, "\u2261", this::openHistory);
+        addSideButton(left + step, buttonY, "\u2699", this::openSettingEditor);
+        addSideButton(left + step * 2, buttonY, "\u270E", this::openConfig);
+        int right = inputX + inputWidth - BUTTON_SIZE * 3 + BUTTON_GAP * 2 + BUTTON_SIZE;
         addSideButton(right, buttonY, "Aa", () -> togglePopup(PopupType.LANGUAGE, right, buttonY));
         addSideButton(right - step, buttonY, "\u266A",
                 () -> togglePopup(PopupType.TTS, right - step, buttonY));
@@ -132,9 +137,19 @@ public class AIChatScreen extends Screen {
         Minecraft.getInstance().setScreen(new AISettingEditScreen(this.maid));
     }
     /**
-     * U+270E = 设置（1.20.1 的 config，本版是这只女仆的站点 / 模型 / 温度）。
+     * U+270E = 设置：站点管理（对应 1.20.1 的 AIChatSettingsHubScreen）。
+     *
+     * <p>站点的新增 / 编辑 / 删除都在这里面，改完会写回 available_sites.yml。</p>
      */
     private void openConfig() {
+        Minecraft.getInstance().setScreen(new AISiteListScreen(this.maid));
+    }
+    /**
+     * 每只女仆的站点 / 模型 / 温度选择（原 ✎ 的用途，现在直接在界面里选）。
+     *
+     * <p>保留这个入口：右三按钮的弹层已经能改站点与模型，这个界面用于一次性看全部字段。</p>
+     */
+    private void openMaidConfig() {
         PENDING_SETTING_SCREEN = true;
         GetMaidAIDataPacket.send(this.maid.getId());
     }
@@ -225,7 +240,7 @@ public class AIChatScreen extends Screen {
         int xOffset = 5;
         int yOffset = 6;
         fill(poseStack, input.x - xOffset, input.y - yOffset,
-                input.x + input.getInnerWidth() + xOffset,
+                input.x + input.getWidth() + xOffset,
                 input.y + input.getHeight() - yOffset, 0x9f_000000);
         input.render(poseStack, mouseX, mouseY, partialTicks);
 
@@ -249,11 +264,12 @@ public class AIChatScreen extends Screen {
                 ? String.format("Token: %s / %s (%.1f%%)", formatTokenCount(current),
                 formatTokenCount(max), current * 100.0D / max)
                 : String.format("Token: %s / \u221E", formatTokenCount(current));
-        int y = this.height - 92 - 26 - 12;
+        // 位置：输入条正上方 12px，居中，0.75 缩放（与 1.20.1 的 renderTokenUsage 一致）
+        int y = this.input.y - 12;
         poseStack.pushPose();
-        poseStack.translate(this.width / 2.0F, y, 0.0F);
+        poseStack.translate(this.input.x + this.input.getWidth() / 2.0F, y, 0.0F);
         poseStack.scale(0.75F, 0.75F, 1.0F);
-        drawCenteredString(poseStack, this.font, new TextComponent(text), 0, 0, 0xAAAAAA);
+        drawCenteredString(poseStack, this.font, new TextComponent(text), 0, 0, 0xFFADADAD);
         poseStack.popPose();
     }
 
@@ -270,13 +286,14 @@ public class AIChatScreen extends Screen {
         String tts = new TranslatableComponent("ai.touhou_little_maid.chat.summary.tts",
                 joinOrDash(ttsSite, ttsModel), languageName(ttsLang)).getString();
 
-        int y = this.height - 92 + 24;
+        // 输入条下方 24px，左右贴边，0.5 缩放（1.20.1 的 renderSelectionSummaries 同款）
+        int y = this.input.y + 24;
         poseStack.pushPose();
-        poseStack.scale(0.75F, 0.75F, 1.0F);
-        drawString(poseStack, this.font, llm, (int) (52 / 0.75F), (int) (y / 0.75F), 0xAAAAAA);
+        poseStack.scale(0.5F, 0.5F, 1.0F);
+        drawString(poseStack, this.font, llm, this.input.x * 2, y * 2, 0xFFADADAD);
         int ttsWidth = this.font.width(tts);
         drawString(poseStack, this.font, tts,
-                (int) ((this.width - 52) / 0.75F) - ttsWidth, (int) (y / 0.75F), 0xAAAAAA);
+                (this.input.x + this.input.getWidth()) * 2 - ttsWidth, y * 2, 0xFFADADAD);
         poseStack.popPose();
     }
 

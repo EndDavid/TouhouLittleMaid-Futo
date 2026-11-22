@@ -47,6 +47,17 @@ public final class AvailableSites {
     private static final Map<String, List<String>> CLIENT_TTS_SITES = Maps.newLinkedHashMap();
     private static final Path SITES_FILES = Paths.get("config", TouhouLittleMaid.MOD_ID, FILE_NAME);
     private static final String JAR_SITES_FILES = String.format("/assets/%s/config/%s", TouhouLittleMaid.MOD_ID, FILE_NAME);
+    /**
+     * 原始 yml 内容（站点名 → 原始键值），包含没填 api_key 的站点。
+     * <p>GUI 编辑要用它：{@code CHAT_SITES} 只收「能用的」站点，
+     * 而设置界面还要能看见并编辑那些没填 key 的。</p>
+     */
+    private static final Map<String, LinkedHashMap<String, Object>> RAW_SITES = Maps.newLinkedHashMap();
+
+    public static Map<String, LinkedHashMap<String, Object>> getRawSites() {
+        return RAW_SITES;
+    }
+
     public static void readSites() {
         CHAT_SITES.clear();
         TTS_SITES.clear();
@@ -92,7 +103,9 @@ public final class AvailableSites {
                 TouhouLittleMaid.LOGGER.error("[Futo] failed to load site: {}", key, e);
             }
         });
-        // 保存
+        // 保存（同时留一份给 GUI 编辑用）
+        RAW_SITES.clear();
+        RAW_SITES.putAll(allSites);
         saveSites(allSites);
         TouhouLittleMaid.LOGGER.info("[Futo] AI chat sites: {} chat / {} tts (only those with an api key count)",
                 CHAT_SITES.size(), TTS_SITES.size());
@@ -113,6 +126,55 @@ public final class AvailableSites {
         } catch (Exception e) {
             TouhouLittleMaid.LOGGER.error("[Futo] failed to save available sites file", e);
         }
+    }
+    /**
+     * 新增或覆盖一个站点，并落盘、重新加载。
+     *
+     * <p>字段名与 yml 一致（{@code type} / {@code api_type} / {@code url} / {@code api_key} /
+     * {@code models}）。{@code apiType} 传空时按类型补默认值。</p>
+     *
+     * @return 是否成功写入磁盘
+     */
+    public static boolean saveSite(String name, String type, String apiType, String url,
+                                   String apiKey, java.util.List<String> models) {
+        if (StringUtils.isBlank(name)) {
+            return false;
+        }
+        LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+        map.put("type", type);
+        map.put("api_type", StringUtils.isBlank(apiType)
+                ? ("tts".equals(type) ? TTSApiType.FISH_AUDIO.getName() : ChatApiType.OPENAI.getName())
+                : apiType);
+        map.put("url", StringUtils.defaultString(url));
+        map.put("api_key", StringUtils.defaultString(apiKey));
+        map.put("models", models == null ? new java.util.ArrayList<String>() : models);
+        RAW_SITES.put(name, map);
+        saveSites(RAW_SITES);
+        readSites();
+        return true;
+    }
+    /**
+     * 删除一个站点并落盘。
+     */
+    public static boolean removeSite(String name) {
+        if (!RAW_SITES.containsKey(name)) {
+            return false;
+        }
+        RAW_SITES.remove(name);
+        saveSites(RAW_SITES);
+        readSites();
+        return true;
+    }
+    /**
+     * 站点是否「已启用」（即填了 api_key，能被聊天/TTS 用到）。
+     */
+    public static boolean isEnabled(String name) {
+        LinkedHashMap<String, Object> map = RAW_SITES.get(name);
+        if (map == null) {
+            return false;
+        }
+        Object key = map.get("api_key");
+        return key instanceof String && StringUtils.isNotBlank((String) key);
     }
     public static Site getChatSite(String key) {
         return CHAT_SITES.get(key);

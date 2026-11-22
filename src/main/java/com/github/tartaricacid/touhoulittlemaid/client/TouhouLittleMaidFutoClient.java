@@ -163,6 +163,7 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.SyncChatTokensPacket.initClient();
         com.github.tartaricacid.touhoulittlemaid.network.SyncMaidAIHistoryPacket.initClient();
         com.github.tartaricacid.touhoulittlemaid.network.SyncMaidAISettingPacket.initClient();
+        com.github.tartaricacid.touhoulittlemaid.network.SyncSiteListPacket.initClient();
         // 对着可聊天的女仆按聊天键（默认 T）开界面
         com.github.tartaricacid.touhoulittlemaid.client.event.PressAIChatKeyEvent.init();
 
