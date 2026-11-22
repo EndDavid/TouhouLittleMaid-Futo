@@ -1,6 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.client.screen.ai;
 
 import com.github.tartaricacid.touhoulittlemaid.client.gui.widget.button.FlatColorButton;
+import com.github.tartaricacid.touhoulittlemaid.ai.manager.setting.Site;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.network.SaveSitePacket;
 import com.github.tartaricacid.touhoulittlemaid.network.SyncSiteListPacket;
@@ -105,6 +106,19 @@ public class AISiteEditScreen extends Screen {
         return entry == null ? "" : String.join(", ", entry.models());
     }
 
+    /**
+     * 保存后这个站点是否启用。
+     *
+     * <p>已有站点沿用列表里的开关值；<b>但只要这次填了像样的 api_key 就强制启用</b> ——
+     * 否则「在编辑界面填好 key 却仍然不算配置」会让人完全摸不着头脑
+     * （这正是之前请求打到 127.0.0.1 的那一类困惑）。</p>
+     */
+    private boolean enabled(String apiKey) {
+        SyncSiteListPacket.Entry entry = source();
+        boolean current = entry != null && entry.enabled();
+        return current || Site.isUsableApiKey(apiKey);
+    }
+
     private void save() {
         String name = StringUtils.trimToEmpty(this.nameField.getValue());
         if (StringUtils.isBlank(name)) {
@@ -118,9 +132,10 @@ public class AISiteEditScreen extends Screen {
                 models.add(model);
             }
         }
+        String apiKey = StringUtils.trimToEmpty(this.keyField.getValue());
         SaveSitePacket.sendSave(name, this.type, this.apiType,
-                StringUtils.trimToEmpty(this.urlField.getValue()),
-                StringUtils.trimToEmpty(this.keyField.getValue()), models);
+                StringUtils.trimToEmpty(this.urlField.getValue()), apiKey, models,
+                this.enabled(apiKey));
         this.onClose();
     }
 

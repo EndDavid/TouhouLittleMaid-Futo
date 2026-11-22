@@ -19,9 +19,15 @@ public final class SaveSitePacket {
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "save_site");
     private SaveSitePacket() {
     }
-    /** 保存（新增或覆盖）。 */
+    /** 保存（新增或覆盖）。{@code enabled} 由界面里的开关决定。 */
     public static void sendSave(String name, String type, String apiType, String url,
                                 String apiKey, List<String> models) {
+        sendSave(name, type, apiType, url, apiKey, models, true);
+    }
+
+    /** 保存并显式指定 {@code enabled}（站点列表上的勾选框走这条）。 */
+    public static void sendSave(String name, String type, String apiType, String url,
+                                String apiKey, List<String> models, boolean enabled) {
         FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBoolean(true);
         buf.writeUtf(name);
@@ -29,6 +35,7 @@ public final class SaveSitePacket {
         buf.writeUtf(apiType);
         buf.writeUtf(url);
         buf.writeUtf(apiKey);
+        buf.writeBoolean(enabled);
         buf.writeVarInt(models.size());
         for (String model : models) {
             buf.writeUtf(model);
@@ -51,6 +58,7 @@ public final class SaveSitePacket {
                     String apiType = isSave ? buf.readUtf() : "";
                     String url = isSave ? buf.readUtf() : "";
                     String apiKey = isSave ? buf.readUtf() : "";
+                    boolean enabled = isSave && buf.readBoolean();
                     List<String> models = new ArrayList<>();
                     if (isSave) {
                         int count = Math.min(Math.max(buf.readVarInt(), 0), 256);
@@ -58,17 +66,19 @@ public final class SaveSitePacket {
                             models.add(buf.readUtf());
                         }
                     }
-                    server.execute(() -> handle(player, isSave, name, type, apiType, url, apiKey, models));
+                    server.execute(() -> handle(player, isSave, name, type, apiType, url, apiKey,
+                            enabled, models));
                 });
     }
     private static void handle(ServerPlayer player, boolean isSave, String name, String type,
-                               String apiType, String url, String apiKey, List<String> models) {
+                               String apiType, String url, String apiKey, boolean enabled,
+                               List<String> models) {
         // 会写磁盘上的配置文件，按管理操作处理（与 /tlm ai_chat reload 同级）
         if (!player.hasPermissions(2)) {
             return;
         }
         if (isSave) {
-            AvailableSites.saveSite(name, type, apiType, url, apiKey, models);
+            AvailableSites.saveSite(name, type, apiType, url, apiKey, models, enabled);
         } else {
             AvailableSites.removeSite(name);
         }

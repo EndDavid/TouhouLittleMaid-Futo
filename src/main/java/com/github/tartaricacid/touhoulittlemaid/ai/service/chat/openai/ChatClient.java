@@ -1,4 +1,5 @@
 package com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai;
+import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.Service;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.request.ChatCompletion;
 import com.github.tartaricacid.touhoulittlemaid.ai.service.chat.openai.response.ChatCallback;
@@ -49,13 +50,36 @@ public final class ChatClient {
         this.chatCompletion = chatCompletion;
         return this;
     }
+    /**
+     * 拼出最终请求地址。
+     *
+     * <p>yml 里的 {@code url} 有两种写法，两种都得认：</p>
+     * <ul>
+     *     <li>1.18.2 风格：base 地址（{@code https://api.deepseek.com}、
+     *         {@code https://api.openai.com/v1}），要补 {@code /chat/completions}；</li>
+     *     <li>1.20.1 风格：完整端点（{@code https://api.deepseek.com/chat/completions}），
+     *         再补就会变成 {@code …/chat/completions/chat/completions}。</li>
+     * </ul>
+     */
+    private String resolveUrl() {
+        String suffix = ChatCompletion.getUrl();
+        if (this.baseUrl.endsWith(suffix)) {
+            return this.baseUrl;
+        }
+        return this.baseUrl + suffix;
+    }
+
     public void handle(Consumer<ChatCompletionResponse> consumer, Consumer<Throwable> failConsumer) {
+        String url = resolveUrl();
+        // 每次请求都留一行：曾经有过「明明填了 key，请求却在打 127.0.0.1」的困惑，
+        // 而当时只有失败才打日志，看不出到底选了哪个站点。
+        TouhouLittleMaid.LOGGER.info("[Futo] AI chat POST {}", url);
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.JSON_UTF_8.toString())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + this.apiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(Service.GSON.toJson(chatCompletion)))
                 .timeout(Duration.ofSeconds(20))
-                .uri(URI.create(baseUrl + ChatCompletion.getUrl()))
+                .uri(URI.create(url))
                 .build();
         httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .whenComplete((response, throwable) -> {

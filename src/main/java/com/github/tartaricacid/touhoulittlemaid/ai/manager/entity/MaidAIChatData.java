@@ -15,7 +15,7 @@ import java.util.Optional;
  *
  * <p>几处「回退」都是上游的既定行为，别当成 bug：</p>
  * <ul>
- *     <li>站点名为空或已不存在 → 用第一个<b>填了 key</b> 的站点；</li>
+ *     <li>站点名为空或已不存在 → 用第一个<b>已启用</b>的站点（{@code enabled: true}）；</li>
  *     <li>模型名为空 → 用该站点模型列表的第一个；</li>
  *     <li>温度 &lt; 0（默认 -1）→ 用全局 {@code AIConfig.CHAT_TEMPERATURE}。</li>
  * </ul>

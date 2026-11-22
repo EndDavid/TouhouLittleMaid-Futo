@@ -30,9 +30,10 @@ import java.util.Objects;
  * <p>读完后<b>立刻把合并结果写回玩家配置文件</b>（上游同样如此）：这样玩家第一次进游戏
  * 就能看到一份带注释字段的完整模板，照着填 {@code api_key} 即可。</p>
  *
- * <p><b>只有在填了 {@code api_key} 的站点才会进 {@code CHAT_SITES}</b>
- * —— 一份干净的配置里 {@code CHAT_SITES} 是空的，聊天时会提示
- * {@code ai.touhou_little_maid.chat.api_key.empty}，这是预期行为，不是 bug。</p>
+ * <p><b>只有 {@code enabled: true} 的站点才会进 {@code CHAT_SITES} / {@code TTS_SITES}</b>。
+ * 老配置没有 {@code enabled} 键时按「有没有真 {@code api_key}」推一个，并写回文件
+ * （1.18.2 用 {@code empty} / {@code empty_key} 表示「没填」，这些占位串不算已配置 ——
+ * 否则本地站点 {@code player2} 会顶替成默认站点，请求全打到 {@code 127.0.0.1}）。</p>
  *
  * <p>{@code CLIENT_*} 两张表是发给客户端的副本（只有 站点名 → 模型列表），
  * 不含密钥，见 {@code SyncAiSettingPacket}。</p>
@@ -87,15 +88,17 @@ public final class AvailableSites {
         // 分类
         allSites.forEach((key, value) -> {
             fixOldVersionConfig(value);
+            fillEnabled(value);
             try {
                 Site site = new Site(value);
-                // 必须设置了 key 的才能用于聊天
-                if (site.isChat() && StringUtils.isNotBlank(site.getApiKey())) {
+                // 只有 enabled 的站点才能用于聊天 / TTS。
+                // 老配置没有 enabled 键时由 Site 推一个（占位密钥不算已配置），
+                // 并在下面写回 yml，玩家就能在文件里直接看见并改动。
+                if (site.isChat() && site.isEnabled()) {
                     CHAT_SITES.put(key, site);
                     CLIENT_CHAT_SITES.put(key, site.getModels());
                 }
-                // 必须设置了 key 的才能用于 tts
-                if (site.isTts() && StringUtils.isNotBlank(site.getApiKey())) {
+                if (site.isTts() && site.isEnabled()) {
                     TTS_SITES.put(key, site);
                     CLIENT_TTS_SITES.put(key, site.getModels());
                 }
@@ -107,7 +110,7 @@ public final class AvailableSites {
         RAW_SITES.clear();
         RAW_SITES.putAll(allSites);
         saveSites(allSites);
-        TouhouLittleMaid.LOGGER.info("[Futo] AI chat sites: {} chat / {} tts (only those with an api key count)",
+        TouhouLittleMaid.LOGGER.info("[Futo] AI sites in use: {} chat / {} tts (enabled ones only)",
                 CHAT_SITES.size(), TTS_SITES.size());
     }
     public static void saveSites(Map<String, LinkedHashMap<String, Object>> allSites) {
@@ -137,6 +140,22 @@ public final class AvailableSites {
      */
     public static boolean saveSite(String name, String type, String apiType, String url,
                                    String apiKey, java.util.List<String> models) {
+        // 未显式指定 enabled 时：填了真 key 就自动启用，否则沿用旧值 / 推导值
+        LinkedHashMap<String, Object> old = RAW_SITES.get(name);
+        boolean enabled = old != null && old.containsKey("enabled")
+                ? Boolean.parseBoolean(Objects.toString(old.get("enabled"), "false"))
+                : Site.defaultEnabled(apiType, apiKey);
+        if (Site.isUsableApiKey(apiKey) || "system".equalsIgnoreCase(StringUtils.defaultString(apiType))) {
+            enabled = true;
+        }
+        return saveSite(name, type, apiType, url, apiKey, models, enabled);
+    }
+
+    /**
+     * 同上，但显式指定 {@code enabled}（界面里的开关走这条）。
+     */
+    public static boolean saveSite(String name, String type, String apiType, String url,
+                                   String apiKey, java.util.List<String> models, boolean enabled) {
         if (StringUtils.isBlank(name)) {
             return false;
         }
@@ -147,6 +166,7 @@ public final class AvailableSites {
                 : apiType);
         map.put("url", StringUtils.defaultString(url));
         map.put("api_key", StringUtils.defaultString(apiKey));
+        map.put("enabled", enabled);
         map.put("models", models == null ? new java.util.ArrayList<String>() : models);
         RAW_SITES.put(name, map);
         saveSites(RAW_SITES);
@@ -166,15 +186,22 @@ public final class AvailableSites {
         return true;
     }
     /**
-     * 站点是否「已启用」（即填了 api_key，能被聊天/TTS 用到）。
+     * 站点是否「已启用」（能被聊天 / TTS 用到）。
+     *
+     * <p>判定与 {@link #readSites()} 完全一致：看 yml 里的 {@code enabled}，
+     * 老配置缺这个键时按是否填了真 api_key 推一个。</p>
      */
     public static boolean isEnabled(String name) {
         LinkedHashMap<String, Object> map = RAW_SITES.get(name);
         if (map == null) {
             return false;
         }
-        Object key = map.get("api_key");
-        return key instanceof String && StringUtils.isNotBlank((String) key);
+        Object raw = map.get("enabled");
+        if (raw != null) {
+            return Boolean.parseBoolean(raw.toString());
+        }
+        return Site.defaultEnabled(Objects.toString(map.get("api_type"), StringUtils.EMPTY),
+                Objects.toString(map.get("api_key"), StringUtils.EMPTY));
     }
     public static Site getChatSite(String key) {
         return CHAT_SITES.get(key);
@@ -214,6 +241,16 @@ public final class AvailableSites {
                 map.put("api_type", TTSApiType.FISH_AUDIO.getName());
             }
         }
+    }
+    private static void fillEnabled(LinkedHashMap<String, Object> map) {
+        if (map.containsKey("enabled")) {
+            return;
+        }
+        // 老配置没有 enabled 键：按「有没有真 api_key」推一个，然后写回文件，
+        // 这样玩家能在 yml 里直接看到、也能在界面里勾掉。
+        String apiType = Objects.toString(map.get("api_type"), StringUtils.EMPTY);
+        String apiKey = Objects.toString(map.get("api_key"), StringUtils.EMPTY);
+        map.put("enabled", Site.defaultEnabled(apiType, apiKey));
     }
     private AvailableSites() {
     }

@@ -29,8 +29,14 @@ public class AISiteListScreen extends Screen {
     };
     private static final String[] TAB_TYPES = {"chat", "tts", "stt"};
     private static final int ROW_HEIGHT = 22;
+    private static final String CHECKED = "\u2611";
+    private static final String UNCHECKED = "\u2610";
     private static final int ROW_PADDING = 4;
     private static final int TAB_WIDTH = 96;
+    /** 勾选框 / 铅笔 / 垃圾桶在行内的右对齐位置（从左边缘算起的偏移）。 */
+    private static final int COL_CHECK = 78;
+    private static final int COL_EDIT = 46;
+    private static final int COL_DELETE = 20;
     private final EntityMaid maid;
     private int tab = 0;
     private int scroll = 0;
@@ -44,6 +50,15 @@ public class AISiteListScreen extends Screen {
     }
     @Override
     protected void init() {
+        this.buildWidgets();
+        GetSiteListPacket.send();
+    }
+
+    /**
+     * 只建控件。<b>不要在这里发请求</b>：服务端回包会触发 {@link #refresh()}，
+     * 而 refresh 又会重建控件 —— 请求写在这里就成一个死循环了。
+     */
+    private void buildWidgets() {
         this.listX = 24 + TAB_WIDTH + 8;
         this.listY = 24;
         this.listWidth = this.width - this.listX - 24;
@@ -62,10 +77,11 @@ public class AISiteListScreen extends Screen {
                 b -> this.openEditor(null)));
         this.addRenderableWidget(new Button(this.width - 24 - 96, bottomY, 96, 20,
                 new TranslatableComponent("gui.back"), b -> this.onClose()));
-        GetSiteListPacket.send();
     }
     /** Called when a new site list arrives. */
     public void refresh() {
+        this.clearWidgets();
+        this.buildWidgets();
     }
     private List<SyncSiteListPacket.Entry> currentSites() {
         String type = TAB_TYPES[this.tab];
@@ -107,10 +123,14 @@ public class AISiteListScreen extends Screen {
             drawString(poseStack, this.font, entry.name(),
                     this.listX + ROW_PADDING + 14, rowY + 7,
                     entry.enabled() ? 0xFFFFFF : 0x808080);
+            drawString(poseStack, this.font,
+                    new TextComponent(entry.enabled() ? CHECKED : UNCHECKED),
+                    this.listX + this.listWidth - COL_CHECK, rowY + 7,
+                    entry.enabled() ? 0x7FE0FF : 0x808080);
             drawString(poseStack, this.font, new TextComponent("\u270E"),
-                    this.listX + this.listWidth - 42, rowY + 7, 0x7FE0FF);
+                    this.listX + this.listWidth - COL_EDIT, rowY + 7, 0x7FE0FF);
             drawString(poseStack, this.font, new TextComponent("\u2716"),
-                    this.listX + this.listWidth - 20, rowY + 7, 0xFF8080);
+                    this.listX + this.listWidth - COL_DELETE, rowY + 7, 0xFF8080);
         }
         if (sites.isEmpty()) {
             drawCenteredString(poseStack, this.font,
@@ -128,8 +148,15 @@ public class AISiteListScreen extends Screen {
             List<SyncSiteListPacket.Entry> sites = this.currentSites();
             if (index >= 0 && index < sites.size()) {
                 SyncSiteListPacket.Entry entry = sites.get(index);
-                if (mouseX >= this.listX + this.listWidth - 28) {
+                if (mouseX >= this.listX + this.listWidth - COL_DELETE + 8) {
                     SaveSitePacket.sendDelete(entry.name());
+                    return true;
+                }
+                if (mouseX >= this.listX + this.listWidth - COL_CHECK - 6
+                        && mouseX < this.listX + this.listWidth - COL_EDIT + 8) {
+                    // 勾选框：把这个站点的启用状态取反后整条存回去
+                    SaveSitePacket.sendSave(entry.name(), entry.type(), entry.apiType(),
+                            entry.url(), entry.apiKey(), entry.models(), !entry.enabled());
                     return true;
                 }
                 this.openEditor(entry);
