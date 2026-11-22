@@ -153,3 +153,4 @@ public class MaidFishingHookRenderer<T extends MaidFishingHook> extends EntityRe
         return TEXTURE_LOCATION;
     }
 }
+

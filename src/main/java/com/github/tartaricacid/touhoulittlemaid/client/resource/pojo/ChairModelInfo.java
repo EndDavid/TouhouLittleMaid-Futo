@@ -15,10 +15,10 @@ import java.util.stream.Collectors;
  * 一条坐垫模型定义（{@code maid_chair.json} 里 {@code model_list} 的一个元素），
  * 移植自上游 {@code client/resource/pojo/ChairModelInfo}。
  *
- * <p>与上游的差异只有一处：上游还实现了 {@code IModelInfo} 接口以复用「模型图标缓存」，
- * 本移植版没有图标缓存系统，因此这里是一个独立的 POJO。</p>
+ * <p>与上游的差异只有一处：上游还提供 {@code getCacheIconId()}（图标缓存键），
+ * 本移植版没有图标缓存系统；它实现了 {@link IModelInfo} 以复用同一个换肤界面。</p>
  */
-public class ChairModelInfo {
+public class ChairModelInfo implements IModelInfo {
     private static final float RENDER_ENTITY_SCALE_MIN = 0.2F;
     private static final float RENDER_ENTITY_SCALE_MAX = 2.0F;
     private static final String GECKO_ANIMATION = ".animation.json";
@@ -146,4 +146,3 @@ public class ChairModelInfo {
         return this;
     }
 }
-

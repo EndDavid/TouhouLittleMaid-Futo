@@ -1,6 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.client.resource;
 
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.ChairModelInfo;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.CustomModelPack;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemChair;
 import net.minecraft.core.NonNullList;
 import net.minecraft.resources.ResourceLocation;
@@ -33,7 +34,7 @@ public final class ChairModelRegistry {
     public static final String DEFAULT_CHAIR_ID = "touhou_little_maid:cushion";
 
     private static final Map<ResourceLocation, ChairModelInfo> INFOS = new LinkedHashMap<>();
-    private static final List<ChairPack> PACKS = new ArrayList<>();
+    private static final List<CustomModelPack<ChairModelInfo>> PACKS = new ArrayList<>();
 
     private ChairModelRegistry() {
     }
@@ -47,11 +48,11 @@ public final class ChairModelRegistry {
         INFOS.put(info.getModelId(), info);
     }
 
-    public static void putPack(ChairPack pack) {
+    public static void putPack(CustomModelPack<ChairModelInfo> pack) {
         PACKS.add(pack);
     }
 
-    public static List<ChairPack> allPacks() {
+    public static List<CustomModelPack<ChairModelInfo>> allPacks() {
         return PACKS;
     }
 
@@ -123,41 +124,4 @@ public final class ChairModelRegistry {
                     info.isNoGravity())));
         }
     }
-
-    /**
-     * 一个坐垫模型包，对应上游 {@code CustomModelPack<ChairModelInfo>} 里坐垫用得到的那部分。
-     */
-    public static final class ChairPack {
-        private final String packName;
-        private final List<String> description;
-        @Nullable
-        private final ResourceLocation icon;
-        private final List<ChairModelInfo> models;
-
-        public ChairPack(String packName, List<String> description, @Nullable ResourceLocation icon,
-                         List<ChairModelInfo> models) {
-            this.packName = packName == null ? "" : packName;
-            this.description = description == null ? List.of() : description;
-            this.icon = icon;
-            this.models = models == null ? List.of() : models;
-        }
-
-        public String getPackName() {
-            return this.packName;
-        }
-
-        public List<String> getDescription() {
-            return this.description;
-        }
-
-        @Nullable
-        public ResourceLocation getIcon() {
-            return this.icon;
-        }
-
-        public List<ChairModelInfo> getModels() {
-            return this.models;
-        }
-    }
 }
-

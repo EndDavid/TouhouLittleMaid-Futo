@@ -89,7 +89,7 @@ loom_version=1.15.5
 | **神社 / 胶片 / 女仆床 / 稻草人** | **完成** |
 
 | **墓碑（死亡收纳）+ 祭坛召唤箱** | **完成** |
-| **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器）** | **完成**（换肤 GUI 待 `AbstractModelGui` 泛型化） |
+| **坐垫（58 种模型 + 物品 3D 图标 + 碰撞箱显示器 + 换肤界面）** | **完成** |
 | **帕秋莉手册（书内容 + 侧边页签）** | **完成**（54 条目 / 3 分类） |
 | **搜索 / 定位（小号 / 仆从铃 / 狐狸卷轴 / 河童罗盘）** | **完成**（含 `SchedulePos` 三坐标作息） |
 | **棋类（象棋 / 五子棋 / 国际象棋：各 3×3 多方块 + 对局 AI）** | **完成**（三块棋盘全部可玩） |
@@ -2339,13 +2339,34 @@ HandItems: [{id: "minecraft:stone_sword", ...}, {id: "minecraft:fishing_rod", ta
   这个分流写在 `EntityChairRenderer#render` 最前面，位置与上游一致；物品图标渲染期间
   会临时把 `renderHitBox` 关掉，否则图标里会多一个红框。
 
-### 还没做的
-
-**蹲下右键的换肤界面（`ChairModelGui`）。** 上游复用的是 `AbstractModelGui`，
-而本移植的 `AbstractModelGui` 把模型类型钉死在 `MaidModelInfo` 上；
-要复用必须先把它泛型化成 `<T extends LivingEntity, M>`。
-在此之前蹲下右键保持无动作，换模型只能靠创造模式物品栏里的各个变体 ——
-功能不缺，只是少一个入口。
+### 换肤界面（`ChairModelGui`）
+蹲下右键坐垫后，服务端发 S2C 包 `touhou_little_maid:open_chair_gui`（载荷是实体 id），
+客户端据此打开 `ChairModelGui`。网格里点一格则发 C2S 包 `touhou_little_maid:chair_model`
+（实体 id + model_id + 坐高 + 可骑 + 无重力），服务端写进四个同步字段。
+**为什么不用菜单（`MenuType`）**：这个界面没有物品槽，只有一张模型网格。上游同样是纯
+`Screen` 加自定义包（`OpenChairGuiMessage` / `ChairModelMessage`），比容器界面少一整层。
+**为什么「开界面」由服务端发起**：谁真的蹲着右键了这个坐垫，只有服务端说了算；
+客户端自己开界面等于允许伪造。所以 `EntityChair#interact` 里那句发包带着 `!level.isClientSide`。
+**`AbstractModelGui` 泛型化**：上游本来就是
+`AbstractModelGui<T extends LivingEntity, E extends IModelInfo>`。本移植版最初把 `E`
+钉死成 `MaidModelInfo`，于是坐垫只能靠创造模式物品栏换模型。现在分成四层：
+| 类型 | 角色 |
+| --- | --- |
+| `IModelInfo` | 四条公共查询：`getModelId` / `getName` / `getDescription` / `getRenderItemScale` |
+| `CustomModelPack<E>` | 模型包元数据（页签名 / 描述 / 作者 / 版本 / 图标），两边共用 |
+| `SkinGuiNumber<E>` | 分页与网格换算（每页 7 个页签 / 每行 11 格 / 一屏 5 行） |
+| `AbstractModelGui<T, E>` | 布局与交互；子类只实现「一格画什么」「点了做什么」 |
+坐垫那边因此不再需要自己的包类型：`ChairModelRegistry.ChairPack` 已删除，
+`allPacks()` 直接返回 `List<CustomModelPack<ChairModelInfo>>`，字段名与 `maid_model.json` 一致。
+**服务端复核（逐条对齐上游字节码）**：`allowed = ChairConfig.CHAIR_CHANGE_MODEL || player.isCreative()`；
+不允许时只回一句 `message.touhou_little_maid.change_model.disabled`，其它什么都不做；
+允许时写入四项，`tameableCanRide` 变 `false` 且坐垫上有人则 `ejectPassengers()`，
+最后打一次进度判据 `change_chair_model`（「我刚买的家具啊」）。
+**界面渲染期间临时关掉碰撞箱红框**：打开这个界面必须蹲着，而「蹲下 + 手持 `chair_show`」
+正是红框模式的触发条件 —— 不关的话大立绘与网格里 55 个缩略图会全变成红色线框。
+与 `ChairItemRenderer` 的处理同源，用 `finally` 恢复。
+**静态校验的范围**：三个包各有一条 `pack_name`、图标文件都在，58 个 `model_id` 互不重复，
+58 份几何与 58 张贴图全部存在。但界面本身（翻页、点格子、缩略图是否居中）需要真人看一眼。
 
 ### 必须注册属性表（Forge 有兜底，Fabric 没有）
 

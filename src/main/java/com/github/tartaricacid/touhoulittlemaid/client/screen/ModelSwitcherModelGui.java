@@ -40,7 +40,7 @@ import java.util.List;
  *         与 {@code AbstractModelGui} 的类注释一致，永远走实时渲染。</li>
  * </ol>
  */
-public class ModelSwitcherModelGui extends AbstractModelGui<EntityMaid> {
+public class ModelSwitcherModelGui extends AbstractModelGui<EntityMaid, MaidModelInfo> {
     // 三个下标做成 static：上游同样是「关掉界面再打开保持上次的位置」
     private static int PAGE_INDEX = 0;
     private static int PACK_INDEX = 0;
@@ -143,4 +143,3 @@ public class ModelSwitcherModelGui extends AbstractModelGui<EntityMaid> {
         ROW_INDEX = rowIndex;
     }
 }
-

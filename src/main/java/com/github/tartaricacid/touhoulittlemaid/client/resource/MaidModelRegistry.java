@@ -30,7 +30,7 @@ public final class MaidModelRegistry {
     private static final Map<ResourceLocation, MaidModelInfo> MODELS = new LinkedHashMap<>();
 
     /** 模型包列表，顺序即界面顶部页签的顺序。 */
-    private static final List<CustomModelPack> PACKS = new ArrayList<>();
+    private static final List<CustomModelPack<MaidModelInfo>> PACKS = new ArrayList<>();
 
     private MaidModelRegistry() {
     }
@@ -44,12 +44,12 @@ public final class MaidModelRegistry {
         MODELS.put(info.getModelId(), info);
     }
 
-    public static void putPack(CustomModelPack pack) {
+    public static void putPack(CustomModelPack<MaidModelInfo> pack) {
         PACKS.add(pack);
     }
 
     /** 模型包列表（换肤界面用）。空列表表示还没加载过资源。 */
-    public static List<CustomModelPack> allPacks() {
+    public static List<CustomModelPack<MaidModelInfo>> allPacks() {
         return PACKS;
     }
 

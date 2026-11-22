@@ -17,7 +17,7 @@ import java.util.List;
  * 上游该类还实现 {@code IModelInfo} 并携带聊天气泡等字段，那些属于背包/GUI 里程碑,
  * 这里先只保留渲染所需的部分。</p>
  */
-public class MaidModelInfo {
+public class MaidModelInfo implements IModelInfo {
     private static final float RENDER_ENTITY_SCALE_MIN = 0.2f;
     private static final float RENDER_ENTITY_SCALE_MAX = 2.0f;
 

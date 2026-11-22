@@ -197,9 +197,9 @@ public final class GeckoModelLoader {
      * <p>上游把这些字段（pack_name / description / author / version / date / icon）
      * 直接反序列化进 {@code CustomModelPack}；这里手工读，字段名与上游保持一致。</p>
      */
-    private static CustomModelPack buildPack(String namespace, JsonObject root,
+    private static CustomModelPack<MaidModelInfo> buildPack(String namespace, JsonObject root,
                                              java.util.List<MaidModelInfo> models) {
-        CustomModelPack pack = new CustomModelPack();
+        CustomModelPack<MaidModelInfo> pack = new CustomModelPack<>();
         pack.setPackName(getStringOr(root, "pack_name", namespace));
         pack.setDescription(getStringList(root, "description"));
         pack.setAuthor(getStringList(root, "author"));

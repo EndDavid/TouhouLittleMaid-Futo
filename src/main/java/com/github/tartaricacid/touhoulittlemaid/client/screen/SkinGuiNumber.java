@@ -1,7 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.client.screen;
 
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.CustomModelPack;
-import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.IModelInfo;
 import net.minecraft.util.Mth;
 
 import java.util.List;
@@ -13,9 +13,9 @@ import java.util.List;
  * <p>所有下标都在这里算，界面类只负责画 —— 这样「一页多少个」「第几行对应第几个模型」
  * 只有一处定义，翻页与滚动不会各自算错。</p>
  *
- * <p>三个常量就是上游的值：每页 7 个包页签、每行 11 个模型、每屏 5 行。</p>
+ * <p>三个常量就是上游的值：每页 7 个模型包（顶部页签数量）。</p>
  */
-public class SkinGuiNumber {
+public class SkinGuiNumber<E extends IModelInfo> {
     /** 每页最多 7 个模型包（顶部页签数量）。 */
     private static final int PACK_INTERVAL = 7;
     /** 每行 11 个模型。 */
@@ -23,9 +23,9 @@ public class SkinGuiNumber {
     /** 一屏 5 行，即 55 个。 */
     private static final int MODEL_TOTAL_ROW = 5;
 
-    private final List<CustomModelPack> modelPackList;
+    private final List<CustomModelPack<E>> modelPackList;
 
-    public SkinGuiNumber(List<CustomModelPack> modelPackList) {
+    public SkinGuiNumber(List<CustomModelPack<E>> modelPackList) {
         this.modelPackList = modelPackList;
     }
 
@@ -34,6 +34,11 @@ public class SkinGuiNumber {
     }
 
     public int getModelSize(int packIndex) {
+        // 空包列表时不能落到 get(-1)：构造函数里就会调到这里。
+        // 与上游同样返回 0 而不是抛异常 —— 界面会显示「没有模型包」。
+        if (this.modelPackList.isEmpty()) {
+            return 0;
+        }
         packIndex = Mth.clamp(packIndex, 0, this.modelPackList.size() - 1);
         return this.modelPackList.get(packIndex).getModelList().size();
     }

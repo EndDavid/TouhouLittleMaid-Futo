@@ -2,6 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.client.resource;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.ChairModelInfo;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.CustomModelPack;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.file.AnimationFile;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.render.built.GeoModel;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.resource.GeckoLibCache;
@@ -84,12 +85,35 @@ public final class ChairModelLoader {
             }
             validModels.add(info);
         }
-        ChairModelRegistry.putPack(new ChairModelRegistry.ChairPack(
-                getStringOr(root, "pack_name", namespace),
-                getStringList(root, "description"),
-                parseIcon(root),
-                validModels));
+        ChairModelRegistry.putPack(buildPack(namespace, root, validModels));
         return validModels.size();
+    }
+
+    /**
+     * 从同一个 {@code maid_chair.json} 里取出包级别的元数据。
+     *
+     * <p>字段名与女仆包的 {@code maid_model.json} 完全一致（pack_name / description /
+     * author / version / date / icon / icon_delay），所以直接复用 {@link CustomModelPack}；
+     * 上游也是同一个泛型类，只是把 {@code ChairModelInfo} 当元素类型。</p>
+     */
+    private static CustomModelPack<ChairModelInfo> buildPack(String namespace, JsonObject root,
+                                                             List<ChairModelInfo> models) {
+        CustomModelPack<ChairModelInfo> pack = new CustomModelPack<>();
+        pack.setPackName(getStringOr(root, "pack_name", namespace));
+        pack.setDescription(getStringList(root, "description"));
+        pack.setAuthor(getStringList(root, "author"));
+        pack.setVersion(getStringOrNull(root, "version"));
+        pack.setDate(getStringOrNull(root, "date"));
+        pack.setIcon(parseIcon(root));
+        if (root.has("icon_delay") && root.get("icon_delay").isJsonPrimitive()) {
+            try {
+                pack.setIconDelay(root.get("icon_delay").getAsInt());
+            } catch (RuntimeException ignored) {
+                // 非法值退回缺省，不影响加载
+            }
+        }
+        pack.setModelList(models);
+        return pack.decorate();
     }
 
     /**
@@ -149,5 +173,12 @@ public final class ChairModelLoader {
         }
         return null;
     }
-}
 
+    @Nullable
+    private static String getStringOrNull(JsonObject root, String key) {
+        if (root.has(key) && root.get(key).isJsonPrimitive()) {
+            return root.get(key).getAsString();
+        }
+        return null;
+    }
+}

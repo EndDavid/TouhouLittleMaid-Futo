@@ -69,4 +69,3 @@ final class MaidFishingDiagnostics {
                 channel, uuid, maid.blockPosition(), detail);
     }
 }
-

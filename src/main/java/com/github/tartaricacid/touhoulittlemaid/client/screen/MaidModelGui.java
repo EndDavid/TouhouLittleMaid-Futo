@@ -35,7 +35,7 @@ import java.util.List;
  * 因此这里直接取缓存即可 —— 只有构建失败的坏条目会返回 {@code null}，那时跳过这一格，
  * 否则渲染器会每帧为它刷一条警告。</p>
  */
-public class MaidModelGui extends AbstractModelGui<EntityMaid> {
+public class MaidModelGui extends AbstractModelGui<EntityMaid, MaidModelInfo> {
     private static int PAGE_INDEX = 0;
     private static int PACK_INDEX = 0;
     private static int ROW_INDEX = 0;
@@ -43,7 +43,7 @@ public class MaidModelGui extends AbstractModelGui<EntityMaid> {
     @Nullable
     private EntityMaid previewEntity;
 
-    public MaidModelGui(EntityMaid maid, List<CustomModelPack> packs) {
+    public MaidModelGui(EntityMaid maid, List<CustomModelPack<MaidModelInfo>> packs) {
         super(maid, packs);
     }
 

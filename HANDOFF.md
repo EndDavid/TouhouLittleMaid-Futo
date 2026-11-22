@@ -32,6 +32,13 @@
 - **坐船钓鱼**：`TaskFishing#createBrainTasks` 改回上游的 `MaidFindSitTask`，
   抛钩仍在 RIDE_WORK；临时的 `MaidFishingCastTask`（岸钓绕行）已删除。
 
+- **坐垫换肤系统**：`AbstractModelGui` 已泛型化为 `<T extends LivingEntity, E extends IModelInfo>`
+  （与上游一致），配套新增 `IModelInfo`；`CustomModelPack` / `SkinGuiNumber` 一并泛型化，
+  `ChairModelRegistry.ChairPack` 删除、改用共用的 `CustomModelPack<ChairModelInfo>`。
+  新增 `client/screen/ChairModelGui` + 两个包 `network/OpenChairGuiPacket`（S2C 开界面，
+  由服务端在 `EntityChair#interact` 里发起）与 `network/ChairModelPacket`（C2S 写四个同步字段，
+  含 `CHAIR_CHANGE_MODEL`/创造模式判定、`ejectPassengers`、`change_chair_model` 判据）。
+
 ### 仍然要真人验证的
 1. 模型切换器界面（见下一小节）。
 2. 附魔的实际**战斗效果**：给御币附上三个附魔，看弹幕是否变快 / 命中是否施加缓慢 / 能否打末影人。
@@ -44,9 +51,12 @@
    **主手、副手都认**（见 `util/FishingRodUtil`）：上游只看主手，副手放竿会静默地什么都不做。
 
 ### 还没做的一件事
-**界面的人工实测。** 需要真人：右击方块开界面 → 加 / 删 / 排序模式 → 选模型与朝向 →
-关界面后红石脉冲仍能切换；以及「手持物品右击女仆」把 tooltip 从「未绑定」变成「已绑定」。
-代码侧的数据包线程模型与服务端复核已经就位（见 README 那一节末尾），风险只在 UI 布局。
+**两个界面的人工实测。** 坐垫换肤（蹲下右键坐垫 → 翻页 / 点格子 / 缩略图居中）与
+模型切换器界面（右击方块 → 加 / 删 / 排序模式 → 选模型与朝向）。
+坐垫侧的服务端链路已用 RCON 验过（四个同步字段可写可读、`ModelId` 落盘正确），
+代码侧的数据包线程模型与服务端复核都已就位，风险只在 UI 布局。
+
+模型切换器还要确认两件事：关界面后红石脉冲仍能切换；「手持物品右击女仆」把 tooltip 从「未绑定」变成「已绑定」。
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；

@@ -153,6 +153,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 模型切换器界面：服务端发坐标、客户端找到方块实体后开 Screen。
         // 它是纯 Screen（没有物品槽），所以不走 MenuType 那一套。
         com.github.tartaricacid.touhoulittlemaid.network.OpenSwitcherGuiPacket.initClient();
+        // 坐垫换肤界面：服务端发实体 id、客户端找到坐垫后开 Screen。
+        // 同样是纯 Screen（没有物品槽），不走 MenuType。
+        com.github.tartaricacid.touhoulittlemaid.network.OpenChairGuiPacket.initClient();
 
 
         // 座位实体不该被看见，但必须有渲染器：未注册类型的

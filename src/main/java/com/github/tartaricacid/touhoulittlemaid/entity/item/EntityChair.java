@@ -6,6 +6,7 @@ import com.github.tartaricacid.touhoulittlemaid.config.subconfig.ChairConfig;
 import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemChair;
+import com.github.tartaricacid.touhoulittlemaid.network.OpenChairGuiPacket;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.nbt.CompoundTag;
@@ -14,6 +15,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
@@ -167,10 +169,11 @@ public class EntityChair extends AbstractEntityFromItem {
             if (player.getItemInHand(hand).interactLivingEntity(player, this, hand).consumesAction()) {
                 return InteractionResult.SUCCESS;
             }
-            // TODO(换肤界面)：上游在这里发 OpenChairGuiMessage 让客户端打开 ChairModelGui。
-            // 那个界面是 AbstractModelGui 的子类，而本移植版的 AbstractModelGui 目前把模型类型
-            // 钉死在 MaidModelInfo 上，需要先把它泛型化才能复用。在此之前蹲下右键保持无动作，
-            // 换模型只能通过创造模式物品栏里的各个坐垫变体来达成。
+            // 与上游一致：由服务端发 S2C 包让客户端打开界面，而不是客户端自己开 ——
+            // 「是不是真的蹲着右键了这个坐垫」只有服务端说了算。
+            if (!this.level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+                OpenChairGuiPacket.send(serverPlayer, this.getId());
+            }
         } else if (!this.level.isClientSide && getPassengers().isEmpty() && !player.isPassenger()) {
             player.startRiding(this);
         }

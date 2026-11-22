@@ -2,7 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.client.screen;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.CustomModelPack;
-import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.IModelInfo;
 import com.github.tartaricacid.touhoulittlemaid.util.ParseI18n;
 import com.google.common.collect.Lists;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -55,8 +55,13 @@ import java.util.List;
  * <p><b>与上游的差异只有一处：</b>上游用 {@code MiscConfig.MODEL_ICON_CACHE} 决定
  * 「画缓存图标还是实时画实体」，本移植版没有图标缓存，所以
  * {@link #drawRightEntity} 永远走实时绘制分支。左上角那个复选框因此也省略。</p>
+ *
+ * <p><b>两个类型参数：</b>{@code T} 是被换肤的实体，{@code E} 是该实体的模型定义类型
+ * （女仆 {@code MaidModelInfo}、坐垫 {@code ChairModelInfo}）。上游同样是这样泛型化的，
+ * 本移植版最初把它写死成 {@code MaidModelInfo}，导致坐垫换肤界面无法复用 ——
+ * 两边除了「一个格子画的是什么」以外完全一致，没有必要写两遍。</p>
  */
-public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
+public abstract class AbstractModelGui<T extends LivingEntity, E extends IModelInfo> extends Screen {
     /** 占位点击回调（上游给纯装饰按钮用它）。 */
     public static final Button.OnPress NO_PRESS = b -> {
     };
@@ -67,8 +72,8 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/gui/skin_select_side.png");
 
     protected final T entity;
-    private final SkinGuiNumber guiNumber;
-    private final List<CustomModelPack> modelPackList;
+    private final SkinGuiNumber<E> guiNumber;
+    private final List<CustomModelPack<E>> modelPackList;
 
     /**
      * 自己持有的 widget 列表。
@@ -79,11 +84,11 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
      */
     private final List<Widget> ownWidgets = new ArrayList<>();
 
-    protected AbstractModelGui(T entity, List<CustomModelPack> listPack) {
+    protected AbstractModelGui(T entity, List<CustomModelPack<E>> listPack) {
         super(new TextComponent("Custom Model GUI"));
         this.entity = entity;
         this.modelPackList = listPack;
-        this.guiNumber = new SkinGuiNumber(modelPackList);
+        this.guiNumber = new SkinGuiNumber<>(modelPackList);
         setPageIndex(Mth.clamp(getPageIndex(), 0, Math.max(0, guiNumber.getPageSize() - 1)));
         setPackIndex(Mth.clamp(getPackIndex(), 0, Math.max(0, guiNumber.getPackSize() - 1)));
         setRowIndex(Mth.clamp(getRowIndex(), 0, guiNumber.getRowSize(getPackIndex())));
@@ -95,10 +100,10 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
     protected abstract void drawLeftEntity(int middleX, int middleY, float mouseX, float mouseY);
 
     /** 右侧网格里的单个缩略图。 */
-    protected abstract void drawRightEntity(PoseStack poseStack, int posX, int posY, MaidModelInfo modelItem);
+    protected abstract void drawRightEntity(PoseStack poseStack, int posX, int posY, E modelItem);
 
     /** 悬停提示里追加的额外行（例如「使用声音包」）。 */
-    protected abstract void addModelCustomTips(MaidModelInfo modelItem, List<Component> tooltips);
+    protected abstract void addModelCustomTips(E modelItem, List<Component> tooltips);
 
     protected abstract int getPackIndex();
 
@@ -116,7 +121,7 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
     protected abstract String getCurrentModelId();
 
     /** 点了一个格子。 */
-    protected abstract void onModelClicked(MaidModelInfo modelItem);
+    protected abstract void onModelClicked(E modelItem);
 
     // ------------------------------------------------------------------ 初始化
 
@@ -216,16 +221,16 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
         if (this.modelPackList.isEmpty()) {
             return;
         }
-        CustomModelPack pack = this.modelPackList.get(getPackIndex());
+        CustomModelPack<E> pack = this.modelPackList.get(getPackIndex());
         int offsetX = -100;
         int offsetY = -35;
         int fromIndex = guiNumber.modelFromIndex(getRowIndex());
         int toIndex = guiNumber.modelToIndex(getPackIndex(), getRowIndex());
-        List<MaidModelInfo> list = pack.getModelList();
+        List<E> list = pack.getModelList();
         if (fromIndex >= list.size()) {
             return;
         }
-        for (MaidModelInfo modelItem : list.subList(fromIndex, toIndex)) {
+        for (E modelItem : list.subList(fromIndex, toIndex)) {
             this.addOwnedWidget(new ImageButton(startX + offsetX - 8, startY + offsetY - 26,
                     15, 24, 41, 201, 24, BG, b -> this.onModelClicked(modelItem)));
             offsetX += 20;
@@ -330,7 +335,7 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
      */
     private void drawTabIcon(PoseStack poseStack, int middleX, int middleY) {
         for (int index = 0; index < guiNumber.getTabSize(getPackIndex()); index++) {
-            CustomModelPack pack = this.modelPackList.get(guiNumber.tabToPackIndex(index, getPageIndex()));
+            CustomModelPack<E> pack = this.modelPackList.get(guiNumber.tabToPackIndex(index, getPageIndex()));
             ResourceLocation icon = pack.getIcon();
             if (icon == null) {
                 continue;
@@ -365,7 +370,7 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
      * 上游读 {@code SizeTexture#getWidth/getHeight}，这里直接读 PNG 头。
      * 读不到（缺文件 / 非法 PNG）时按静态图标处理，不会抛异常影响界面。</p>
      */
-    private void checkIconAnimation(CustomModelPack pack, ResourceLocation icon) {
+    private void checkIconAnimation(CustomModelPack<E> pack, ResourceLocation icon) {
         int[] size = readImageSize(icon);
         if (size == null) {
             pack.setIconAnimation(CustomModelPack.AnimationState.FALSE);
@@ -407,19 +412,19 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
                     middleX, middleY, 0xFFFFFF);
             return;
         }
-        CustomModelPack pack = this.modelPackList.get(getPackIndex());
+        CustomModelPack<E> pack = this.modelPackList.get(getPackIndex());
         this.drawPackInfoText(poseStack, pack, middleX, middleY);
 
         int offsetX = -100;
         int offsetY = -38;
         int fromIndex = guiNumber.modelFromIndex(getRowIndex());
         int toIndex = guiNumber.modelToIndex(getPackIndex(), getRowIndex());
-        List<MaidModelInfo> list = pack.getModelList();
+        List<E> list = pack.getModelList();
         if (fromIndex >= list.size()) {
             return;
         }
         String current = this.getCurrentModelId();
-        for (MaidModelInfo modelItem : list.subList(fromIndex, toIndex)) {
+        for (E modelItem : list.subList(fromIndex, toIndex)) {
             int x = middleX + offsetX;
             int y = middleY + offsetY;
             drawRightEntity(poseStack, x, y, modelItem);
@@ -437,7 +442,7 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
     }
 
     /** 左侧的包名 / 描述 / 作者 / 版本 / 日期，以及顶部页数。 */
-    private void drawPackInfoText(PoseStack poseStack, CustomModelPack pack, int middleX, int middleY) {
+    private void drawPackInfoText(PoseStack poseStack, CustomModelPack<E> pack, int middleX, int middleY) {
         int offsetY = -80;
         int sideMiddleX = (middleX - 256 / 2) / 2;
 
@@ -497,14 +502,14 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
      */
     private void drawTooltips(PoseStack poseStack, int mouseX, int mouseY, int middleX, int middleY) {
         if (!this.modelPackList.isEmpty()) {
-            CustomModelPack pack = this.modelPackList.get(getPackIndex());
+            CustomModelPack<E> pack = this.modelPackList.get(getPackIndex());
             int offsetX = -100;
             int offsetY = -35;
             int fromIndex = guiNumber.modelFromIndex(getRowIndex());
             int toIndex = guiNumber.modelToIndex(getPackIndex(), getRowIndex());
-            List<MaidModelInfo> list = pack.getModelList();
+            List<E> list = pack.getModelList();
             if (fromIndex < list.size()) {
-                for (MaidModelInfo modelItem : list.subList(fromIndex, toIndex)) {
+                for (E modelItem : list.subList(fromIndex, toIndex)) {
                     boolean inX = middleX + offsetX - 8 < mouseX && mouseX < middleX + offsetX + 7;
                     boolean inY = middleY + offsetY - 23 < mouseY && mouseY < middleY + offsetY + 1;
                     if (inX && inY) {
@@ -533,7 +538,7 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
             boolean inX = middleX - 98 + 28 * index < mouseX && mouseX < middleX - 98 + 28 * index + 28;
             boolean inY = middleY - 108 < mouseY && mouseY < middleY - 108 + 31;
             if (inX && inY) {
-                CustomModelPack hoverPack = this.modelPackList.get(
+                CustomModelPack<E> hoverPack = this.modelPackList.get(
                         guiNumber.tabToPackIndex(index, getPageIndex()));
                 this.renderTooltip(poseStack, ParseI18n.parse(hoverPack.getPackName()), mouseX, mouseY);
             }
@@ -581,4 +586,3 @@ public abstract class AbstractModelGui<T extends LivingEntity> extends Screen {
         return guiNumber.getModelSize(packIndex);
     }
 }
-

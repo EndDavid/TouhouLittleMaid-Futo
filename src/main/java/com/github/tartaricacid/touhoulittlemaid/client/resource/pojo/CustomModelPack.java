@@ -1,7 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.client.resource.pojo;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
-import com.github.tartaricacid.touhoulittlemaid.client.resource.pojo.MaidModelInfo;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -9,16 +8,18 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 一个女仆模型包（{@code assets/<ns>/maid_model.json}）。
+ * 一个模型包（{@code assets/<ns>/maid_model.json} 或 {@code maid_chair.json}）。
  *
- * <p>对应上游 {@code client/resource/pojo/CustomModelPack}，这里只保留女仆用得到的那部分：
- * 上游还有椅子专用字段，本移植版没有椅子。</p>
+ * <p>对应上游 {@code client/resource/pojo/CustomModelPack}，与上游一样按模型类型泛型化：
+ * 女仆用 {@code CustomModelPack<MaidModelInfo>}、坐垫用 {@code CustomModelPack<ChairModelInfo>}。
+ * 两者的 JSON 结构完全同构（{@code model_list} + 包级元数据），差别只在
+ * {@code model_list} 元素的字段，所以包这一层不需要为坐垫另写一份。</p>
  *
  * <p><b>为什么需要它。</b>换肤界面上游是「包」驱动的：顶部一排包页签、每个包独立分页、
  * 左侧显示包名 / 描述 / 作者 / 版本 / 日期。如果只有扁平的模型列表，
  * 界面就退化成「一大坨格子」，既对不上上游也无法表达包信息。</p>
  */
-public class CustomModelPack {
+public class CustomModelPack<E extends IModelInfo> {
     /**
      * 图标是否需要动画。上游用一个三态：未检测 / 不需要 / 需要。
      * 检测方式是看贴图是否「高 &gt; 宽」（竖向图集），是则按帧播放。
@@ -34,7 +35,7 @@ public class CustomModelPack {
     private List<String> author = Collections.emptyList();
     @Nullable
     private ResourceLocation icon;
-    private List<MaidModelInfo> modelList = Collections.emptyList();
+    private List<E> modelList = Collections.emptyList();
 
     /** 图标动画状态与参数，由界面首次绘制时探测后写回。 */
     private AnimationState iconAnimation = AnimationState.UNCHECK;
@@ -93,11 +94,11 @@ public class CustomModelPack {
         this.icon = icon;
     }
 
-    public List<MaidModelInfo> getModelList() {
+    public List<E> getModelList() {
         return this.modelList;
     }
 
-    public void setModelList(List<MaidModelInfo> modelList) {
+    public void setModelList(List<E> modelList) {
         this.modelList = modelList;
     }
 
@@ -128,7 +129,7 @@ public class CustomModelPack {
     /**
      * 补齐缺省值。模型列表为空时整包丢弃（由加载器判断）。
      */
-    public CustomModelPack decorate() {
+    public CustomModelPack<E> decorate() {
         if (this.description == null) {
             this.description = Collections.emptyList();
         }

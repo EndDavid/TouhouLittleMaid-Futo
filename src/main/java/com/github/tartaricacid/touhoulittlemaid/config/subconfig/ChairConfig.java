@@ -5,7 +5,10 @@ import net.minecraftforge.common.ForgeConfigSpec;
 /**
  * 坐垫（{@code EntityChair}）相关配置，移植自上游 {@code config/subconfig/ChairConfig}。
  *
- * <p>坐垫系统尚未移植，因此只建立配置项占位，等实体接入后直接读取。</p>
+ * <p>上游这两个配置项：{@code ChairChangeModel} 决定玩家能否换坐垫模型
+ * （{@code ChairModelPacket} 里做判定，创造模式玩家不受限）;
+ * {@code ChairCanDestroyedByAnyone} 决定谁能在蹲下左键时拆掉别人的坐垫
+ * （{@link com.github.tartaricacid.touhoulittlemaid.entity.item.EntityChair#canKillEntity}）。</p>
  */
 public final class ChairConfig {
     public static ForgeConfigSpec.BooleanValue CHAIR_CHANGE_MODEL;

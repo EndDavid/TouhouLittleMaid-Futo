@@ -99,6 +99,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.DismountBroomPacket.initServer();
         // 模型切换器：C2S 保存模式列表（S2C 的「开界面」在客户端入口注册）
         com.github.tartaricacid.touhoulittlemaid.network.SaveSwitcherDataPacket.initServer();
+        // 坐垫换肤：C2S 改写坐垫四个同步字段（S2C 的「开界面」在客户端入口注册）
+        com.github.tartaricacid.touhoulittlemaid.network.ChairModelPacket.initServer();
 
         // 女仆位置留档：周期性记录，供仆从铃 / 小号处理「她在未加载区块」那一半。
         // 原版 1.18.2 没有实体卸载钩子，Fabric API 0.77 也没有对应事件，说明见该类注释。
