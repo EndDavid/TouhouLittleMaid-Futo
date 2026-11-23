@@ -19,8 +19,8 @@ import net.minecraft.world.item.ItemStack;
  * <p>只会喂「已成年 + 可以求爱 + 手上有它爱吃的食物」的动物；当工作范围内的
  * 动物数量超过上限时就不再喂，避免无限繁殖卡顿。</p>
  *
- * <p>与上游的差异：上游在超限时会弹一个聊天气泡（{@code ChatBubbleManger}），
- * 气泡系统尚未移植，因此省略。</p>
+ * <p>动物数量超上限时弹一句内部提示气泡
+ * （{@code chat_bubble.touhou_little_maid.inner.feed_animal.max_number}），与上游一致。</p>
  */
 public class MaidFeedAnimalTask extends MaidCheckRateTask {
     private static final int MAX_DELAY_TIME = 12;
@@ -68,6 +68,11 @@ public class MaidFeedAnimalTask extends MaidCheckRateTask {
                 }
                 feedEntity = null;
             }
+        } else {
+            // 附近动物数量已达上限：这一轮不再喂，并弹一句提示
+            // （上游同位置的那句气泡，属于「数量超限」这一支，不是「没走到动物旁边」）
+            com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger.addInnerChatText(maid,
+                    "chat_bubble.touhou_little_maid.inner.feed_animal.max_number");
         }
     }
 

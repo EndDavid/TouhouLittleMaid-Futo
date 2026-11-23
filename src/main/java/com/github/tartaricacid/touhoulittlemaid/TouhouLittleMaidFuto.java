@@ -107,6 +107,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // 坐垫换肤：C2S 改写坐垫四个同步字段（S2C 的「开界面」在客户端入口注册）
         com.github.tartaricacid.touhoulittlemaid.network.ChairModelPacket.initServer();
         // AI 聊天：说话（C2S）、保存 / 请求设置（C2S）
+        // 聊天气泡：注册「受伤弹 hurt 台词」的监听（台本本身是懒加载的）
+        com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger.init();
         com.github.tartaricacid.touhoulittlemaid.network.SendUserChatPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.SaveMaidAIDataPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIDataPacket.initServer();

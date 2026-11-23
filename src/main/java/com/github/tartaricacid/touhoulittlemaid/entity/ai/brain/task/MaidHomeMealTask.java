@@ -42,9 +42,8 @@ import java.util.List;
  *
  * <h2>与上游的差异</h2>
  * <p>上游在「两只手都满」「垫子上没吃的」两种情况会弹聊天气泡
- * （{@code ChatBubbleManger#addInnerChatText}）。本移植版<b>没有移植聊天气泡层</b>，
- * 所以这里只是安静地放弃这一轮 —— 行为（不吃饭、不消耗食物）完全一致，
- * 少的只是那一句画面提示。</p>
+ * （{@code ChatBubbleManger#addInnerChatText}），本移植版同样弹出，
+ * 行为（不吃饭、不消耗食物）也完全一致。</p>
  */
 public class MaidHomeMealTask extends MaidCheckRateTask {
     private static final int MAX_DELAY_TIME = 50;
@@ -98,6 +97,9 @@ public class MaidHomeMealTask extends MaidCheckRateTask {
         ItemStack handItemCopy = itemInHand.copy();
         ItemStack leftoverStack = ItemHandlerHelper.insertItemStacked(availableInv, handItemCopy, true);
         if (!leftoverStack.isEmpty()) {
+            // 手上这件既放不进背包、又得腾出手拿食物：这一轮作罢，并提示玩家
+            com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger.addInnerChatText(maid,
+                    "chat_bubble.touhou_little_maid.inner.home_meal.two_hand_is_full");
             return;
         }
 
@@ -118,6 +120,8 @@ public class MaidHomeMealTask extends MaidCheckRateTask {
         }
         int size = candidateFood.size();
         if (size == 0) {
+            com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger.addInnerChatText(maid,
+                    "chat_bubble.touhou_little_maid.inner.home_meal.meal_is_empty");
             return;
         }
 

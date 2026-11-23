@@ -1,5 +1,6 @@
 package com.github.tartaricacid.touhoulittlemaid.client.renderer.ai;
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleScripts;
 import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatText;
 import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -19,70 +20,52 @@ import net.minecraft.util.FormattedCharSequence;
 import org.apache.commons.lang3.tuple.Pair;
 import java.util.List;
 /**
- * 头顶气泡渲染器，按 <b>TLMO Fabric 1.20.1</b> 的样式重写。
+ * 头顶气泡渲染器，按 <b>TLMO Fabric 1.20.1</b> 的九宫格样式绘制，支持
+ * <b>文本</b>与<b>表情图标</b>两类内容。
  *
- * <h2>为什么要重写而不是继续沿用 1.18.2 的那套</h2>
- * 1.18.2 上游的气泡是「3×2 张 20×20 的小方格拼起来的」（{@code default1.png}），
- * 3. 文字不换行、4. 不做垂直居中，长句子会拉成一条横贯屏幕的白条。
- * 1.20.1 换成了<b>九宫格 + 自动换行</b>：
+ * <h2>内容类型</h2>
  * <ul>
- *     <li>贴图 {@code textures/entity/chat_bubble/type2.png}（256×256，实际内容在左上角
- *         48×24 的圆角矩形里，8 px 边距），用九宫格拉伸成任意大小；</li>
- *     <li>文字按 {@code font.split} 折行：居中气泡 200 px、左右两列 120 px；</li>
- *     <li>气泡整体尺寸 = 文字包围盒 + 四周 5 px 内边距。</li>
+ *     <li>文本：{@code chat_text} / 台本里的普通句子 / {@code {翻译键}}；</li>
+ *     <li>图标：台本里写成 {@code %命名空间:贴图路径%} 的条目。贴图是
+ *         <b>60×20 一帧、竖直堆叠</b>的多帧动画（{@code idle1.png} = 8 帧），
+ *         每 2 tick 换一帧，与上游 {@code (tickCount / 2) % count} 一致。</li>
  * </ul>
+ *
+ * <h2>贴图</h2>
+ * <p>底图由 {@link ChatBubbleScripts#getBackground(String)} 按模型 id 决定：
+ * 台本里写的若是 1.18.2 那三张 60×40 旧网格图，就换成 1.20.1 的
+ * {@code type2.png}（白底 + 淡蓝边，九宫格）；其它自定义贴图原样使用。
+ * 九宫格边距按 1.20.1 的 {@code blitNineSliced}：四角原样、四边单向、中间双向。</p>
  *
  * <h2>布局（与 1.20.1 {@code ChatBubbleRenderer} 逐项对齐）</h2>
  * <ul>
- *     <li>气泡按「右、左、右、左……」交替排布，偶数下标在右列、奇数下标在左列；</li>
+ *     <li>气泡按「右、左、右、左……」交替排布；</li>
  *     <li>每列向下堆叠，间距 16 px；</li>
- *     <li>总数为奇数时，最后一条居中，放在「左右两列里较长的那一列」的底部；</li>
- *     <li>左列气泡的尾巴从右侧伸出（贴图 u=32 那个箭头），右列从左侧伸出（u=0），
- *         居中的用中间那个（u=16）。</li>
+ *     <li>总数为奇数时最后一条居中，放在「左右两列里较长的那一列」的底部；</li>
+ *     <li>尾巴：左列从右侧伸出、右列从左侧伸出、居中用中间那个。</li>
  * </ul>
  *
  * <h2>坐姿 / 睡姿</h2>
- * 1.20.1 在女仆坐下时把气泡基线下移 0.25 格 —— 碰撞箱不变，但模型是蹲下去的，
- * 不下移就会顶在头发上。睡姿 1.18.2 上游是整体下移 48 px，这里换算成 0.9 格，
- * 让气泡底边落在与改造前相同的位置。
+ * <p>坐下时基线下移 0.25 格（1.20.1 {@code EntityMaidRenderer} 里那一段）；
+ * 睡着时下移 1.2 格（48 px × 0.025，与 1.18.2 上游一致）。</p>
  *
  * <h2>顶点格式：这里踩过坑，别改回去</h2>
- * <p>上游自建了一种「关混合」的渲染类型，需要 Forge 的 AT 打开
- * {@code RenderStateShard} / {@code RenderType.create}。本移植版没有 AT，改用原版公开的
- * {@code RenderType.text}。它的顶点格式是 {@code POSITION_COLOR_TEX_LIGHTMAP}，
- * 四个元素缺一不可：只写 {@code vertex → color → uv} 会在
- * {@code BufferBuilder#endVertex} 抛 {@code Not filled all elements of the vertex}，
- * 表现就是「AI 一回复、头顶要出气泡，客户端立刻崩」。所以 {@link #vertex} 末尾必须补
- * {@code uv2}，这里固定给 {@link LightTexture#FULL_BRIGHT}：气泡不该随天黑变暗。</p>
+ * <p>本移植版没有 AT，无法自建渲染类型，改用原版公开的 {@code RenderType.text}。
+ * 它的顶点格式是 {@code POSITION_COLOR_TEX_LIGHTMAP}，四个元素缺一不可：
+ * 只写 {@code vertex → color → uv} 会在 {@code BufferBuilder#endVertex} 抛
+ * {@code Not filled all elements of the vertex}，表现就是「一冒气泡客户端立刻崩」。
+ * 所以 {@link #vertex} 末尾必须补 {@code uv2}，固定给
+ * {@link LightTexture#FULL_BRIGHT}：气泡不该随天黑变暗。</p>
  */
 public final class ChatBubbleRenderer {
-    /** 正文气泡背景（1.20.1 的 {@code IChatBubbleData#TYPE_1}）：白底 + 黑边。 */
-    public static final ResourceLocation TYPE_1 =
-            new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/chat_bubble/type1.png");
-    /**
-     * AI 回复与内部提示用的背景（1.20.1 的 {@code IChatBubbleData#TYPE_2}）：白底 + 淡蓝边。
-     *
-     * <p><b>为什么 AI 聊天不用 TYPE_1：</b>1.20.1 里
-     * {@code ChatBubbleManager#addLLMChatText}（AI 回复）与
-     * {@code ChatBubbleManager#addTextChatBubble}（「角色设定为空」这类内部提示）
-     * 调用的都是 {@code TextChatBubbleData.type2(...)}，
-     * {@code AutoGenSettingCallback} 与 {@code addThinkingText} 也显式传 {@code TYPE_2}。
-     * {@code TYPE_1} 只给「台本气泡」等少数地方用。</p>
-     */
+    /** 现代九宫格底图（1.20.1 的 {@code IChatBubbleData#TYPE_2}）：白底 + 淡蓝边。 */
     public static final ResourceLocation TYPE_2 =
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/chat_bubble/type2.png");
-    /**
-     * 本轮所有气泡都用 TYPE_2。
-     *
-     * <p>本移植版的气泡只有两种来源（AI 回复、内部提示），二者在 1.20.1 都是 TYPE_2。
-     * 将来做「台本气泡」那一轮时，背景应当跟着气泡数据一起同步（上游是
-     * {@code TextChatBubbleData} 里带一个 {@code bg} 字段），而不是在这里写死。</p>
-     */
-    private static final ResourceLocation BACKGROUND = TYPE_2;
+    /** 1.18.2 的正文底图（白底 + 粗黑边），保留常量供台本判断，不再直接绘制。 */
+    public static final ResourceLocation TYPE_1 =
+            new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/chat_bubble/type1.png");
     private static final List<Pair<Long, ChatText>> TMP_CHAT_BUBBLES = Lists.newArrayList();
-    /** 贴图实际尺寸（{@code blit} 的默认坐标系就是 256×256）。 */
-    private static final int TEXTURE_SIZE = 256;
-    /** 气泡主体在贴图里的位置与尺寸：左上角 48×24。 */
+    /** 底图主体在贴图里的位置与尺寸：左上角 48×24（1.20.1 的 type2.png）。 */
     private static final int BODY_U = 0;
     private static final int BODY_V = 0;
     private static final int BODY_WIDTH = 48;
@@ -108,7 +91,7 @@ public final class ChatBubbleRenderer {
     private static final double MAX_RENDER_DISTANCE_SQR = 64.0D * 64.0D;
     /** 坐下时气泡基线下移的格数（1.20.1 的 0.25）。 */
     private static final float SITTING_Y_OFFSET = 0.25F;
-    /** 睡着时气泡基线下移的格数：48 px x 0.025 = 1.2 格，与改造前的行为完全一致。 */
+    /** 睡着时气泡基线下移的格数：48 px × 0.025 = 1.2 格。 */
     private static final float SLEEPING_Y_OFFSET = 1.2F;
     /** 姿态缩放：1 像素 = 0.025 格。 */
     private static final float PIXEL_SCALE = 0.025F;
@@ -129,26 +112,30 @@ public final class ChatBubbleRenderer {
         }
         Font font = Minecraft.getInstance().font;
         float baseHeight = getBaseHeight(maid);
+        // 底图与贴图尺寸按模型 id 取一次，所有气泡共用
+        ResourceLocation background = ChatBubbleScripts.getBackground(maid.getModelId());
+        int[] backgroundSize = IconTextureSizes.get(background);
         int size = TMP_CHAT_BUBBLES.size();
-        // 奇数个时，最后一条居中；其余按「右、左」交替两列堆叠
         int columnCount = isOdd(size) ? size - 1 : size;
         int rightY = 0;
         int leftY = 0;
         for (int i = 0; i < columnCount; i++) {
             Side side = isOdd(i) ? Side.LEFT : Side.RIGHT;
-            Bubble bubble = Bubble.create(TMP_CHAT_BUBBLES.get(i).getRight(), side, font);
+            Bubble bubble = Bubble.create(TMP_CHAT_BUBBLES.get(i).getRight(), side, font, maid.tickCount);
             if (side == Side.LEFT) {
-                drawBubble(poseStack, buffer, packedLight, bubble, side, baseHeight, leftY);
+                drawBubble(poseStack, buffer, packedLight, bubble, side, baseHeight, leftY,
+                        background, backgroundSize);
                 leftY += bubble.height() + BUBBLE_GAP;
             } else {
-                drawBubble(poseStack, buffer, packedLight, bubble, side, baseHeight, rightY);
+                drawBubble(poseStack, buffer, packedLight, bubble, side, baseHeight, rightY,
+                        background, backgroundSize);
                 rightY += bubble.height() + BUBBLE_GAP;
             }
         }
         if (isOdd(size)) {
-            Bubble bubble = Bubble.create(TMP_CHAT_BUBBLES.get(size - 1).getRight(), Side.CENTER, font);
+            Bubble bubble = Bubble.create(TMP_CHAT_BUBBLES.get(size - 1).getRight(), Side.CENTER, font, maid.tickCount);
             drawBubble(poseStack, buffer, packedLight, bubble, Side.CENTER, baseHeight,
-                    Math.max(leftY, rightY));
+                    Math.max(leftY, rightY), background, backgroundSize);
         }
     }
     /**
@@ -187,20 +174,20 @@ public final class ChatBubbleRenderer {
         if (text == null || text == ChatText.EMPTY_CHAT_TEXT) {
             return;
         }
-        if (!text.isText()) {
-            // 图标气泡需要贴图缓存 SizeTexture，本轮未移植
+        if (!text.isText() && !text.isIcon()) {
             return;
         }
         out.add(bubble);
     }
     /**
-     * 画一条气泡：九宫格背景 + 尾巴 + 多行文字。
+     * 画一条气泡：九宫格背景 + 尾巴 + 内容（多行文字或表情图标）。
      *
      * @param yOffset 同一列里已经堆了几个气泡，本气泡要往下让开多少像素
      */
     private static void drawBubble(PoseStack poseStack, MultiBufferSource buffer,
                                    int packedLight, Bubble bubble, Side side,
-                                   float baseHeight, int yOffset) {
+                                   float baseHeight, int yOffset,
+                                   ResourceLocation background, int[] backgroundSize) {
         int boxWidth = bubble.width() + PADDING * 2;
         int boxHeight = bubble.height() + PADDING * 2;
         int startX = switch (side) {
@@ -214,8 +201,8 @@ public final class ChatBubbleRenderer {
         poseStack.translate(0, baseHeight - yOffset * PIXEL_SCALE, 0);
         poseStack.mulPose(Minecraft.getInstance().getEntityRenderDispatcher().cameraOrientation());
         poseStack.scale(-PIXEL_SCALE, -PIXEL_SCALE, PIXEL_SCALE);
-        VertexConsumer builder = buffer.getBuffer(RenderType.text(BACKGROUND));
-        drawNineSliced(poseStack, builder, startX, startY, boxWidth, boxHeight);
+        VertexConsumer builder = buffer.getBuffer(RenderType.text(background));
+        drawNineSliced(poseStack, builder, startX, startY, boxWidth, boxHeight, backgroundSize);
         int arrowU = switch (side) {
             case LEFT -> ARROW_U_RIGHT;
             case RIGHT -> ARROW_U_LEFT;
@@ -227,14 +214,49 @@ public final class ChatBubbleRenderer {
             case CENTER -> -ARROW_SIZE / 2;
         };
         drawSprite(poseStack, builder, arrowX, -ARROW_SIZE / 2, ARROW_SIZE, ARROW_SIZE,
-                arrowU, ARROW_V, ARROW_SIZE, ARROW_SIZE);
+                arrowU, ARROW_V, ARROW_SIZE, ARROW_SIZE, backgroundSize);
+        if (bubble.icon() != null) {
+            drawIcon(poseStack, buffer, bubble, startX + PADDING, startY + PADDING);
+        } else {
+            drawText(poseStack, buffer, packedLight, bubble, startX + PADDING, startY + PADDING);
+        }
+        poseStack.popPose();
+    }
+    private static void drawText(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
+                                 Bubble bubble, int textX, int textY) {
         Font font = Minecraft.getInstance().font;
         Matrix4f matrix = poseStack.last().pose();
         for (int i = 0; i < bubble.lines().size(); i++) {
-            font.drawInBatch(bubble.lines().get(i), startX + PADDING, startY + PADDING + i * LINE_HEIGHT,
+            font.drawInBatch(bubble.lines().get(i), textX, textY + i * LINE_HEIGHT,
                     0xFF000000, false, matrix, buffer, false, 0, packedLight);
         }
-        poseStack.popPose();
+    }
+    /**
+     * 画表情图标。
+     *
+     * <p>贴图与气泡底图不是同一张，必须换一个 {@code RenderType.text(icon)} 分批 ——
+     * 它的顶点格式与底图那条完全相同，所以顶点写法不变。</p>
+     *
+     * <p>帧选择：{@code (tickCount / 2) % frames}，与上游一致；单帧图直接整张画。</p>
+     */
+    private static void drawIcon(PoseStack poseStack, MultiBufferSource buffer,
+                                 Bubble bubble, int iconX, int iconY) {
+        ResourceLocation icon = bubble.icon();
+        int frames = bubble.iconFrames();
+        VertexConsumer iconBuilder = buffer.getBuffer(RenderType.text(icon));
+        float v0 = 0.0F;
+        float v1 = 1.0F;
+        if (frames > 1) {
+            v0 = 1.0F / frames * bubble.iconFrame();
+            v1 = 1.0F / frames * (bubble.iconFrame() + 1);
+        }
+        int width = bubble.width();
+        int height = bubble.height();
+        Matrix4f matrix = poseStack.last().pose();
+        vertex(matrix, iconBuilder, iconX, iconY + height, 0.0F, v1);
+        vertex(matrix, iconBuilder, iconX + width, iconY + height, 1.0F, v1);
+        vertex(matrix, iconBuilder, iconX + width, iconY, 1.0F, v0);
+        vertex(matrix, iconBuilder, iconX, iconY, 0.0F, v0);
     }
     /**
      * 九宫格拉伸：四角原样、四条边单向拉伸、中间双向拉伸。
@@ -243,7 +265,7 @@ public final class ChatBubbleRenderer {
      * {@code min(slice, size / 2)} 夹一次 —— 气泡很小时（一个字符）不会画出负宽度。</p>
      */
     private static void drawNineSliced(PoseStack poseStack, VertexConsumer builder,
-                                       int x, int y, int width, int height) {
+                                       int x, int y, int width, int height, int[] textureSize) {
         int left = Math.min(SLICE, width / 2);
         int right = Math.min(SLICE, width / 2);
         int top = Math.min(SLICE, height / 2);
@@ -257,39 +279,42 @@ public final class ChatBubbleRenderer {
         int u1 = BODY_U + BODY_WIDTH - right;
         int v1 = BODY_V + BODY_HEIGHT - bottom;
         // 四角：源与目标同尺寸
-        drawSprite(poseStack, builder, x, y, left, top, u0, v0, left, top);
-        drawSprite(poseStack, builder, x + width - right, y, right, top, u1, v0, right, top);
-        drawSprite(poseStack, builder, x, y + height - bottom, left, bottom, u0, v1, left, bottom);
+        drawSprite(poseStack, builder, x, y, left, top, u0, v0, left, top, textureSize);
+        drawSprite(poseStack, builder, x + width - right, y, right, top, u1, v0, right, top, textureSize);
+        drawSprite(poseStack, builder, x, y + height - bottom, left, bottom,
+                u0, v1, left, bottom, textureSize);
         drawSprite(poseStack, builder, x + width - right, y + height - bottom, right, bottom,
-                u1, v1, right, bottom);
+                u1, v1, right, bottom, textureSize);
         // 上下两条边：只横向拉伸
         drawSprite(poseStack, builder, x + left, y, middleWidth, top,
-                u0 + left, v0, middleSourceWidth, top);
+                u0 + left, v0, middleSourceWidth, top, textureSize);
         drawSprite(poseStack, builder, x + left, y + height - bottom, middleWidth, bottom,
-                u0 + left, v1, middleSourceWidth, bottom);
+                u0 + left, v1, middleSourceWidth, bottom, textureSize);
         // 左右两条边：只纵向拉伸
         drawSprite(poseStack, builder, x, y + top, left, middleHeight,
-                u0, v0 + top, left, middleSourceHeight);
+                u0, v0 + top, left, middleSourceHeight, textureSize);
         drawSprite(poseStack, builder, x + width - right, y + top, right, middleHeight,
-                u1, v0 + top, right, middleSourceHeight);
+                u1, v0 + top, right, middleSourceHeight, textureSize);
         // 中央：双向拉伸
         drawSprite(poseStack, builder, x + left, y + top, middleWidth, middleHeight,
-                u0 + left, v0 + top, middleSourceWidth, middleSourceHeight);
+                u0 + left, v0 + top, middleSourceWidth, middleSourceHeight, textureSize);
     }
     /**
      * 从贴图上取一块 {@code sourceWidth × sourceHeight} 的矩形，拉伸绘制成
      * {@code width × height}。
      *
-     * <p>UV 用贴图实际尺寸归一化（1.20.1 的 {@code blit} 默认按 256×256 处理，
-     * 这里显式写出来，免得以后换贴图尺寸时算错）。</p>
+     * <p>UV 用<b>贴图实际尺寸</b>归一化 —— {@code type2.png} 是 256×256，
+     * 但台本里可能换成别的尺寸，写死 256 会让自定义贴图错位。</p>
      */
     private static void drawSprite(PoseStack poseStack, VertexConsumer builder,
                                    int x, int y, int width, int height,
-                                   int u, int v, int sourceWidth, int sourceHeight) {
-        float u0 = u / (float) TEXTURE_SIZE;
-        float u1 = (u + sourceWidth) / (float) TEXTURE_SIZE;
-        float v0 = v / (float) TEXTURE_SIZE;
-        float v1 = (v + sourceHeight) / (float) TEXTURE_SIZE;
+                                   int u, int v, int sourceWidth, int sourceHeight, int[] textureSize) {
+        float textureWidth = textureSize[0];
+        float textureHeight = textureSize[1];
+        float u0 = u / textureWidth;
+        float u1 = (u + sourceWidth) / textureWidth;
+        float v0 = v / textureHeight;
+        float v1 = (v + sourceHeight) / textureHeight;
         Matrix4f matrix = poseStack.last().pose();
         vertex(matrix, builder, x, y + height, u0, v1);
         vertex(matrix, builder, x + width, y + height, u1, v1);
@@ -317,10 +342,21 @@ public final class ChatBubbleRenderer {
         LEFT, RIGHT, CENTER
     }
     /**
-     * 一条折好行的气泡：行列表 + 文字包围盒。
+     * 一条排好版的气泡：文本行 或 图标。
+     *
+     * <p>图标气泡的宽高固定为 60×20（上游 {@code drawIcon} 的尺寸），
+     * 文本气泡的宽高由折行结果决定。</p>
      */
-    private record Bubble(List<FormattedCharSequence> lines, int width, int height) {
-        private static Bubble create(ChatText chatText, Side side, Font font) {
+    private record Bubble(List<FormattedCharSequence> lines, int width, int height,
+                          ResourceLocation icon, int iconFrames, int iconFrame) {
+        private static Bubble create(ChatText chatText, Side side, Font font, int tickCount) {
+            if (chatText.isIcon()) {
+                ResourceLocation icon = chatText.getIconPath();
+                int frames = IconTextureSizes.getFrameCount(icon);
+                int frame = frames > 1 ? (tickCount / 2) % frames : 0;
+                return new Bubble(Lists.newArrayList(), IconTextureSizes.FRAME_WIDTH,
+                        IconTextureSizes.FRAME_HEIGHT, icon, frames, frame);
+            }
             Component text = ParseI18n.parse(chatText.getText());
             int maxWidth = side == Side.CENTER ? MAX_WIDTH_CENTER : MAX_WIDTH_SIDE;
             List<FormattedCharSequence> lines = font.split(text, maxWidth);
@@ -331,7 +367,7 @@ public final class ChatBubbleRenderer {
             for (FormattedCharSequence line : lines) {
                 width = Math.max(width, font.width(line));
             }
-            return new Bubble(lines, width, lines.size() * LINE_HEIGHT);
+            return new Bubble(lines, width, lines.size() * LINE_HEIGHT, null, 1, 0);
         }
     }
 }

@@ -53,10 +53,11 @@ public class MaidFindSitTask extends MaidCheckRateTask {
             // 这里只在「状态变化」时打一条，避免这个行为每 60 tick 刷屏。
             MaidFishingDiagnostics.reportSit(maid, null, "no boat or cushion within " + SIT_SEARCH_RADIUS);
         }
-        found.ifPresent(entity -> {
+        found.ifPresentOrElse(entity -> {
             this.sitEntity = entity;
             BehaviorUtils.setWalkAndLookTargetMemories(maid, this.sitEntity, this.speedModifier, 0);
-        });
+        }, () -> com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger.addInnerChatText(maid,
+                "chat_bubble.touhou_little_maid.inner.fishing.no_sit"));
 
         if (this.sitEntity != null && this.sitEntity.isAlive() && this.sitEntity.closerThan(maid, 2)) {
             if (this.sitEntity.getPassengers().isEmpty()) {

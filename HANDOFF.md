@@ -258,6 +258,51 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 **未验证**：三个界面的实际观感与交互（气泡对齐、悬浮提示位置、多行框输入、清除确认）—— 需要真人点一遍。
 
 ---
+
+### 聊天气泡全量移植（本轮 2026-11-23 续二）
+
+**起点**：AI 模块已够用，用户要求「各个时候会触发的消息弹窗全量移植」——
+即 1.18.2 上游的气泡层里除 AI 之外的全部触发点。
+
+**新增/重写**
+
+| 文件 | 作用 |
+|---|---|
+| `entity/chatbubble/ChatBubbleInfo` | 台本 pojo（`bg` + `text.main/special/other`）+ `decorate` 合并 |
+| `entity/chatbubble/ChatBubbleScripts` | 台本加载器：读 jar 内 `default_chat_bubble.json` 与模型 `maid_model.json` 的 `chat_bubble`，按模型缓存；`getBackground` 把旧网格图映射成 `type2.png` |
+| `entity/chatbubble/MaidScriptBookManager` | 书与笔台本（安装 / 清空 / 复制 / NBT） |
+| `entity/chatbubble/ChatBubbleManger` | 补齐 `tick` 三路随机、`hurt` 监听、饰品 `other`、`addDebugChatText` |
+| `client/renderer/ai/IconTextureSizes` | 读 PNG IHDR 拿图标帧数（替代上游 `SizeTexture`） |
+| `client/renderer/ai/ChatBubbleRenderer` | 支持图标气泡（60×20 一格、每 2 tick 换帧）+ 按模型取底图 |
+| `EntityMaid` | `scriptBookManager` 字段 / NBT / `getScriptBookManager` / `mobInteract` 里的 `applyScriptBook` |
+| `MaidRenderer` | 渲染前检查全局与单只开关 |
+| `MaidFeedAnimalTask` / `MaidFindSitTask` / `MaidHomeMealTask` | 三处任务失败气泡 |
+| `MaidCommand` | 新增 `/tlm ai_chat bubble <targets> <id>` |
+| `TouhouLittleMaidFuto` / `...Client` | 注册 `ChatBubbleManger.init()`；资源重载清台本与图标缓存 |
+
+**踩到的坑（都在编译或首跑时暴露）**
+
+1. `ResourceLocation` 没有默认 Gson 适配器 → 台本 `"bg"` 抛 `Expected BEGIN_OBJECT but was STRING`。
+   必须 `registerTypeAdapter(ResourceLocation.class, …)`。
+2. 1.18.2 的 `ResourceManager#getResource` 返回 `Resource`（找不到抛 IOException），不是 1.19+ 的 `Optional`。
+3. `Biome#getTemperature(BlockPos)` 在 1.18.2 是 private（上游靠 AT），改用 `getBaseTemperature()`。
+4. 调试命令里判断「有没有台本」不能用对象身份比 `MaidChatBubbles.DEFAULT`（过期清理会写回新对象），
+   改成看「气泡数量有没有增加」。
+
+**验证**：`build` SUCCESSFUL；四道闸全绿（`SCANNED_FILES=1495 BAD_FILES=0 FFFD_CHARS=0`、
+`ALL OK`、`entries=54 problems=0`）；`runClient` 到主菜单无崩溃报告。
+`runServer` + RCON 实测（`PYTHONIOENCODING=utf-8`，否则控制台 GBK 打印颜文字会报错）：
+`idle` → `icon …idle4.png`、`hurt` → `˃ʍ˂`、`morning` → `{chat_bubble.touhou_little_maid.morning.1}`、
+`work` → `( ≧Д≦)`、`mute` → `icon …mute1.png`、`nosuch` → `1 without script`。
+服务端日志里 9 条 ERROR 全是原版「No data fixer registered」常规提示。
+
+**未验证**：游戏内真实观感（气泡位置、图标动画帧率、三槽位堆叠）、书与笔交互手感、
+受伤 / 天气 / 作息是否真的命中（需要真人或长时间运行）。
+
+**与 1.20.1 的差异**（README 已写）：随机台词数据仍用 1.18.2 的台本格式，
+1.20.1 的 `kaomoji.json` 与 `maid_emoji/*.png` 本仓库没有；热判断换成基础温度。
+
+---
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；

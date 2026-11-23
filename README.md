@@ -95,6 +95,7 @@ loom_version=1.15.5
 | **棋类（象棋 / 五子棋 / 国际象棋：各 3×3 多方块 + 对局 AI）** | **完成**（三块棋盘全部可玩） |
 | 骑乘模型倒置 | **完成**（钓鱼已回归上游的「坐船 / 坐垫再抛钩」） |
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | **完成**（挂在御币上，效果走弹幕链路） |
+| **聊天气泡（随机台本 + 受伤 + 饰品 + 书与笔 + 表情图标）** | **完成** |
 | **AI 聊天（LLM 对话 + 头顶气泡 + TTS 语音 + 设置界面）** | **完成**（STT 未做） |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
 | **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
@@ -3764,16 +3765,73 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 **按键顺序很关键**: 先判 [ 准星指向的女仆能不能聊 ]，再 `consumeClick()`。
 反过来的话，玩家指着普通方块按 T 时点击已被吃掉，聊天栏就打不开了。
 
-### 聊天气泡：本轮只做了 AI 需要的那一半
+### 聊天气泡：全量移植（含随机台本 / 受伤 / 饰品 / 书与笔）
 
-已移植：`ChatText` / `ChatTextType` / `MaidChatBubbles`（三个槽位 + 同步序列化器）/
-`ChatBubbleManger` 的槽位选择、过期清理、内部提示、AI 回复 / `ChatBubbleRenderer`（只画文本）。
+1.18.2 上游的气泡层现在<b>整块都搬过来了</b>，不再是「只做 AI 需要的那一半」：
 
-**未移植**（属于「聊天气泡子系统」那一轮）：每 60 秒的随机台本（`idle` / `sleep` / `work` /
-`morning` / `rain` / `cold` …）、受伤气泡、饰品带的 `other` 气泡、书与笔写的台本
-（`MaidScriptBookManager`）、图标气泡（需要 `SizeTexture` 贴图缓存）。
+| 触发时机 | 台词键 | 代码位置 |
+|---|---|---|
+| 每 60 秒（按 UUID 打散）· 待机 | `idle` | `ChatBubbleManger#addMainChatText` |
+| 每 60 秒 · 睡觉 | `sleep` | 同上 |
+| 每 60 秒 · 工作 | `work` + **当前任务 id**（`fishing` / `farmer` …） | `addWorkChatText` |
+| 每 60 秒 · 讨食 | `beg` | `addSpecialChatText` |
+| 每 60 秒 · 早上（0–3000 刻） | `morning` | 同上 |
+| 每 60 秒 · 傍晚（12000–15000 刻） | `night` | 同上 |
+| 每 60 秒 · 雨 / 雪 / 冷 / 热 | `rain` / `snow` / `cold` / `hot` | 同上（`SoundUtil.isRainBiome` / `isSnowyBiome` 同款判定） |
+| **受伤时立刻** | `hurt` | `MaidDamageEvent` 监听（`ChatBubbleManger#init` 里注册） |
+| 每 60 秒 · 饰品自定义 | `IMaidBauble#getChatBubbleId()`（静音饰品 = `mute`） | `addOtherChatText` |
+| AI 回复 / 内部提示 | —— | 沿用上一轮（`addAiChatText` / `addInnerChatText`） |
+| 任务失败提示 | `chat_bubble...inner.*` | `MaidFeedAnimalTask`（动物超限）/ `MaidFindSitTask`（找不到坐具）/ `MaidHomeMealTask`（手满、垫子空） |
 
-所以：**如果不用 AI 聊天，女仆头顶不会有任何气泡** —— 预期行为。
+**三路随机的偏移量**取自 `UUID` 的高/低位，与上游逐字一致：同一刻只有「该说话」的那一部分女仆会说话，
+不会全服女仆一起开口。
+
+#### 台本从哪来（三级合并）
+
+1. **默认台本** `assets/touhou_little_maid/tlm_custom_pack/default_chat_bubble.json`
+   —— 模组自带的那几句（含表情图标与颜文字）；
+2. **模型台本** `maid_model.json` 里该模型的 `chat_bubble` 字段（内联对象或
+   `命名空间:路径` 指向另一个 json 都支持），按 `decorate` 规则与默认合并
+   （`replace: true` 时整段替换）；
+3. **玩家台本**：拿成书 / 书与笔右击女仆写入（潜行右击清空、拿空书与笔右击复制）。
+   书页格式是「类型 + 两个换行 + 若干条台词」，随实体 NBT 落盘。
+
+读取由 `entity/chatbubble/ChatBubbleScripts` 负责：**直接读模组 jar 里的
+`maid_model.json`**（不用上游那套 `ServerCustomPackLoader`，理由与服务端模型池相同），
+按模型 id 缓存，`/reload` 与换资源包时清缓存。
+
+#### 图标气泡（表情图）
+
+台本里写成 `%命名空间:贴图路径%` 的条目是图标。贴图是 **60×20 一帧、竖直堆叠**的动画
+（`idle1.png` = 60×160 → 8 帧），渲染时每 2 tick 换一帧（`(tickCount / 2) % frames`，与上游一致）。
+
+**不复用上游的 `SizeTexture`**：那要靠替换纹理管理器实现（需要 mixin / AT）。
+本移植版改成 `client/renderer/ai/IconTextureSizes`：从资源管理器读 PNG 的 IHDR
+（8 字节签名 + 4 字节长度 + `IHDR` + 宽 + 高，共 24 字节），按贴图缓存，读不到就当单帧。
+
+#### 底图：旧网格图自动换成九宫格
+
+默认台本里写的仍是 1.18.2 那三张 60×40 的旧网格图（`default1/2/3.png`），
+它们与九宫格格式不兼容（用九宫格九切会糊成一团）。所以
+`ChatBubbleScripts#getBackground` 的规则是：
+
+* 台本写的是那三张旧图 → 换成 1.20.1 的 `textures/entity/chat_bubble/type2.png`；
+* 其它贴图原样使用（第三方模型包若自带现代九宫格底图就照用）。
+
+#### 显示开关
+
+渲染前看两个条件，缺一不可（与 1.20.1 `EntityMaidRenderer` 同一处判断）：
+
+* 全局 `MaidConfig.GLOBAL_MAID_SHOW_CHAT_BUBBLE`（默认 true）；
+* 这只女仆自己的 `MaidSubConfig.isShowChatBubble`（女仆配置界面里的「显示聊天气泡」）。
+
+#### 与 1.20.1 的差异
+
+| 项 | 1.20.1 | 这里 |
+|---|---|---|
+| 随机台词数据 | 数据包 `chat_bubble/kaomoji.json` + `textures/chat_bubble/maid_emoji/*.png`，带权重配置 | 沿用 1.18.2 的「台本里直接写贴图或颜文字」，等价能力、不同来源；1.20.1 那批 `maid_emoji` 与 `kaomoji.json` 本仓库没有 |
+| 热判断 | `Biome#getTemperature(BlockPos)`（靠 AT） | `Biome#getBaseTemperature()`：山地这类按高度降温的群系会判得略热，阈值 0.95 不变 |
+| 受伤监听注册 | `@EventBusSubscriber` 自动 | `ChatBubbleManger#init()` 里手工 `MinecraftForge.EVENT_BUS.register`（本仓库的兼容层，与各保护饰品相同） |
 
 过期判定**两端都做**：服务端清是不再同步旧内容，客户端清是因为同步包有延迟。
 
@@ -3882,14 +3940,25 @@ return info.map(i -> ParseI18n.parse(i.getName()))
 只清历史队列（站点 / 模型 / 温度 / 主人称呼 / 自定义设定都不动）。
 `SyncMaidAIHistoryPacket` 的载荷加了 `gameTime`（历史界面「x小时前」的唯一来源），
 并改为**按旧→新**发送（队列是 `offerFirst`，迭代顺序是新→旧）。
-### 调试命令：`/tlm ai_chat say`
+### 调试命令
+
+两个入口都不走 HTTP，用来验收气泡本身（换行宽度、多条堆叠、坐姿下移、九宫格贴图、
+表情图标），真人验 AI 回复时不必为每一句等一次网络往返。
 
 ```
-/tlm ai_chat say @e[type=touhou_little_maid:maid,limit=1] Maids are here! ...
+/tlm ai_chat say <targets> <text...>
 ```
 
-不走任何 HTTP，直接把文本塞进选中的女仆头顶的气泡。用来验收换行、多条堆叠、
-坐下时的下移与九宫格贴图；真人验 AI 回复时不必为每一句等一次网络往返。
+直接把文本塞进选中女仆头顶的气泡。
+
+```
+/tlm ai_chat bubble <targets> <id>
+```
+
+按台本键名取词：把 `main` / `special` / `other` 三段里这个键的候选混在一起随机挑一条，
+并回显挑中的内容（`picked: icon …` / `picked: ( ≧Д≦)` / `picked: {chat_bubble…}`）。
+`id` 的候选是 `idle` / `sleep` / `work` / `morning` / `night` / `rain` / `snow` /
+`cold` / `hot` / `hurt` / `beg` / `mute`（命令有补全）。
 
 ### 存档字段
 

@@ -170,6 +170,12 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
                 != com.github.tartaricacid.touhoulittlemaid.api.client.render.MaidRenderState.ENTITY) {
             return;
         }
+        // 气泡显示开关：全局配置 + 这只女仆自己的开关（上游 1.20.1 EntityMaidRenderer 同一处判断）。
+        // 两个都要看 —— 全局关掉是「整个存档都不显示」，单独关掉是「这只是太吵了」。
+        if (!com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.GLOBAL_MAID_SHOW_CHAT_BUBBLE.get()
+                || !com.github.tartaricacid.touhoulittlemaid.entity.passive.MaidSubConfig.isShowChatBubble(entity)) {
+            return;
+        }
         double distanceSqr = net.minecraft.client.Minecraft.getInstance()
                 .getEntityRenderDispatcher().distanceToSqr(entity);
         com.github.tartaricacid.touhoulittlemaid.client.renderer.ai.ChatBubbleRenderer

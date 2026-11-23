@@ -74,7 +74,14 @@ public final class MaidCommand {
                                         .then(Commands.literal("say")
                                                 .then(Commands.argument("targets", EntityArgument.entities())
                                                         .then(Commands.argument("text", StringArgumentType.greedyString())
-                                                                .executes(MaidCommand::debugSay)))))
+                                                                .executes(MaidCommand::debugSay))))
+                                        // 调试用：按台本里的某一类（idle / hurt / rain …）随机挑一条弹出来，
+                                        // 用来验收随机台本与表情图标，不必等 60 秒的随机 tick
+                                        .then(Commands.literal("bubble")
+                                                .then(Commands.argument("targets", EntityArgument.entities())
+                                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                                .suggests(BUBBLE_IDS)
+                                                                .executes(MaidCommand::debugBubble)))))
                                 .then(Commands.literal("task")
                                         .then(Commands.argument("targets", EntityArgument.entities())
                                                 .executes(MaidCommand::queryTask)
@@ -166,6 +173,11 @@ public final class MaidCommand {
         return 1;
     }
 
+    /** {@code /tlm ai_chat bubble} 的候选 id：台本里的三段键名。 */
+    private static final SuggestionProvider<CommandSourceStack> BUBBLE_IDS =
+            (ctx, builder) -> SharedSuggestionProvider.suggest(
+                    new String[]{"idle", "sleep", "work", "morning", "night", "rain", "snow",
+                            "cold", "hot", "hurt", "beg", "mute"}, builder);
     /**
      * /tlm ai_chat say &lt;targets&gt; &lt;text&gt;：让女仆头顶直接冒一条气泡。
      *
@@ -182,6 +194,38 @@ public final class MaidCommand {
             count++;
         }
         reply(ctx, "chat bubble sent to " + count + " maid(s)");
+        return count;
+    }
+    /**
+     * {@code /tlm ai_chat bubble <targets> <id>}：按台本里的某一类随机挑一条弹出来。
+     *
+     * <p>纯调试入口，不经过 HTTP、不看作息与环境，直接问「这一类台词有没有被正确读到」。
+     * 例如 {@code /tlm ai_chat bubble @e[type=touhou_little_maid:maid,limit=1] idle}
+     * 应当让女仆头顶冒出一个颜文字或一张表情图。</p>
+     *
+     * <p>先查 {@code main}、{@code special}、{@code other} 三段，哪一段有这个键就用哪一段，
+     * 所以 {@code idle} / {@code hurt} / {@code mute} 都能用同一个命令。</p>
+     */
+    private static int debugBubble(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(ctx, "id");
+        int count = 0;
+        int empty = 0;
+        for (EntityMaid maid : maids(ctx)) {
+            // 用「气泡数量有没有增加」判断，而不是拿对象和 DEFAULT 比：
+            // 反正过期清理也会写回一个新的 MaidChatBubbles 对象，对象身份不可靠。
+            com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatText picked =
+                    com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManger
+                            .addDebugChatText(maid, id);
+            if (picked == null) {
+                empty++;
+            } else {
+                // 把挑中的内容也打出来：能一眼看出是图标、翻译键还是纯文本
+                String label = picked.isIcon() ? "icon " + picked.getIconPath() : picked.getText();
+                reply(ctx, "  picked: " + label);
+            }
+            count++;
+        }
+        reply(ctx, "bubble '" + id + "' -> " + count + " maid(s), " + empty + " without script");
         return count;
     }
     private static int queryTask(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {

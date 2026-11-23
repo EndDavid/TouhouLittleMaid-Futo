@@ -46,6 +46,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.Util;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.network.chat.Component;
@@ -316,6 +317,14 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     private static final EntityDataAccessor<com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles> CHAT_BUBBLE =
             SynchedEntityData.defineId(EntityMaid.class,
                     com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidChatBubbles.DATA);
+
+    /**
+     * 书与笔台本（上游 {@code EntityMaid#scriptBookManager}）。
+     * <p>玩家拿成书 / 书与笔右击女仆即可写入、潜行右击清空、拿空书与笔右击复制，
+     * 详见 {@code MaidScriptBookManager}。台本随实体 NBT 落盘。</p>
+     */
+    private final com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidScriptBookManager scriptBookManager =
+            new com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidScriptBookManager();
 
     private int pickupSoundCount = 5;
     /**
@@ -1704,6 +1713,13 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                 .getChatBubbleCount(this);
     }
 
+    /**
+     * 书与笔台本管理器（上游 {@code EntityMaid#getScriptBookManager}）。
+     */
+    public com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.MaidScriptBookManager getScriptBookManager() {
+        return this.scriptBookManager;
+    }
+
     // ---------------------------------------------------------------- 基础行为
 
     @Override
@@ -1993,6 +2009,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.favorabilityManager.save(tag);
         this.gameRecordManager.addAdditionalSaveData(tag);
         this.aiChatManager.writeToTag(tag);
+        this.scriptBookManager.addAdditionalSaveData(tag);
 
         MaidSubConfig.save(tag, this);
         this.attackList.save(tag);
@@ -2073,6 +2090,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.favorabilityManager.load(tag);
         this.gameRecordManager.readAdditionalSaveData(tag);
         this.aiChatManager.readFromTag(tag);
+        this.scriptBookManager.readAdditionalSaveData(tag);
         // 好感度决定最大生命与攻击力，读档后必须按当前好感度重建一次属性，
         // 否则会出现「好感度 300 但生命還是 20」
         this.favorabilityManager.refreshAttributes();
@@ -2771,6 +2789,11 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             if (hand != InteractionHand.MAIN_HAND) {
                 return InteractionResult.PASS;
             }
+            // 书与笔 / 成书：写入台本、潜行清空、空书复制（上游 ApplyScriptBook）
+            InteractionResult scriptResult = this.applyScriptBook(player, stack);
+            if (scriptResult != null) {
+                return scriptResult;
+            }
             // 玻璃瓶换附魔之瓶必须排在开界面之前（上游 GetExpBottleEvent 的顺序）
             InteractionResult xpBottleResult = this.takeXpWithBottle(player, stack);
             if (xpBottleResult != null) {
@@ -3180,6 +3203,56 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         return InteractionResult.SUCCESS;
     }
 
+    /**
+     * 书与笔台本（上游 {@code event/maid/ApplyScriptBook}）。
+     *
+     * <h2>三种操作</h2>
+     * <ul>
+     *     <li><b>潜行右击</b>（{@code isDiscrete}，即「双击 W 进入的潜行」）→ 清空台本；</li>
+     *     <li><b>普通右击且书里有内容</b> → 装进女仆身上
+     *         （成书取 {@code text} 字段，书与笔直接取页面）；</li>
+     *     <li><b>普通右击但书是空白的</b> → 把她现有的台本复制进这本书。</li>
+     * </ul>
+     *
+     * <p>返回 {@code null} 表示手里不是书，交给后续交互；否则一律吞掉这次右键 ——
+     * 上游同样是先 {@code event.setCanceled(true)} 再处理，
+     * 所以「拿书右击女仆」不会打开女仆界面。</p>
+     *
+     * <p>提示消息只在服务端发一次：客户端那边只会看到服务端同步过来的聊天栏。</p>
+     */
+    @Nullable
+    private InteractionResult applyScriptBook(Player player, ItemStack stack) {
+        if (!stack.is(Items.WRITTEN_BOOK) && !stack.is(Items.WRITABLE_BOOK)) {
+            return null;
+        }
+        // 潜行：清空
+        if (player.isDiscrete()) {
+            this.scriptBookManager.removeScript();
+            if (!this.level.isClientSide) {
+                player.sendMessage(new TranslatableComponent("message.touhou_little_maid.script_book.remove"),
+                        Util.NIL_UUID);
+            }
+            return InteractionResult.sidedSuccess(this.level.isClientSide);
+        }
+        // 装入
+        if (this.scriptBookManager.installScript(stack)) {
+            if (!this.level.isClientSide) {
+                player.sendMessage(new TranslatableComponent("message.touhou_little_maid.script_book.install"),
+                        Util.NIL_UUID);
+            }
+            return InteractionResult.sidedSuccess(this.level.isClientSide);
+        }
+        // 复制（只有空白的书与笔能接收）
+        if (stack.is(Items.WRITABLE_BOOK) && this.scriptBookManager.copyScript(stack)) {
+            if (!this.level.isClientSide) {
+                player.sendMessage(new TranslatableComponent("message.touhou_little_maid.script_book.copy"),
+                        Util.NIL_UUID);
+            }
+            return InteractionResult.sidedSuccess(this.level.isClientSide);
+        }
+        // 书里既没内容、也没法复制：也把这次点击吞掉，否则会去开女仆界面
+        return InteractionResult.sidedSuccess(this.level.isClientSide);
+    }
     /**
      * 拿玻璃瓶右击有经验的女仆 → 换成附魔之瓶（上游 {@code GetExpBottleEvent}）。
      *

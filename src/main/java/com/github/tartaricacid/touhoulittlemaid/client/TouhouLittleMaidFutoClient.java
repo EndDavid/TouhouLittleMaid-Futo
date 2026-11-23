@@ -318,7 +318,12 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
 
                     @Override
                     public void onResourceManagerReload(ResourceManager resourceManager) {
-                        GeckoModelLoader.reload();                        // 方块基岩模型同样要丢缓存，否则资源包换了模型还在用旧的
+                        GeckoModelLoader.reload();
+                        // 气泡台本与图标尺寸都是按贴图缓存过的：换资源包 / 改模型后必须丢一次，
+                        // 否则台本里的旧贴图路径与旧的帧数会一直生效。
+                        com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleScripts.clear();
+                        com.github.tartaricacid.touhoulittlemaid.client.renderer.ai.IconTextureSizes.clear();
+                        // 方块基岩模型同样要丢缓存，否则资源包换了模型还在用旧的
                         com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.clear();
                         // 预热两个方块模型：首次渲染时再加载会卡一帧，而且模型写错
                         // 只会在「方块看不见」这种很难定位的现象里暴露，这里提前解析一遍，
