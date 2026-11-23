@@ -303,6 +303,23 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 1.20.1 的 `kaomoji.json` 与 `maid_emoji/*.png` 本仓库没有；热判断换成基础温度。
 
 ---
+### 图标气泡的横条纹闪烁（同日补修）
+
+用户反馈：表情气泡随视角转动时出现横条纹式闪烁。
+
+**根因**：`ChatBubbleRenderer#vertex` 当时硬编码 z=0.2，底图九宫格与图标四边形
+共面。共面且都写深度、LEQUAL 下，两个大小不同的四边形逐像素插值出的
+深度有末位差异 → 一半像素通过、一半不通过 → 横条纹，且随相机移动。
+text 没事是因为 `Font#drawInBatch` 的顶点 z 固定是 0，天然和底图拉开了 0.2。
+
+**修法**：把 z 提成常量并按层分配 —— `Z_BACKGROUND=0.2`、`Z_ARROW=0.1`、`Z_CONTENT=0.0`（图标，
+文字本就是 0）。`vertex()` 与 `drawSprite()` 都加了 z 参数。
+这个位姿下 z 越小越靠近镜头（证据：z=0 的文字能盖住 z=0.2 的底图），
+所以层与层之间至少留 0.1（=0.0025 格，肉眼看不出错位），不要改成 0.199 这种。
+
+验证：build SUCCESSFUL、四道闸全绿、`runClient` 到主菜单无崩溃。
+观感需真人确认（我看不到屏幕）。
+
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；

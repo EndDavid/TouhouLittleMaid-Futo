@@ -95,6 +95,37 @@ public final class ChatBubbleRenderer {
     private static final float SLEEPING_Y_OFFSET = 1.2F;
     /** 姿态缩放：1 像素 = 0.025 格。 */
     private static final float PIXEL_SCALE = 0.025F;
+
+    /**
+     * 气泡各层的局部 Z，<b>必须互不相同</b>。
+     *
+     * <h2>为什么不能都用同一个值（踩过的坑）</h2>
+     * <p>底图是九宫格拼出来的若干个四边形，图标是另一个四边形。两者若在同一 z 上，
+     * 就是「共面」的几何：数学上的深度相同，但光栅化时两个大小不同的四边形在
+     * 逐像素插值出的深度值会有末位差异，配上 {@code RenderType} 的
+     * {@code LEQUAL_DEPTH_TEST}（且写深度），结果就是<b>大约一半像素通过、一半不通过</b>
+     * —— 表现是一条条横向条纹，玩家转动视角时条纹还会跟着移动闪烁。</p>
+     *
+     * <p>文字之所以从来没出过这个现象：{@code Font#drawInBatch} 的顶点 z 固定是 {@code 0}，
+     * 恰好和底图的 {@code 0.2} 拉开了距离。上游 1.18.2 也是这么分的
+     * （{@code drawBg} 传 0.2f、{@code drawIcon} 传 0）—— 这里只是把这条隐式约定写明。</p>
+     *
+     * <p><b>方向</b>：这个位姿下（{@code scale(…, +0.025F)} 且已经过
+     * {@code cameraOrientation()}）<b>z 越小越靠近镜头</b>，
+     * 证据就是 z=0 的文字能盖住 z=0.2 的底图。</p>
+     */
+    private static final float Z_BACKGROUND = 0.2F;
+    /**
+     * 尾巴压在底图之上（与 1.20.1 里那两句 {@code translate(0, 0, -0.01)} 同理）。
+     *
+     * <p>与底图之间留 {@code 0.1} 个单位（= 0.0025 格 ≈ 2.5 mm，肉眼看不出错位），
+     * 换成深度值是几百个单位，远大于光栅化的浮点误差 —— 不要改成 {@code 0.199} 这种
+     * 「只差一点」的值，那样又会回到共面附近。</p>
+     */
+    private static final float Z_ARROW = 0.1F;
+    /** 内容层（图标）。文字走 {@code Font} 自带的 0，正好是同一层。 */
+    private static final float Z_CONTENT = 0.0F;
+
     private ChatBubbleRenderer() {
     }
     /**
@@ -214,7 +245,7 @@ public final class ChatBubbleRenderer {
             case CENTER -> -ARROW_SIZE / 2;
         };
         drawSprite(poseStack, builder, arrowX, -ARROW_SIZE / 2, ARROW_SIZE, ARROW_SIZE,
-                arrowU, ARROW_V, ARROW_SIZE, ARROW_SIZE, backgroundSize);
+                arrowU, ARROW_V, ARROW_SIZE, ARROW_SIZE, backgroundSize, Z_ARROW);
         if (bubble.icon() != null) {
             drawIcon(poseStack, buffer, bubble, startX + PADDING, startY + PADDING);
         } else {
@@ -237,6 +268,9 @@ public final class ChatBubbleRenderer {
      * <p>贴图与气泡底图不是同一张，必须换一个 {@code RenderType.text(icon)} 分批 ——
      * 它的顶点格式与底图那条完全相同，所以顶点写法不变。</p>
      *
+     * <p><b>z 必须用 {@link #Z_CONTENT}，不能和底图同为 0.2</b>：共面会 z-fighting，
+     * 表现就是玩家转视角时图标上出现横向条纹闪烁（实测踩过）。</p>
+     *
      * <p>帧选择：{@code (tickCount / 2) % frames}，与上游一致；单帧图直接整张画。</p>
      */
     private static void drawIcon(PoseStack poseStack, MultiBufferSource buffer,
@@ -253,10 +287,10 @@ public final class ChatBubbleRenderer {
         int width = bubble.width();
         int height = bubble.height();
         Matrix4f matrix = poseStack.last().pose();
-        vertex(matrix, iconBuilder, iconX, iconY + height, 0.0F, v1);
-        vertex(matrix, iconBuilder, iconX + width, iconY + height, 1.0F, v1);
-        vertex(matrix, iconBuilder, iconX + width, iconY, 1.0F, v0);
-        vertex(matrix, iconBuilder, iconX, iconY, 0.0F, v0);
+        vertex(matrix, iconBuilder, iconX, iconY + height, Z_CONTENT, 0.0F, v1);
+        vertex(matrix, iconBuilder, iconX + width, iconY + height, Z_CONTENT, 1.0F, v1);
+        vertex(matrix, iconBuilder, iconX + width, iconY, Z_CONTENT, 1.0F, v0);
+        vertex(matrix, iconBuilder, iconX, iconY, Z_CONTENT, 0.0F, v0);
     }
     /**
      * 九宫格拉伸：四角原样、四条边单向拉伸、中间双向拉伸。
@@ -309,6 +343,17 @@ public final class ChatBubbleRenderer {
     private static void drawSprite(PoseStack poseStack, VertexConsumer builder,
                                    int x, int y, int width, int height,
                                    int u, int v, int sourceWidth, int sourceHeight, int[] textureSize) {
+        drawSprite(poseStack, builder, x, y, width, height, u, v, sourceWidth, sourceHeight,
+                textureSize, Z_BACKGROUND);
+    }
+
+    /**
+     * 同上，但显式指定 z（尾巴用 {@link #Z_ARROW}，压底图一点点）。
+     */
+    private static void drawSprite(PoseStack poseStack, VertexConsumer builder,
+                                   int x, int y, int width, int height,
+                                   int u, int v, int sourceWidth, int sourceHeight,
+                                   int[] textureSize, float z) {
         float textureWidth = textureSize[0];
         float textureHeight = textureSize[1];
         float u0 = u / textureWidth;
@@ -316,19 +361,23 @@ public final class ChatBubbleRenderer {
         float v0 = v / textureHeight;
         float v1 = (v + sourceHeight) / textureHeight;
         Matrix4f matrix = poseStack.last().pose();
-        vertex(matrix, builder, x, y + height, u0, v1);
-        vertex(matrix, builder, x + width, y + height, u1, v1);
-        vertex(matrix, builder, x + width, y, u1, v0);
-        vertex(matrix, builder, x, y, u0, v0);
+        vertex(matrix, builder, x, y + height, z, u0, v1);
+        vertex(matrix, builder, x + width, y + height, z, u1, v1);
+        vertex(matrix, builder, x + width, y, z, u1, v0);
+        vertex(matrix, builder, x, y, z, u0, v0);
     }
+
     /**
      * {@code RenderType.text} 的顶点格式是 {@code POSITION_COLOR_TEX_LIGHTMAP}，
      * 顺序 position → color → uv0 → uv2，四个都要写，少一个就抛
      * {@code Not filled all elements of the vertex}。
+     *
+     * <p>{@code z} 必须按层区分（见 {@link #Z_BACKGROUND} 的注释），
+     * 不要图省事统一传一个值 —— 共面会换来满屏横条纹。</p>
      */
     private static void vertex(Matrix4f matrix4f, VertexConsumer builder, float x, float y,
-                               float u, float v) {
-        builder.vertex(matrix4f, x, y, 0.2F)
+                               float z, float u, float v) {
+        builder.vertex(matrix4f, x, y, z)
                 .color(255, 255, 255, 255)
                 .uv(u, v)
                 .uv2(LightTexture.FULL_BRIGHT)
