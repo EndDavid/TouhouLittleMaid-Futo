@@ -3837,6 +3837,51 @@ return info.map(i -> ParseI18n.parse(i.getName()))
 **与上游的差异**：1.18.2 的 `getTypeName()` 里还有 `MaidTypeNameEvent` 与 YSM 模型名两个分支，
 本移植版没有那条 Forge 事件、也没有 YSM 联动，所以只保留「默认模型名」这一层。
 
+### 三个界面：与 1.20.1 对齐 + 按钮悬浮提示
+
+上一版的聊天主界面右下三个按钮是「有字形、没提示」，而左侧两个按钮打开的界面和 1.20.1 差得太远
+（历史界面是一整屏纯文本、还把模型的原始 JSON 直接画出来；角色设定界面只有四个平铺按钮），
+玩家看不出按钮用途。本轮按 1.20.1 重做这三处：
+
+| 界面 | 1.20.1 对应类 | 现在的样子 |
+|---|---|---|
+| 历史聊天记录 | `HistoryAIChatScreen` + `HistoryChatWidget` | 双侧气泡 + 尾巴 + 头像 + 「x小时前」+ 右侧压缩摘要面板 + 清除 / 返回 |
+| 角色设定 | `SettingEditScreen` | 左上「主人称呼」单行框、下方「自定义设定」多行框（自动折行 / 滚动 / 4096 字数统计）、右侧一列按钮 |
+| 设定正文（本移植版独有） | —— | 只读显示 `settings/<模型>.yml` 正文，提供「重新生成人设」「复制台本」 |
+
+**按钮悬浮提示**：1.20.1 的 `FlatColorButton` 自带 `setTooltips`，1.18.2 没有 `GuiGraphics`，
+所以改成「界面在 `render` 末尾统一调 `renderToolTip`」——这也是 1.18.2 里
+`AbstractContainerScreen` 画提示的时机（`AbstractWidget#render` 不会自己画提示，已用字节码确认）。
+聊天主界面六个按钮的文案全部取自上游语言文件：
+`history.tip` / `setting.tip` / `config.tip` / `llm.tip` / `tts.tip` / `language.tip`。
+
+**字形与语义重新对齐 1.20.1**：左三 = `≡` 历史 / `✎` 角色设定 / `⚙` 设置；右三 = `Aa` 语种 /
+`♪` 语音 / `✦` 大语言。上一版把 `⚙` 与 `✎` 的含意对调了，所以「看起来像设置的按钮」打开的是
+角色设定编辑器 —— 这也是「功能不明」的来源之一。
+
+#### 历史界面为什么要先解 JSON
+
+历史队列里存的是模型的**原始响应**（`{"chat_text":"…","tts_text":"…"}`）。
+1.20.1 的 `transformMessage` 用 `new ResponseChat(text).getChatText()` 取出正文再显示；
+本移植版上一版漏了这一步，于是截图里那一整串 JSON 就原样画了出来。现在同样先解析，
+解析失败（纯文本 / 被截断）才原样显示，避免丢消息。
+
+#### 与 1.20.1 的差异
+
+| 项 | 1.20.1 | 这里 |
+|---|---|---|
+| 压缩摘要 | `HistorySummaryManager` 定期调 LLM 压缩长对话 | **未做**，面板固定显示「当前还没有压缩摘要」（与上游尚未压缩时同貌） |
+| 工具调用气泡 | 有（`Role.TOOL`） | 无（本移植版没有工具调用） |
+| 「导出设定」 | TinyFileDialogs 弹系统保存框 | 复制同样的 yml 文本到剪贴板（不引入原生库） |
+| 女仆立绘预览 | 角色设定界面右下方画一只 | 未画（省一次实体渲染，不影响功能） |
+| 多行输入框 | 原版 `MultiLineEditBox` | 手写 `client/gui/widget/MultiLineEditBox`（1.18.2 没有这个类），支持折行 / 滚动 / 光标 / Ctrl+ACVX / 字数统计 |
+
+#### 新增的网络包
+
+`ClearMaidAIChatHistoryPacket`（C2S）：历史界面「清除历史聊天记录」→ 服务端复核「是主人」后
+只清历史队列（站点 / 模型 / 温度 / 主人称呼 / 自定义设定都不动）。
+`SyncMaidAIHistoryPacket` 的载荷加了 `gameTime`（历史界面「x小时前」的唯一来源），
+并改为**按旧→新**发送（队列是 `offerFirst`，迭代顺序是新→旧）。
 ### 调试命令：`/tlm ai_chat say`
 
 ```

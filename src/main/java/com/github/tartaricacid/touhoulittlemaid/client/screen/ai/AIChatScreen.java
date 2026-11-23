@@ -15,6 +15,7 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.LanguageInfo;
 import net.minecraft.client.resources.language.LanguageManager;
@@ -105,25 +106,44 @@ public class AIChatScreen extends Screen {
         // 字形全部限定在 BMP 内：1.20.1 用的 U+1F551 / U+1F50A / U+1F310 属于增补平面，
         // 1.18.2 自带的 unifont 没有这些字形，会渲染成方框。这里换成语义等价的 BMP 符号：
         // U+2261 列表 / U+2699 设定 / U+270E 设置 / U+2726 星形 / U+266A 音符 / "Aa" 语种。
+        // 顺序与字形都按 1.20.1 摆：左三 = 历史 / 角色设定 / 设置，右三 = 大语言 / 语音 / 语种
         int left = inputX - 8;
-        addSideButton(left, buttonY, "\u2261", this::openHistory);
-        addSideButton(left + step, buttonY, "\u2699", this::openSettingEditor);
-        addSideButton(left + step * 2, buttonY, "\u270E", this::openConfig);
+        addSideButton(left, buttonY, "\u2261", this::openHistory,
+                "ai.touhou_little_maid.chat.button.history.tip");
+        addSideButton(left + step, buttonY, "\u270E", this::openSettingEditor,
+                "ai.touhou_little_maid.chat.button.setting.tip");
+        addSideButton(left + step * 2, buttonY, "\u2699", this::openConfig,
+                "ai.touhou_little_maid.chat.button.config.tip");
         int right = inputX + inputWidth - BUTTON_SIZE * 3 + BUTTON_GAP * 2 + BUTTON_SIZE;
-        addSideButton(right, buttonY, "Aa", () -> togglePopup(PopupType.LANGUAGE, right, buttonY));
+        addSideButton(right, buttonY, "Aa", () -> togglePopup(PopupType.LANGUAGE, right, buttonY),
+                "ai.touhou_little_maid.chat.button.language.tip");
         addSideButton(right - step, buttonY, "\u266A",
-                () -> togglePopup(PopupType.TTS, right - step, buttonY));
+                () -> togglePopup(PopupType.TTS, right - step, buttonY),
+                "ai.touhou_little_maid.chat.button.tts.tip");
         addSideButton(right - step * 2, buttonY, "\u2726",
-                () -> togglePopup(PopupType.LLM, right - step * 2, buttonY));
+                () -> togglePopup(PopupType.LLM, right - step * 2, buttonY),
+                "ai.touhou_little_maid.chat.button.llm.tip");
 
         // 打开界面时拉一份设置来画底部摘要（不切界面）
         PENDING_SETTING_SCREEN = false;
         GetMaidAIDataPacket.send(this.maid.getId());
     }
 
-    private void addSideButton(int x, int y, String glyph, Runnable action) {
+    /**
+     * 圆形图标按钮。1.20.1 每个都带 {@code setTooltips(...)}，否则光看字形猜不出功能
+     * （截图里就是鼠标停上去才显示「打开角色设定界面」）。
+     */
+    private void addSideButton(int x, int y, String glyph, Runnable action, String tooltipKey) {
         this.addRenderableWidget(new FlatColorButton(x, y, BUTTON_SIZE, BUTTON_SIZE,
-                new TextComponent(glyph), b -> action.run()));
+                new TextComponent(glyph), b -> action.run()).setTooltips(tooltipKey));
+    }
+    /** 提示框必须在所有控件画完之后再画，否则会被后画的按钮盖住。 */
+    private void renderSideButtonTooltips(PoseStack poseStack, int mouseX, int mouseY) {
+        for (GuiEventListener listener : this.children()) {
+            if (listener instanceof FlatColorButton button) {
+                button.renderToolTip(poseStack, this, mouseX, mouseY);
+            }
+        }
     }
 
     private void openHistory() {
@@ -134,7 +154,7 @@ public class AIChatScreen extends Screen {
      * U+2699 = 角色设定编辑器（1.20.1 的 SettingEditScreen）：人设正文 / 主人称呼 / 自定义设定。
      */
     private void openSettingEditor() {
-        Minecraft.getInstance().setScreen(new AISettingEditScreen(this.maid));
+        Minecraft.getInstance().setScreen(new AISettingEditScreen(this, this.maid));
     }
     /**
      * U+270E = 设置：站点管理（对应 1.20.1 的 AIChatSettingsHubScreen）。
@@ -255,6 +275,7 @@ public class AIChatScreen extends Screen {
         renderSummaries(poseStack);
         super.render(poseStack, mouseX, mouseY, partialTicks);
         renderPopup(poseStack, mouseX, mouseY);
+        renderSideButtonTooltips(poseStack, mouseX, mouseY);
     }
 
     private void renderTokenUsage(PoseStack poseStack) {

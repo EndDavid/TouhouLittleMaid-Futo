@@ -214,6 +214,50 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 它在模型包里本来就没有 `name` / `desc` 的中文键（上游同样如此）。
 
 ---
+
+### 三个 AI 界面重做（本轮 2026-11-23 续）
+
+**问题**：聊天主界面左下两个按钮打开的界面与 1.20.1 差太远，玩家看不出按钮做什么；
+六个图标按钮没有悬浮提示（1.20.1 每个都有）；历史界面把模型原始 JSON 直接画出来。
+
+**改动**
+
+1. `FlatColorButton` 补 `setTooltips(String) / setTooltips(List)` 与 `renderToolTip`。
+   1.18.2 的 `AbstractWidget#render` **不会**自己画提示（已用 `javap -c` 确认），
+   因此每个界面在 `render` 末尾统一遍历 `children()` 调 `renderToolTip`。
+2. `AIChatScreen` 六个按钮全部挂上上游语言键的提示；字形/语义重新对齐 1.20.1：
+   左三 `≡` 历史 / `✎` 角色设定 / `⚙` 设置，右三 `Aa` 语种 / `♪` 语音 / `✦` 大语言。
+   （上一版把 `⚙` 与 `✎` 对调了，这是「功能不明」的直接原因。）
+3. `AIHistoryScreen` 按 `HistoryAIChatScreen` + `HistoryChatWidget` 重写：
+   双侧气泡九宫格 + 尾巴 + 头像（女仆用 1.20.1 的 32×32 头像、玩家用皮肤头部 8×8 放大）、
+   「x小时前」、右侧压缩摘要面板、清除（`ConfirmScreen`）/ 返回。
+   贴图 `textures/gui/maid_history_chat.png` 直接从 1.20.1 jar 复制（未改一像素）。
+   助手消息先 `ResponseChat` 解出 `chat_text` 再显示。
+4. `AISettingEditScreen` 按 `SettingEditScreen` 重写：主人称呼（`EditBox`）+
+   自定义设定（手写 `MultiLineEditBox`，折行/滚动/光标/Ctrl+ACVX/4096 字数统计）+
+   右侧「导出设定 / 保存 / 保存并退出 / 返回」+「设定已保存」正弦淡出提示。
+   「导出设定」改为复制 yml 文本到剪贴板（不引入 TinyFileDialogs 原生库）。
+5. 新增 `AISettingBodyScreen`（原名 `AISettingEditScreen` 的只读正文界面）：
+   显示 `settings/<模型>.yml` 正文 + 「重新生成人设」「复制台本」。
+   上一版这个界面就是「角色设定」，本轮把它降为二级页面，从角色设定界面进入。
+6. 新增 `ClearMaidAIChatHistoryPacket`（C2S，服务端复核「是主人」）；
+   `SyncMaidAIHistoryPacket` 加 `gameTime` 字段、改为按旧→新发送、收到后按 entityId 找到女仆再开界面。
+
+**1.18.2 兼容点（踩过的）**
+
+- `enableScissor/disableScissor` 不在 `GuiComponent` 里：只能用 `RenderSystem`，且坐标是
+  「帧缓冲像素 + 左下角原点」，宽度要乘 GUI 缩放。公式抄自 `ClientMaidTooltip` / `AbstractMaidScreen`。
+- `SkinManager` 没有 `getInsecureSkinLocation`：改用 `AbstractClientPlayer#getSkinTextureLocation()`。
+- `GuiComponent#blit` **不会**自己绑贴图，必须先 `RenderSystem.setShaderTexture`。
+- 语言键：`gui.touhou_little_maid.button.maid_ai_chat_config.*`（22 条，含 3 条自造提示）
+  与 `ai.touhou_little_maid.chat.setting.*.tip` 已写入 `zh_cn.json` / `en_us.json`。
+
+**验证**：`./gradlew.bat build` BUILD SUCCESSFUL；`check-encoding.ps1` `SCANNED_FILES=1491 BAD_FILES=0 FFFD_CHARS=0`；
+`check-renderers.ps1` `ALL OK`；`validate-book.ps1` `entries=54 problems=0`；
+`runClient` 到主菜单出现 `Sound engine started`，`run/crash-reports` 为空（已用 `port/kill-dev-run.ps1` 停掉）。
+**未验证**：三个界面的实际观感与交互（气泡对齐、悬浮提示位置、多行框输入、清除确认）—— 需要真人点一遍。
+
+---
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；

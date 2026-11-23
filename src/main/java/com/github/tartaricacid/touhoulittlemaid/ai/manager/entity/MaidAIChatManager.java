@@ -146,6 +146,16 @@ public final class MaidAIChatManager extends MaidAIChatData {
         }
         this.autoGenSetting(site, language, name);
     }
+    /**
+     * 清空这只女仆的对话记忆（历史界面里的「清除历史聊天记录」）。
+     *
+     * <p>只清历史队列：站点 / 模型 / 温度 / 主人称呼 / 自定义设定都不动。
+     * 上游的 {@code ClearMaidAIDataMessage} 还会一并清掉压缩摘要，本移植版还没有那个字段。</p>
+     */
+    public void clearHistory() {
+        this.getHistory().getDeque().clear();
+    }
+
     private void onAutoGenSuccess(ChatCompletionResponse result) {
         // 正文在 JSON 的 chat_text 字段里（上游 AutoGenSettingCallback 同样只取这一项）
         String body = AutoGenSetting.extractSettingBody(result.getFirstChoiceMessage());

@@ -111,6 +111,7 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.SaveMaidAIDataPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIDataPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.GetMaidAIHistoryPacket.initServer();
+        com.github.tartaricacid.touhoulittlemaid.network.ClearMaidAIChatHistoryPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.GetMaidAISettingPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.RegenerateAISettingPacket.initServer();
         com.github.tartaricacid.touhoulittlemaid.network.GetSiteListPacket.initServer();

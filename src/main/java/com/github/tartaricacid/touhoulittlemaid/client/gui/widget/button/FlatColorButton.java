@@ -5,7 +5,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
 
+import javax.annotation.Nullable;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -20,7 +23,11 @@ import java.util.List;
  *         这里直接用白色；即便有，上游那个写法最后也只是白色。</li>
  *     <li>文字改用静态的 {@code drawCenteredString}：1.18.2 的 {@code Button}
  *         没有 {@code renderString} 这个可覆写方法。</li>
- *     <li>去掉 {@code setTooltips}：当前界面用不到，需要时再加。</li>
+ *     <li>{@code setTooltips} 的触发方式不同：1.20.1 的 {@code GuiGraphics} 能在
+ *         {@code renderWidget} 里直接画提示，1.18.2 的 {@code PoseStack} 不携带
+ *         鼠标坐标，所以改由界面在 {@code render} 末尾统一调
+ *         {@link #renderToolTip(PoseStack, Screen, int, int)} —— 这也是 1.18.2 里
+ *         官方界面（如 {@code AbstractContainerScreen}）画提示的时机。</li>
  * </ul>
  */
 public class FlatColorButton extends Button {
@@ -39,9 +46,27 @@ public class FlatColorButton extends Button {
     private static final int COLOR_TEXT = 0xFFF3EFE0;
 
     private boolean selected = false;
+    /**
+     * 悬停时显示的提示行；{@code null} = 不显示（与上游同名同义）。
+     */
+    @Nullable
+    private List<Component> tooltips;
 
     public FlatColorButton(int x, int y, int width, int height, Component message, OnPress onPress) {
         super(x, y, width, height, message, onPress);
+    }
+
+    /**
+     * 设置提示（翻译键），对应上游 {@code FlatColorButton#setTooltips(String)}。
+     */
+    public FlatColorButton setTooltips(String key) {
+        this.tooltips = Collections.singletonList(new TranslatableComponent(key));
+        return this;
+    }
+
+    public FlatColorButton setTooltips(List<Component> tooltips) {
+        this.tooltips = tooltips;
+        return this;
     }
 
     public void setSelect(boolean select) {
@@ -71,14 +96,12 @@ public class FlatColorButton extends Button {
     }
 
     /**
-     * 上游在这里画多行提示框。保留方法签名（当前界面不用），避免将来加提示时
-     * 还要重新对照上游。
+     * 画悬停提示。必须在「本帧所有控件都渲染完之后」调用（见类的注释），
+     * 否则提示框会被后画的控件盖住。
      */
-    public void renderToolTip(PoseStack poseStack, Screen screen, List<Component> tooltips,
-                              int mouseX, int mouseY) {
+    public void renderToolTip(PoseStack poseStack, Screen screen, int mouseX, int mouseY) {
         if (this.isHovered && tooltips != null) {
             screen.renderComponentTooltip(poseStack, tooltips, mouseX, mouseY);
         }
     }
 }
-

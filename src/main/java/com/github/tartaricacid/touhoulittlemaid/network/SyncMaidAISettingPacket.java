@@ -34,8 +34,9 @@ public final class SyncMaidAISettingPacket {
                     String text = buf.readUtf();
                     client.execute(() -> {
                         CLIENT_SETTING = text;
+                        // 正文界面（yml 台本）才是这份数据的消费方；设置编辑界面不显示正文
                         if (client.screen instanceof
-                                com.github.tartaricacid.touhoulittlemaid.client.screen.ai.AISettingEditScreen screen) {
+                                com.github.tartaricacid.touhoulittlemaid.client.screen.ai.AISettingBodyScreen screen) {
                             screen.refresh();
                         }
                     });
