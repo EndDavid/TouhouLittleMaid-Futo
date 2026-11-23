@@ -68,7 +68,7 @@ public final class MaidAIChatManager extends MaidAIChatData {
      * 就带着「生成一份人设」的 prompt 发一次请求，把结果落盘成 settings 文件
      * （见 onSettingIsEmpty）。本移植版按 1.20.1 的行为走。</p>
      */
-    public void chat(String message, String language) {
+    public void chat(String message, String language, String name) {
         if (!isChatEnabled()) {
             ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.disable");
             return;
@@ -84,7 +84,7 @@ public final class MaidAIChatManager extends MaidAIChatData {
             return;
         }
         if (this.getSetting().isEmpty()) {
-            this.onSettingIsEmpty(site, language);
+            this.onSettingIsEmpty(site, language, name);
             return;
         }
         ChatClient chatClient = Service.getChatClient(site);
@@ -105,18 +105,18 @@ public final class MaidAIChatManager extends MaidAIChatData {
      * <p>配置允许时自动生成（ai.AutoGenSettingEnabled，默认开启），
      * 否则退回 1.18.2 上游的「设定为空」提示。</p>
      */
-    private void onSettingIsEmpty(Site site, String language) {
+    private void onSettingIsEmpty(Site site, String language, String name) {
         if (!isAutoGenSettingEnabled()) {
             ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.llm.role_no_setting");
             return;
         }
-        this.autoGenSetting(site, language);
+        this.autoGenSetting(site, language, name);
     }
 
     /**
      * 让模型写一份人设，成功后落盘成 config/touhou_little_maid/settings/<model>.yml。
      */
-    private void autoGenSetting(Site site, String language) {
+    private void autoGenSetting(Site site, String language, String name) {
         // 提示先弹：这一步可能要等十几秒，玩家需要知道正在处理
         ChatBubbleManger.addInnerChatText(maid,
                 "ai.touhou_little_maid.chat.llm.role_no_setting_and_gen_setting");
@@ -124,7 +124,7 @@ public final class MaidAIChatManager extends MaidAIChatData {
             return;
         }
         this.generatingSetting = true;
-        ChatCompletion completion = AutoGenSetting.build(this, language);
+        ChatCompletion completion = AutoGenSetting.build(this, language, name);
         Service.getChatClient(site).chat(completion).handle(this::onAutoGenSuccess, this::onAutoGenFail);
     }
 
@@ -138,13 +138,13 @@ public final class MaidAIChatManager extends MaidAIChatData {
      * </ul>
      * <p>已有设定文件时仍然不覆盖（见 {@code SettingReader#saveGeneratedSetting}）。</p>
      */
-    public void regenerateSetting(String language) {
+    public void regenerateSetting(String language, String name) {
         @Nullable Site site = this.getChatSite();
         if (site == null || StringUtils.isBlank(site.getApiKey())) {
             ChatBubbleManger.addInnerChatText(maid, "ai.touhou_little_maid.chat.api_key.empty");
             return;
         }
-        this.autoGenSetting(site, language);
+        this.autoGenSetting(site, language, name);
     }
     private void onAutoGenSuccess(ChatCompletionResponse result) {
         // 正文在 JSON 的 chat_text 字段里（上游 AutoGenSettingCallback 同样只取这一项）

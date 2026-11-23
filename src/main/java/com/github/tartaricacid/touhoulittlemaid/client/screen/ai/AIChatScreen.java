@@ -454,7 +454,8 @@ public class AIChatScreen extends Screen {
             LanguageManager languageManager = Minecraft.getInstance().getLanguageManager();
             LanguageInfo info = languageManager.getLanguage(languageManager.getSelected().getCode());
             String language = info != null ? info.toString() : "English (US)";
-            SendUserChatPacket.send(this.maid.getId(), value, language);
+            // 名字必须在这里取：客户端才有玩家的语言文件，未命名时能解析出模型译名
+            SendUserChatPacket.send(this.maid.getId(), value, language, this.maid.getName().getString());
             String name = player.getScoreboardName();
             String format = String.format("<%s> %s", name, value);
             player.sendMessage(new TextComponent(format).withStyle(ChatFormatting.GRAY), Util.NIL_UUID);

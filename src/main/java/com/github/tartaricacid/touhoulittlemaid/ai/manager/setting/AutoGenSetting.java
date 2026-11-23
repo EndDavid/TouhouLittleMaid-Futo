@@ -32,14 +32,19 @@ public final class AutoGenSetting {
     /**
      * 构造生成人设的请求。
      *
-     * @param manager  这只女仆的聊天管理器（提供模型名、温度与自定义设定）
+     * @param manager  这只女仆的聊天管理器（提供模型 id、温度与自定义设定）
      * @param language 玩家当前语言的显示名，要求模型用这种语言写人设
+     * @param name     女仆名字的<b>已翻译</b>文本，由客户端算好随聊天包送上来
+     *                 （对应 1.20.1 {@code ChatClientInfo#name()}）。
+     *                 为空时退回模型 id 的可读形式 —— 注意<b>不能</b>在这里调
+     *                 {@code maid.getName().getString()}：未命名时那是
+     *                 {@code {model.xxx.name}} 翻译键，服务端解析不出人话。
      */
-    public static ChatCompletion build(MaidAIChatManager manager, String language) {
+    public static ChatCompletion build(MaidAIChatManager manager, String language, String name) {
         String modelId = StringUtils.defaultString(manager.getMaid().getModelId());
         String modelName = modelId.contains(":")
                 ? modelId.substring(modelId.indexOf(':') + 1) : modelId;
-        String name = manager.getMaid().getName().getString();
+        String displayName = StringUtils.isNotBlank(name) ? name : modelName;
         String description = manager.getCustomSetting();
 
         StringBuilder prompt = new StringBuilder();
@@ -47,7 +52,7 @@ public final class AutoGenSetting {
                 .append("- Character setting and role\n")
                 .append("- Personality traits\n")
                 .append("- Language style and speech patterns\n\n")
-                .append("Name: ").append(name).append('\n')
+                .append("Name: ").append(displayName).append('\n')
                 .append("Model: ").append(modelName).append('\n')
                 .append("Chat language: ").append(language).append('\n');
         if (StringUtils.isNotBlank(description)) {

@@ -18,10 +18,15 @@ public final class RegenerateAISettingPacket {
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "regenerate_ai_setting");
     private RegenerateAISettingPacket() {
     }
-    public static void send(int entityId, String language) {
+    /**
+     * @param name 女仆名字的已翻译文本（未命名时是模型译名），与
+     *             {@link SendUserChatPacket} 同一个理由：只有客户端能翻译。
+     */
+    public static void send(int entityId, String language, String name) {
         FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeInt(entityId);
         buf.writeUtf(language == null ? "English (US)" : language);
+        buf.writeUtf(name == null ? "" : name);
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(CHANNEL, buf);
     }
     public static void initServer() {
@@ -29,14 +34,15 @@ public final class RegenerateAISettingPacket {
                 (server, player, handler, buf, responseSender) -> {
                     int entityId = buf.readInt();
                     String language = buf.readUtf();
-                    server.execute(() -> handle(player, entityId, language));
+                    String name = buf.readUtf();
+                    server.execute(() -> handle(player, entityId, language, name));
                 });
     }
-    private static void handle(ServerPlayer player, int entityId, String language) {
+    private static void handle(ServerPlayer player, int entityId, String language, String name) {
         Entity entity = player.level.getEntity(entityId);
         if (!(entity instanceof EntityMaid maid) || !maid.isAlive() || !maid.isOwnedByPlayer(player)) {
             return;
         }
-        maid.getAiChatManager().regenerateSetting(language);
+        maid.getAiChatManager().regenerateSetting(language, name);
     }
 }

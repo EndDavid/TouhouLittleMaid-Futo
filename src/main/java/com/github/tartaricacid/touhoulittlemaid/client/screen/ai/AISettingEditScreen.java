@@ -67,7 +67,7 @@ public class AISettingEditScreen extends Screen {
                 new TranslatableComponent("gui.done"), b -> save()));
         this.addRenderableWidget(new FlatColorButton(x + buttonWidth + gap, buttonY, buttonWidth, 20,
                 new TranslatableComponent("ai.touhou_little_maid.chat.setting.regenerate"),
-                b -> RegenerateAISettingPacket.send(this.maid.getId(), currentLanguage())));
+                b -> RegenerateAISettingPacket.send(this.maid.getId(), currentLanguage(), this.maid.getName().getString())));
         this.addRenderableWidget(new FlatColorButton(x + (buttonWidth + gap) * 2, buttonY, buttonWidth, 20,
                 new TranslatableComponent("ai.touhou_little_maid.chat.setting.export"),
                 b -> copyToClipboard()));

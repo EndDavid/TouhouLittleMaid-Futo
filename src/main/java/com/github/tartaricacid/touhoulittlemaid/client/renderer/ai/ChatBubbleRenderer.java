@@ -26,7 +26,7 @@ import java.util.List;
  * 3. 文字不换行、4. 不做垂直居中，长句子会拉成一条横贯屏幕的白条。
  * 1.20.1 换成了<b>九宫格 + 自动换行</b>：
  * <ul>
- *     <li>贴图 {@code textures/entity/chat_bubble/type1.png}（256×256，实际内容在左上角
+ *     <li>贴图 {@code textures/entity/chat_bubble/type2.png}（256×256，实际内容在左上角
  *         48×24 的圆角矩形里，8 px 边距），用九宫格拉伸成任意大小；</li>
  *     <li>文字按 {@code font.split} 折行：居中气泡 200 px、左右两列 120 px；</li>
  *     <li>气泡整体尺寸 = 文字包围盒 + 四周 5 px 内边距。</li>
@@ -56,12 +56,29 @@ import java.util.List;
  * {@code uv2}，这里固定给 {@link LightTexture#FULL_BRIGHT}：气泡不该随天黑变暗。</p>
  */
 public final class ChatBubbleRenderer {
-    /** 正文气泡背景（1.20.1 的 {@code IChatBubbleData#TYPE_1}）。 */
+    /** 正文气泡背景（1.20.1 的 {@code IChatBubbleData#TYPE_1}）：白底 + 黑边。 */
     public static final ResourceLocation TYPE_1 =
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/chat_bubble/type1.png");
-    /** 内部提示气泡背景（1.20.1 的 {@code IChatBubbleData#TYPE_2}），保留给后续区分用。 */
+    /**
+     * AI 回复与内部提示用的背景（1.20.1 的 {@code IChatBubbleData#TYPE_2}）：白底 + 淡蓝边。
+     *
+     * <p><b>为什么 AI 聊天不用 TYPE_1：</b>1.20.1 里
+     * {@code ChatBubbleManager#addLLMChatText}（AI 回复）与
+     * {@code ChatBubbleManager#addTextChatBubble}（「角色设定为空」这类内部提示）
+     * 调用的都是 {@code TextChatBubbleData.type2(...)}，
+     * {@code AutoGenSettingCallback} 与 {@code addThinkingText} 也显式传 {@code TYPE_2}。
+     * {@code TYPE_1} 只给「台本气泡」等少数地方用。</p>
+     */
     public static final ResourceLocation TYPE_2 =
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/entity/chat_bubble/type2.png");
+    /**
+     * 本轮所有气泡都用 TYPE_2。
+     *
+     * <p>本移植版的气泡只有两种来源（AI 回复、内部提示），二者在 1.20.1 都是 TYPE_2。
+     * 将来做「台本气泡」那一轮时，背景应当跟着气泡数据一起同步（上游是
+     * {@code TextChatBubbleData} 里带一个 {@code bg} 字段），而不是在这里写死。</p>
+     */
+    private static final ResourceLocation BACKGROUND = TYPE_2;
     private static final List<Pair<Long, ChatText>> TMP_CHAT_BUBBLES = Lists.newArrayList();
     /** 贴图实际尺寸（{@code blit} 的默认坐标系就是 256×256）。 */
     private static final int TEXTURE_SIZE = 256;
@@ -197,7 +214,7 @@ public final class ChatBubbleRenderer {
         poseStack.translate(0, baseHeight - yOffset * PIXEL_SCALE, 0);
         poseStack.mulPose(Minecraft.getInstance().getEntityRenderDispatcher().cameraOrientation());
         poseStack.scale(-PIXEL_SCALE, -PIXEL_SCALE, PIXEL_SCALE);
-        VertexConsumer builder = buffer.getBuffer(RenderType.text(TYPE_1));
+        VertexConsumer builder = buffer.getBuffer(RenderType.text(BACKGROUND));
         drawNineSliced(poseStack, builder, startX, startY, boxWidth, boxHeight);
         int arrowU = switch (side) {
             case LEFT -> ARROW_U_RIGHT;

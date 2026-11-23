@@ -11,6 +11,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.MaidSchedule;
 import com.github.tartaricacid.touhoulittlemaid.entity.backpack.BackpackManager;
 import com.github.tartaricacid.touhoulittlemaid.entity.backpack.EmptyBackpack;
 import com.github.tartaricacid.touhoulittlemaid.entity.data.AttackListData;
+import com.github.tartaricacid.touhoulittlemaid.entity.info.ModelDisplayNames;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskIdle;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.github.tartaricacid.touhoulittlemaid.init.InitSounds;
@@ -47,6 +48,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -2357,6 +2359,27 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     @Override
     protected int getExperienceReward(Player player) {
         return this.getExperience();
+    }
+
+    /**
+     * 未命名时的名字：她当前模型的译名（如「博丽灵梦」），对齐 1.18.2 / 1.20.1 上游。
+     *
+     * <p>原版 {@code Entity#getName()} 在玩家没起名时回落到 {@code getTypeName()}，
+     * 而 {@code getTypeName()} 默认返回<b>实体类型名</b>，也就是 {@code Maid}。
+     * 上游覆写它，改成「模型包里写着的名字」——于是聊天栏的 {@code <女仆名> 内容}、
+     * 名牌、墓碑、AI 人设里看到的都是「博丽灵梦」而不是「Maid」。</p>
+     *
+     * <p>返回 {@link Component} 而不是字符串：模型名在模型包里通常是
+     * {@code {model.xxx.name}} 这种翻译键，必须留到客户端按玩家语言解析。
+     * 模型 id 为空 / 非法时退回实体类型名。</p>
+     *
+     * <p><b>1.18.2 上游还有 {@code MaidTypeNameEvent} 与 YSM 模型名的分支</b>：
+     * 本移植版没有那条 Forge 事件，也没有 YSM 联动，因此只保留「默认模型名」这一层。</p>
+     */
+    @Override
+    protected Component getTypeName() {
+        Component modelName = ModelDisplayNames.getName(this.getModelId());
+        return modelName == null ? this.getType().getDescription() : modelName;
     }
 
 

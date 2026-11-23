@@ -3784,7 +3784,7 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 
 | 项 | 旧实现（1.18.2 上游） | 现在（= 1.20.1） |
 |---|---|---|
-| 贴图 | `textures/chat_bubble/bg/default1.png`（3x2 网格） | `textures/entity/chat_bubble/type1.png`（256x256，内容在左上 48x24，8 px 九宫格边距） |
+| 贴图 | `textures/chat_bubble/bg/default1.png`（3x2 网格） | `textures/entity/chat_bubble/type2.png`（256x256，内容在左上 48x24，8 px 九宫格边距） |
 | 绘制 | 左右两张 + 中间重复 N 张 | 九宫格：四角原样、四边单向拉伸、中间双向拉伸 |
 | 换行 | 不换行 | `font.split`：居中 200 px、左右两列 120 px |
 | 多行 | 不可能 | 每行 9 px；气泡高度 = 行数 x 9 + 上下各 5 px |
@@ -3793,9 +3793,49 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 | 坐姿 | 无偏移（气泡顶在头发上） | 基线下移 **0.25 格**（1.20.1 的 `isMaidInSittingPose` 分支） |
 | 睡姿 | 下移 48 px | 换算成 0.9 格，底边与改造前一致 |
 
-`type2.png` 也一并搬进来了（1.20.1 用它画内部提示），但**暂时统一用 type1**：
-`ChatTextType` 里没有「内部提示」这一档，加值会改动同步数据的枚举序，
-留给「聊天气泡子系统」那一轮。
+**用哪张图？用 `type2`。** 1.20.1 里 AI 回复（`ChatBubbleManager#addLLMChatText`）、
+内部提示（`addTextChatBubble`）、自动生成人设（`AutoGenSettingCallback`）、
+思考中（`addThinkingText`）**全部**走 `TextChatBubbleData.type2(...)`，
+`type1.png`（粗黑边那张）只留给「台本气泡」等少数地方。
+第一版误用了 `type1`，看上去仍是旧版的粗黑边，已改。
+
+`ChatTextType` 里没有「内部提示」这一档，加值会改动同步数据的枚举序，所以现在
+**所有气泡一律用 `type2`**；等做「台本气泡」那一轮，背景要像上游那样跟着气泡数据
+一起同步（`TextChatBubbleData` 带一个 `bg` 字段），而不是写死在渲染器里。
+
+### 未命名女仆的名字：模型译名，不是「Maid」
+
+玩家没给女仆起名时，原版 `Entity#getName()` 会回落到 `getTypeName()`，而它默认返回
+**实体类型名**（`Maid`）。上游覆写了 `EntityMaid#getTypeName()`，改成「她当前模型的译名」：
+
+```java
+// 1.18.2 上游 EntityMaid#getTypeName()
+Optional<MaidModelInfo> info = ServerCustomPackLoader.SERVER_MAID_MODELS.getInfo(getModelId());
+return info.map(i -> ParseI18n.parse(i.getName()))
+           .orElseGet(() -> new TextComponent(getType().getDescriptionId()));
+```
+
+于是 `<博丽灵梦> 你好啊主人` 这种聊天栏消息、名牌、墓碑、AI 人设里的「名字」都是模型译名。
+本移植版缺那一层服务端模型池（见 `ServerModelPool` 的注释），改用
+`entity/info/ModelDisplayNames`：直接读模组 jar 里的 `assets/<命名空间>/maid_model.json`，
+按 `model_id` 找 `name`，找不到就用上游同款的默认键 `{model.<命名空间>.<路径>.name}`。
+
+| 项 | 做法 |
+|---|---|
+| 数据来源 | `ModContainer#findPath("assets/<ns>/maid_model.json")`，开发环境与生产环境一致 |
+| 缓存 | `ConcurrentHashMap`（客户端渲染线程与服务端线程都会调） |
+| 返回值 | `Component`：JSON 里通常是 `{model.xxx.name}`，必须留到客户端按玩家语言解析 |
+| 兜底 | 模型 id 为空 → 实体类型名；id 合法但查不到 → 默认翻译键 |
+| 覆盖面 | 194 条内置模型里 193 条在 `zh_cn` 有对应名字；唯一的例外是彩蛋模型 `moesumika`，它在模型包里就既没 `name` 也没 `desc` 的中文键（上游同样如此） |
+
+**为什么聊天包要多带一个 `name` 字段**：`SendUserChatPacket` 现在填 `maidId + 文本 + 语言 + 女仆名`。
+名字和语言一样只能由客户端提供 —— 服务端没有玩家的语言文件，
+`{model.xxx.name}` 在服务端解析出来只是键名本身（RCON 里看到的就是
+`Summoned new model.touhou_little_maid.cirno.name`）。这条等价于 1.20.1 的
+`ChatClientInfo(language, name, description)`，`RegenerateAISettingPacket` 同理。
+
+**与上游的差异**：1.18.2 的 `getTypeName()` 里还有 `MaidTypeNameEvent` 与 YSM 模型名两个分支，
+本移植版没有那条 Forge 事件、也没有 YSM 联动，所以只保留「默认模型名」这一层。
 
 ### 调试命令：`/tlm ai_chat say`
 

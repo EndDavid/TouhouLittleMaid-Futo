@@ -125,11 +125,11 @@
 
 1. **不换行**：长回复被拉成一条横贯屏幕的白条；
 2. **坐下时太高**：碰撞箱不变，但模型蹲下去了，气泡顶在头发上；
-3. **贴图是旧的**：1.20.1 换成了 `textures/entity/chat_bubble/type1.png`。
+3. **贴图是旧的**：1.20.1 换成了 `textures/entity/chat_bubble/type2.png`。
 
 `client/renderer/ai/ChatBubbleRenderer` 因此整体重写（321 行）：
 
-- 贴图 `type1.png` / `type2.png` 从 TLMO 1.20.1 jar 复制到
+- 贴图 `type2.png` / `type1.png` 从 TLMO 1.20.1 jar 复制到
   `assets/touhou_little_maid/textures/entity/chat_bubble/`（256x256，气泡主体在左上
   48x24，8 px 九宫格边距，三个 16x16 尾巴在 v=24 那一行）；
 - 背景改九宫格拉伸（四角原样 / 四边单向 / 中间双向），尺寸随文字走；
@@ -180,6 +180,40 @@ HTTP 400 Prompt must contain the word 'json' in some form to use 'response_forma
 上一轮留下的 4 个脏文件里，`ai/service/chat/openai/ChatClient.java` 被删掉了
 `import ...TouhouLittleMaid;` 但仍在用 `TouhouLittleMaid.LOGGER`，导致 `compileJava` 失败。
 已用 `git checkout --` 复原该 import（另三个只是文件末尾换行）。
+
+### 气泡贴图与「未命名女仆的名字」（本轮 2026-11-23）
+
+**一、气泡背景用错了那张图。** 上一轮把九宫格换成 1.20.1 的 `type1.png`（白底 + 粗黑边），
+但 1.20.1 的 AI 回复走的是 `TextChatBubbleData.type2(...)`（白底 + 淡蓝边），
+`addLLMChatText` / `addTextChatBubble` / `AutoGenSettingCallback` / `addThinkingText`
+四处全是 `TYPE_2`；`TYPE_1` 只给台本气泡等少数地方。因此真人截图里仍是「旧版粗黑边」。
+现在 `ChatBubbleRenderer` 用 `BACKGROUND = TYPE_2`，`TYPE_1` 仍保留常量（留给台本气泡那一轮）。
+
+**二、未命名女仆显示 `Maid` 而不是模型译名。** 根因是没覆写 `EntityMaid#getTypeName()`：
+原版回落到实体类型名。上游的做法是从服务端模型池取 `MaidModelInfo#getName()`，
+本移植版没有那一层，于是新增 `entity/info/ModelDisplayNames`：直接读模组 jar 里的
+`assets/<ns>/maid_model.json`，返回 `Component`（JSON 里是 `{model.xxx.name}`，
+必须留到客户端翻译），查不到时退回上游同款默认键；结果用 `ConcurrentHashMap` 缓存。
+`EntityMaid#getTypeName()` 覆写后，聊天栏 `<>`、名牌、墓碑、AI 人设的名字一起变正确。
+
+**三、名字与语言一样必须由客户端带上服务端。** `SendUserChatPacket` 载荷从
+`maidId + 文本 + 语言` 变成再追加 `name`；`RegenerateAISettingPacket` 同理。
+原因：服务端没有玩家的语言文件，`{model.xxx.name}` 在服务端 `getString()` 出来只是键名
+（RCON 实测 `Summoned new model.touhou_little_maid.cirno.name`）。
+`AutoGenSetting.build` 不再自己 `maid.getName().getString()`，改用客户端送来的 `name`，
+为空才退回模型 id 的可读形式。等价于 1.20.1 的 `ChatClientInfo(language, name, description)`。
+
+**验证**：`./gradlew.bat build` BUILD SUCCESSFUL；三闸全绿
+（`SCANNED_FILES=1487 BAD_FILES=0 FFFD_CHARS=0`、`entity 11/11 + block entity 11/13 ALL OK`、
+`entries=54 categories=3 problems=0`）。`runServer` + RCON：
+`summon ... {ModelId:"touhou_little_maid:cirno"}` 回显 `Summoned new model.touhou_little_maid.cirno.name`
+（= `getTypeName()` 已生效，之前会是 `Maid`），`tlm ai_chat say` 回 `chat bubble sent to 1 maid(s)`。
+**未验证**：客户端里气泡的实际观感（淡蓝边 / 尾巴位置）、聊天栏 `<>` 里中文译名的实际显示 ——
+需要真人重启客户端后看一眼（服务端 RCON 只能看到键名）。
+另：194 条内置模型里 193 条有 `zh_cn` 名字，唯一例外是彩蛋模型 `moesumika`，
+它在模型包里本来就没有 `name` / `desc` 的中文键（上游同样如此）。
+
+---
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；
