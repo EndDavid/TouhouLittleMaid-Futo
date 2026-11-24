@@ -543,6 +543,44 @@ public final class InitItems {
             TouhouLittleMaid.rl("wireless_io"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemWirelessIO());
 
+    // ------------------------------------------------------------------ 进度图标
+
+    /**
+     * 进度图标物品（上游 {@code InitItems} 里那八件 {@code ItemAdvancementIcon}）。
+     *
+     * <p>它们只用来挂 {@code advancements/*.json} 的 {@code display.icon} ——
+     * 对应的图标（「百人斩」「百级」「全套下界合金」……）没法用原版物品表达。
+     * 所以：<b>不进任何创造模式物品栏</b>、{@code stacksTo(1)}、八件共用一个名字，
+     * 详见 {@code item.ItemAdvancementIcon}。</p>
+     *
+     * <p>漏注册的后果不是崩溃，而是进度页面里那几条图标画成紫黑格 ——
+     * 1.18.2 里 {@code display.icon} 的物品 id 找不到时只会静默退化成 {@code air}。</p>
+     */
+    public static final Item ALL_NETHERITE_EQUIPMENT = registerAdvancementIcon("all_netherite_equipment");
+    public static final Item CHANGE_CHAIR_MODEL = registerAdvancementIcon("change_chair_model");
+    public static final Item CHANGE_MAID_MODEL = registerAdvancementIcon("change_maid_model");
+    public static final Item KILL_100 = registerAdvancementIcon("kill_100");
+    public static final Item KILL_DRAGON = registerAdvancementIcon("kill_dragon");
+    public static final Item KILL_SLIME_300 = registerAdvancementIcon("kill_slime_300");
+    public static final Item KILL_WITHER = registerAdvancementIcon("kill_wither");
+    public static final Item MAID_100_HEALTHY = registerAdvancementIcon("maid_100_healthy");
+
+    /**
+     * 「生成？？？」占位物品（上游 {@code InitItems.ENTITY_PLACEHOLDER}）。
+     *
+     * <p>进度图标用它画「祭坛这条配方做出来的东西」，配方 id 记在物品 NBT 的
+     * {@code RecipeId} 上，客户端渲染器按配方名换贴图。对着方块顶面右键还能直接
+     * 生成那条配方的产物（上游就是给整合包作者留的口子）。</p>
+     */
+    public static final Item ENTITY_PLACEHOLDER = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("entity_placeholder"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemEntityPlaceholder());
+
+    private static Item registerAdvancementIcon(String name) {
+        return Registry.register(Registry.ITEM, TouhouLittleMaid.rl(name),
+                new com.github.tartaricacid.touhoulittlemaid.item.ItemAdvancementIcon());
+    }
+
     // ------------------------------------------------------------------ 背包
 
     public static final Item MAID_BACKPACK_SMALL = registerBackpack("maid_backpack_small");

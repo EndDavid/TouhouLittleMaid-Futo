@@ -1,10 +1,13 @@
 package com.github.tartaricacid.touhoulittlemaid.entity.favorability;
 
+import com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
 import com.google.common.collect.Maps;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -221,6 +224,17 @@ public class FavorabilityManager {
                 if (this.maid.getHealth() > this.maid.getMaxHealth()) {
                     this.maid.setHealth(this.maid.getMaxHealth());
                 }
+                // 满 100 生命（下界合金 + 雷劈彩蛋 + 满好感度才能凑到）另有挑战进度
+                if (this.maid.getMaxHealth() >= 100 && this.maid.getOwner() instanceof ServerPlayer serverPlayer) {
+                    InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.MAID_100_HEALTHY);
+                }
+            }
+            // 好感度升级与「三级好感度」，各有一条进度（上游同款）
+            if (this.maid.getOwner() instanceof ServerPlayer serverPlayer) {
+                InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.FAVORABILITY_INCREASED);
+                if (levelAfter == LEVEL_3) {
+                    InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.FAVORABILITY_INCREASED_MAX);
+                }
             }
             this.maid.playSound(SoundEvents.PLAYER_LEVELUP, 0.5F,
                     this.maid.getRandom().nextFloat() * 0.1F + 0.9F);
@@ -283,7 +297,9 @@ public class FavorabilityManager {
             attack.setBaseValue(this.getAttackByLevel(level));
         }
         if (health != null) {
-            health.setBaseValue(this.getHealthByLevel(level));
+            // 被雷劈过的女仆额外 +20 生命（上游同一处也这么算），
+            // 漏掉这一句会让彩蛋在读档后凭空消失，连带 maid_100_healthy 再也凑不到 100。
+            health.setBaseValue(this.getHealthByLevel(level) + (this.maid.isStruckByLightning() ? 20 : 0));
         }
     }
 

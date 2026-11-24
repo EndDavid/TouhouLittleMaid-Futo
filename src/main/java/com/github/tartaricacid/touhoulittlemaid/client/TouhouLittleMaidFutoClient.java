@@ -132,6 +132,17 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.init.InitItems.PICNIC_BASKET,
                 new com.github.tartaricacid.touhoulittlemaid.client.renderer.item.PicnicBasketItemRenderer());
 
+        // 「生成？？？」占位物品：进度图标用它画「祭坛这条配方做出来的东西」。
+        // 与野餐篮同一套 —— 烘焙一块扁平图层 + BuiltinItemRenderer 换贴图。
+        // 物品本身不进创造物品栏（除了主栏里那些非物品类配方的副本）。
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.EntityPlaceholderIconModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.EntityPlaceholderIconModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.BuiltinItemRendererRegistry.INSTANCE.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitItems.ENTITY_PLACEHOLDER,
+                new com.github.tartaricacid.touhoulittlemaid.client.renderer.item.EntityPlaceholderItemRenderer());
+
+
         // 魔理沙的扫帚：和女仆一样是 LivingEntityRenderer + 普通模型层。
         //
         // 【必须在这里注册渲染器】。少了这一行，实体本身仍然能正常生成、正常 tick

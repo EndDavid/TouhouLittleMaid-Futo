@@ -1,8 +1,10 @@
 package com.github.tartaricacid.touhoulittlemaid.entity.item;
 
+import com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType;
 import com.github.tartaricacid.touhoulittlemaid.capability.IPower;
 import com.github.tartaricacid.touhoulittlemaid.capability.PowerCapability;
 import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
+import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -353,6 +355,10 @@ public class EntityPowerPoint extends Entity {
             power.add(value / 100.0F);
         }
         this.discard();
+        // 「拾取 P 点」进度：只有玩家真的吃下（而不是女仆捡走 / 掉进虚空）才算
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.PICKUP_POWER_POINT);
+        }
     }
 
     /**

@@ -1,8 +1,10 @@
 package com.github.tartaricacid.touhoulittlemaid.entity.projectile;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskFishing;
+import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -418,7 +420,15 @@ public class MaidFishingHook extends Entity {
     }
 
     protected void spawnLoot(List<ItemStack> randomItems, EntityMaid maid) {
+        // 「钓到附魔书」是隐藏进度。上游在每件战利品上单独判，这里保持一致 ——
+        // 一次钓上两件战利品时，只有真的出了附魔书才点亮。
+        net.minecraft.server.level.ServerPlayer owner =
+                maid.getOwner() instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                        ? serverPlayer : null;
         for (ItemStack result : randomItems) {
+            if (owner != null && result.is(net.minecraft.world.item.Items.ENCHANTED_BOOK)) {
+                InitTrigger.MAID_EVENT.trigger(owner, TriggerType.MAID_FISHING_ENCHANTED_BOOK);
+            }
             ItemEntity itemEntity = new ItemEntity(this.level, maid.getX(), maid.getY() + 0.5, maid.getZ(), result);
             itemEntity.setDeltaMovement(0, 0.1, 0);
             this.level.addFreshEntity(itemEntity);
@@ -431,6 +441,11 @@ public class MaidFishingHook extends Entity {
     }
 
     protected void afterFishing() {
+        // 「学会了钓鱼」进度：每次真的收杆（nibble > 0）都会走到这里
+        EntityMaid maid = this.getMaidOwner();
+        if (maid != null && maid.getOwner() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.MAID_FISHING);
+        }
     }
 
     protected void hurtRod(EntityMaid maid, ItemStack rodItem, int rodDamage, InteractionHand rodHand) {

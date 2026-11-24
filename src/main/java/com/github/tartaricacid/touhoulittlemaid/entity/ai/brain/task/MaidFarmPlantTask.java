@@ -1,12 +1,15 @@
 package com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task;
 
+import com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IFarmTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
+import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
 import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;
 import com.google.common.collect.ImmutableMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.behavior.Behavior;
@@ -38,7 +41,8 @@ import java.util.Optional;
  *         徒手 30 tick、木斧 15 tick，与原版挖方块一致。</li>
  * </ul>
  *
- * <p>与上游的其它差异：上游收获/种植后会触发进度 {@code MAID_FARM}，进度系统尚未移植，省略。</p>
+ * <p>与上游的其它差异：上游在收获与种植两处触发进度 {@code MAID_FARM}，本移植版同样在
+ * {@link #harvestNow} 与种植分支各打一次判据 —— 进度系统已经移植，这里不再省略。</p>
  */
 public class MaidFarmPlantTask extends Behavior<EntityMaid> {
     /**
@@ -137,6 +141,9 @@ public class MaidFarmPlantTask extends Behavior<EntityMaid> {
                         maid.swing(InteractionHand.MAIN_HAND);
                         maid.getBrain().eraseMemory(InitEntities.TARGET_POS);
                         maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+                        if (maid.getOwner() instanceof ServerPlayer serverPlayer) {
+                            InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.MAID_FARM);
+                        }
                         return;
                     }
                 }
@@ -184,6 +191,9 @@ public class MaidFarmPlantTask extends Behavior<EntityMaid> {
         maid.swing(InteractionHand.MAIN_HAND);
         maid.getBrain().eraseMemory(InitEntities.TARGET_POS);
         maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+        if (maid.getOwner() instanceof ServerPlayer serverPlayer) {
+            InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.MAID_FARM);
+        }
     }
 }
 

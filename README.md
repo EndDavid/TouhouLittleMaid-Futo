@@ -97,6 +97,7 @@ loom_version=1.15.5
 | 自定义附魔（滞弹 / 速弹 / 末影之末） | **完成**（挂在御币上，效果走弹幕链路） |
 | **聊天气泡（随机台本 + 受伤 + 饰品 + 书与笔 + 表情图标）** | **完成** |
 | **AI 聊天（LLM 对话 + 头顶气泡 + TTS 语音 + 设置界面）** | **完成**（STT 未做） |
+| **进度（成就）：54 条 + 9 件图标物品 + 23 处触发点** | **完成**（`change_maid_sound` 待音效包子系统） |
 | 模组联动（JEI / REI / EMI / Jade / YSM / Iris…） | 未开始 |
 | **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
 
@@ -4111,3 +4112,93 @@ AI 回复里的 `tts_text` 现在会被真的念出来。链路与上游一致�
   说明 `SoundEngineMixin` 已成功应用到 `SoundEngine#play`（`defaultRequire: 1`，失败会直接崩溃）。
 - **未验证**：真实 TTS 站点的合成与播放（需要玩家的 `api_key` 或本地 GPT-SoVITS）、
   系统旁白在 Windows 上是否真的出声、Opus 解码后的音质。
+
+## 进度（成就）系统：54 条全量移植
+
+数据文件直接取自上游 **Forge 1.18.2** 的 jar（`data/touhou_little_maid/advancements/**`），
+`assets/touhou_little_maid/textures/advancements/backgrounds/stone.png` 与
+`data/touhou_little_maid/loot_tables/advancement/{cake,power_point}.json` 也一并搬来。
+
+### 为什么用 1.18.2 的那一套而不是 1.20.1 的
+
+两个版本的 JSON 只有两处实质差异，而且**都是 1.20.1 才需要改**：
+
+| 字段 | 1.18.2 | 1.20.1 | 本仓库 |
+|---|---|---|---|
+| 祭坛配方 id | `touhou_little_maid:altar/spawn_box` | `touhou_little_maid:altar_recipe/spawn_box` | 用 1.18.2 的 —— 本仓库配方目录就是 `recipes/altar/`，前缀自然是 `altar/spawn_box` |
+| 图标 NBT 写法 | `"nbt": "{RecipeId:\"...\"}"`（字符串） | 仍是字符串 | 同 1.18.2（1.20.2 才变成对象） |
+| `sends_telemetry_event` | 无 | 有 | 1.18.2 的 `DisplayInfo` 不认识这个字段，带上只会被忽略 |
+
+其余 52 条逐字相同，所以**不需要**任何改写 —— 直接复制即可。
+
+### 物品侧：九件「只为图标存在」的物品
+
+`display.icon` 里有九个图标没法用原版物品表达（百人斩、百级、全套下界合金、
+「生成？？？」……），上游的做法是各注册一件只有贴图的物品：
+
+- `item/ItemAdvancementIcon`（新）—— 八件公用一个类，`stacksTo(1)`、
+  **不进任何创造模式物品栏**、`getDescriptionId()` 统一成「进度图标」。
+  对应 `all_netherite_equipment` / `change_chair_model` / `change_maid_model` /
+  `kill_100` / `kill_dragon` / `kill_slime_300` / `kill_wither` / `maid_100_healthy`。
+- `item/ItemEntityPlaceholder`（新）—— 「生成？？？」，配方 id 记在 NBT 的 `RecipeId`，
+  客户端渲染器按配方文件名去 `textures/item/<配方文件名>.png` 找贴图，找不到退回
+  `entity_placeholder.png`。对着方块顶面右键还能**直接生成那条配方的产物**
+  （上游给整合包作者留的口子）。
+
+渲染侧对应 `client/model/EntityPlaceholderIconModel` +
+`client/renderer/item/EntityPlaceholderItemRenderer`，注册方式与野餐篮同一套
+（`EntityModelLayerRegistry` 烘焙一块 16×16 的零厚度板 + `BuiltinItemRendererRegistry`）。
+物品模型 `models/item/entity_placeholder.json` 是 `builtin/entity`，那套 `display` 变换直接复用。
+
+### 触发侧：23 处补点 + 一个新建的管理器
+
+移植前 `TriggerType` 里 48 个常量只有 25 个真有触发点，其余 23 个「写了但没人打」——
+表现为**进度永远不亮，日志一片安静**。本轮全部补齐：
+
+| 位置 | 事件 |
+|---|---|
+| `EntityMaid#tameMaid` | `tamed_maid`、`tamed_maid_from_structure`（结构生成标记写进 NBT 的 `StructureSpawn`） |
+| `EntityMaid#thunderHit` | `lightning_bolt`、`maid_100_healthy`（**顺带补上「首次被雷劈 +20 生命上限」**，并把 `StruckByLightning` 写进 NBT） |
+| `EntityMaid#setItemSlot`（新覆写） | `any_equipment`、`all_netherite_equipment` |
+| `EntityMaid`（牛奶 / 附魔金苹果 / 玻璃瓶 / 鞍 / 背包） | `clear_maid_effects`、`eat_enchanted_golden_apple`、`take_maid_xp`、`pickup_maid`、`maid_backpack` |
+| `FavorabilityManager#add` | `favorability_increased`、`favorability_increased_max`、`maid_100_healthy` |
+| `MaidFarmPlantTask` / `MaidFeedAnimalTask` / `MaidFeedOwnerTask` | `maid_farm`、`maid_feed_animal`、`maid_feed_player` |
+| `MaidFishingHook` | `maid_fishing`、`maid_fishing_enchanted_book` |
+| `EntityPowerPoint#playerTouch` | `pickup_power_point` |
+| `MaidConfigPacket`（换模型 / 换任务） | `change_maid_model`、`switch_task` |
+| **`MaidKillRecordManager`（新）** | `maid_kill_mob`、`kill_100`、`kill_slime_300`、`kill_wither`、`kill_dragon` |
+
+`MaidKillRecordManager` 是这一轮唯一新建的「子系统」：四个计数（总数 / 史莱姆 /
+凋灵 / 末影龙）写进 NBT 的 `KillRecord` 子标签。**必须落盘** ——「百人斩」要累计 100 次，
+区块一卸载就归零的话这两条进度永远点不亮。
+
+### 与上游的差异（都有原因）
+
+| 上游 | 本移植版 | 原因 |
+|---|---|---|
+| `LivingDeathEvent` + `source.getEntity()` | `ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY` | `ServerLivingEntityEvents` 是 fabric-entity-events **1.6.0+** 才有的类；本工程按 1.18.2 的 fabric-api 0.76 解析到 **1.4.x**，里面只有 `AFTER_KILLED_OTHER_ENTITY`，语义完全一致 |
+| `EntityMaid#isStruckByLightning()`（Forge 给的） | 自己维护 `struckByLightning` 位 + NBT | 1.18.2 vanilla 的 `Entity` 没有这个方法 |
+| `Entity#onEquipItem` / Forge 的 `MaidEquipEvent` | 覆写 `setItemSlot`，用 `firstTick` 过滤读档 | 1.18.2 没有 `onEquipItem`；上游 1.18.2 同样是覆写 `setItemSlot` |
+| `getRecipeManager().byType(...).get(id)` | 遍历 `getAllRecipesFor(...)` 比对 id | 1.18.2 没有按 id 取配方的公开方法（配方总数 40 上下，右键频率极低） |
+| `initializeClient` + `IItemRenderProperties` | `BuiltinItemRendererRegistry` | Fabric 没有 Forge 的物品渲染属性 |
+
+### 已知缺口
+
+**`base/change_maid_sound`（「换个嗓音」）目前点不亮**：它需要「每只女仆各自一个音效包 id」
+这个子系统（上游 `SetMaidSoundIdMessage` + `client/sound/CustomSoundLoader` +
+`MaidSoundPackGui` + 自定义 ogg 流式播放）。本仓库只把模型里的 `use_sound_pack_id`
+读进了 `MaidModelInfo`，**没有**把它同步到实体、也没有选择界面。
+等「女仆音效包」那一轮做完，在写入成功的地方补一行判据即可（`TriggerType.CHANGE_MAID_SOUND` 常量已就位）。
+
+其余 53 条全部可达。
+
+### 验证边界
+
+- `./gradlew.bat build` = BUILD SUCCESSFUL；四道闸全绿（见下）。
+- 打包结果里 `data/touhou_little_maid/advancements/**` 共 **54** 个 JSON。
+- `runServer` 启动日志：`Loaded 1195 advancements`，**零条** `Parsing error loading custom advancement`
+  —— 判据 id 写错 / 字段名写错都会在这一行暴露，所以这一条是有效性证据。
+- `/advancement grant` 在无玩家时只回 `No player was found`（选择器先于 id 解析），
+  因此**无法**用 RCON 验证进度是否真的存在。
+- **未验证**：真人游玩下每一条进度是否真的点亮（尤其 `kill_slime_300` 这种要累计 300 次的），
+  以及进度页面里九个自绘图标的观感。

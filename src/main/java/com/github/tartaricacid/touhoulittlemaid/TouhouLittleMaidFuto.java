@@ -138,6 +138,8 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // 残局道具：数据包加载 + 塞进要塞图书馆 / 制图师小屋的箱子
         com.github.tartaricacid.touhoulittlemaid.datapack.BoardStateDataReload.init();
         com.github.tartaricacid.touhoulittlemaid.event.BoardStateLootEvent.init();
+        // 女仆击杀记录：四条「挑战」进度（百人斩 / 三百只史莱姆 / 凋灵 / 末影龙）
+        com.github.tartaricacid.touhoulittlemaid.event.MaidKillRecordEvent.init();
 
         // 合成表：帕秋莉手册的《记忆中的幻想乡》（touhou_little_maid:memorizable_gensokyo）
         com.github.tartaricacid.touhoulittlemaid.init.InitRecipes.init();

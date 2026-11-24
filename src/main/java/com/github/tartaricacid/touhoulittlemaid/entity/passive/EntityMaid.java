@@ -1,6 +1,7 @@
 package com.github.tartaricacid.touhoulittlemaid.entity.passive;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
+import com.github.tartaricacid.touhoulittlemaid.advancements.maid.TriggerType;
 import com.github.tartaricacid.touhoulittlemaid.api.backpack.IMaidBackpack;
 import com.github.tartaricacid.touhoulittlemaid.api.entity.IMaid;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
@@ -15,6 +16,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.info.ModelDisplayNames;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskIdle;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.github.tartaricacid.touhoulittlemaid.init.InitSounds;
+import com.github.tartaricacid.touhoulittlemaid.init.InitTrigger;
 import com.mojang.serialization.Dynamic;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
@@ -1341,6 +1343,31 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      */
     private boolean struckByLightning = false;
 
+    /**
+     * 这只女仆是不是「结构生成」出来的（上游 {@code structureSpawn}）。
+     *
+     * <p>只在 {@link #finalizeSpawn} 里按 {@code MobSpawnType.STRUCTURE} 置真，
+     * 用来点亮 {@code tamed_maid_from_structure} 那条隐藏进度 —— 它就是「从结构里
+     * 捡到一只野生女仆并驯服」的纪念。</p>
+     */
+    private boolean structureSpawn = false;
+
+    public boolean isStructureSpawn() {
+        return this.structureSpawn;
+    }
+
+    /**
+     * 击杀记录（上游 {@code EntityMaid#killRecordManager}）。
+     *
+     * <p>四条「挑战」进度都靠它：百人斩、三百只史莱姆、凋灵、末影龙。
+     * 计数写进 NBT 的 {@code KillRecord} 子标签，跨存档累计。</p>
+     */
+    private final MaidKillRecordManager killRecordManager = new MaidKillRecordManager();
+
+    public MaidKillRecordManager getKillRecordManager() {
+        return this.killRecordManager;
+    }
+
     public boolean isStruckByLightning() {
         return this.struckByLightning;
     }
@@ -1348,7 +1375,24 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     @Override
     public void thunderHit(ServerLevel level, net.minecraft.world.entity.LightningBolt lightning) {
         super.thunderHit(level, lightning);
+        // 与上游一致：只有【第一次】被雷劈时生命上限 +20，并点亮两个进度判据。
+        // 上游用 Forge 的 Entity#isStruckByLightning 判「第一次」，1.18.2 vanilla 没有，
+        // 所以用上面自己维护的那一位（见字段注释）。
+        if (this.struckByLightning) {
+            return;
+        }
+        net.minecraft.world.entity.ai.attributes.AttributeInstance health =
+                this.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+        if (health != null) {
+            health.setBaseValue(health.getBaseValue() + 20);
+        }
         this.struckByLightning = true;
+        if (this.getOwner() instanceof ServerPlayer serverPlayer) {
+            InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.LIGHTNING_BOLT);
+            if (this.getMaxHealth() >= 100) {
+                InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.MAID_100_HEALTHY);
+            }
+        }
     }
 
 
@@ -1535,6 +1579,13 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                 this.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
                 this.level.broadcastEntityEvent(this, (byte) 7);
                 this.playMaidVoice(InitSounds.MAID_TAMED, 1.0F, 1.0F);
+                if (player instanceof ServerPlayer serverPlayer) {
+                    InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.TAMED_MAID);
+                    // 「从结构里捡到的野生女仆」另有一条隐藏进度（上游同款）
+                    if (this.isStructureSpawn()) {
+                        InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.TAMED_MAID_FROM_STRUCTURE);
+                    }
+                }
                 return InteractionResult.SUCCESS;
             }
         }
@@ -1772,6 +1823,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                                         MobSpawnType reason, @Nullable SpawnGroupData spawnData,
                                         @Nullable CompoundTag dataTag) {
         this.setPersistenceRequired();
+        // 记下「结构生成」，供驯服时判定 tamed_maid_from_structure（上游同款）
+        if (reason == MobSpawnType.STRUCTURE) {
+            this.structureSpawn = true;
+        }
         // 刷怪蛋 / 祭坛 / 魂符 / 结构生成时随机外观，与上游一致；带 dataTag 指定 ModelId 时不覆盖。
         // 池子来自 ServerModelPool（服务端读 jar 内所有 assets/<domain>/maid_model.json），
         // 不是写死的几个 —— 见那个类的注释。
@@ -1783,6 +1838,54 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             }
         }
         return super.finalizeSpawn(level, difficulty, reason, spawnData, dataTag);
+    }
+
+    /**
+     * 装备变更钩子（上游 1.18.2 覆写 {@code setItemSlot} 的那一段）。
+     *
+     * <p>1.18.2 没有 {@code onEquipItem}，上游就把判定塞在这里，并注明
+     * 「这个方法在 MaidEquipEvent 之前执行」。本移植版只需要它点亮两条挑战进度：</p>
+     * <ul>
+     *     <li>{@code any_equipment} —— 第一次给女仆穿上盔甲；</li>
+     *     <li>{@code all_netherite_equipment} —— 四件全是下界合金。</li>
+     * </ul>
+     */
+    @Override
+    public void setItemSlot(net.minecraft.world.entity.EquipmentSlot slot, ItemStack stack) {
+        super.setItemSlot(slot, stack);
+        this.onEquipItem(slot, stack);
+    }
+
+    private void onEquipItem(net.minecraft.world.entity.EquipmentSlot slot, ItemStack newItem) {
+        // firstTick 期间读档会把整套装备塞进来，那不是「玩家给她穿的」，不该点亮进度
+        if (newItem.isEmpty() || this.firstTick
+                || slot.getType() != net.minecraft.world.entity.EquipmentSlot.Type.ARMOR) {
+            return;
+        }
+        if (!(this.getOwner() instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+        InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.ANY_EQUIPMENT);
+        if (!isNetheriteArmor(newItem)) {
+            return;
+        }
+        for (net.minecraft.world.entity.EquipmentSlot other
+                : net.minecraft.world.entity.EquipmentSlot.values()) {
+            if (other.getType() != net.minecraft.world.entity.EquipmentSlot.Type.ARMOR || other == slot) {
+                continue;
+            }
+            if (!isNetheriteArmor(this.getItemBySlot(other))) {
+                return;
+            }
+        }
+        InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.ALL_NETHERITE_EQUIPMENT);
+    }
+
+    private static boolean isNetheriteArmor(ItemStack stack) {
+        if (stack.getItem() instanceof net.minecraft.world.item.ArmorItem armorItem) {
+            return armorItem.getMaterial() == net.minecraft.world.item.ArmorMaterials.NETHERITE;
+        }
+        return false;
     }
 
     @Override
@@ -1990,6 +2093,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             tag.putUUID("FutoOwner", this.getOwnerUUID());
         }
         tag.putBoolean("FutoTamed", this.isTame());
+        tag.putBoolean("StructureSpawn", this.structureSpawn);
+        // 与上游同名标签：被雷劈过的女仆生命上限 +20 是永久彩蛋，必须跨存档保留，
+        // 否则重进世界后 MAX_HEALTH 会被 refreshAttributes() 重建回 20。
+        tag.putBoolean("StruckByLightning", this.struckByLightning);
         tag.putString("ModelId", this.getModelId());
         tag.putInt("Favorability", this.getFavorability());
         tag.putInt(EXPERIENCE_TAG, this.getExperience());
@@ -2010,6 +2117,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.gameRecordManager.addAdditionalSaveData(tag);
         this.aiChatManager.writeToTag(tag);
         this.scriptBookManager.addAdditionalSaveData(tag);
+        this.killRecordManager.addAdditionalSaveData(tag);
 
         MaidSubConfig.save(tag, this);
         this.attackList.save(tag);
@@ -2021,6 +2129,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         // 女仆永不自然消失：从 NBT 读出的 PersistenceRequired 可能是 false，
         // 这里强制恢复，避免驯服过的女仆在区块重载后被当成普通生物刷掉。
         this.setPersistenceRequired();
+        // 结构生成标记要能跨存档/跨区块保留，否则「从结构里捡的女仆」这条进度
+        // 只要区块重载一次就再也点不亮（上游同样写进 NBT）。
+        this.structureSpawn = tag.getBoolean("StructureSpawn");
+        this.struckByLightning = tag.getBoolean("StruckByLightning");
         if (this.getOwnerUUID() == null && tag.hasUUID("FutoOwner")) {
             // vanilla 数据丢失 / 解析失败时，用自有字段恢复归属，
             // 否则女仆会变成「无主」—— 潜行右键既不坐下也不驯服，看起来就是交互失效。
@@ -2091,6 +2203,7 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         this.gameRecordManager.readAdditionalSaveData(tag);
         this.aiChatManager.readFromTag(tag);
         this.scriptBookManager.readAdditionalSaveData(tag);
+        this.killRecordManager.readAdditionalSaveData(tag);
         // 好感度决定最大生命与攻击力，读档后必须按当前好感度重建一次属性，
         // 否则会出现「好感度 300 但生命還是 20」
         this.favorabilityManager.refreshAttributes();
@@ -2945,6 +3058,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         } else {
             // 1.18.2 的 LivingEntity 没有 curePotionEffects，退回原版奶桶自己用的 removeAllEffects
             this.removeAllEffects();
+            // 「干杯」进度（上游 ApplyPotionEffectEvent 只给奶桶打判据，给成药水不打）
+            if (player instanceof ServerPlayer serverPlayer) {
+                InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.CLEAR_MAID_EFFECTS);
+            }
         }
         if (!player.isCreative()) {
             ItemStack remainder = new ItemStack(isPotion ? Items.GLASS_BOTTLE : Items.BUCKET);
@@ -2977,6 +3094,11 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             return InteractionResult.SUCCESS;
         }
         this.eat(this.level, stack);
+        // 「苹果有毒」进度：只有附魔金苹果算，普通金苹果不算（上游 ApplyGoldenAppleEvent）
+        if (food == net.minecraft.world.food.Foods.ENCHANTED_GOLDEN_APPLE
+                && player instanceof ServerPlayer serverPlayer) {
+            InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.EAT_ENCHANTED_GOLDEN_APPLE);
+        }
         return InteractionResult.SUCCESS;
     }
 
@@ -3005,6 +3127,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                 this.setCarrierId(player.getId());
                 if (this.isHomeModeEnable()) {
                     this.setHomeModeEnable(false);
+                }
+                // 「把她抱起来」进度（上游 SaddleMaidEvent）
+                if (player instanceof ServerPlayer serverPlayer) {
+                    InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.PICKUP_MAID);
                 }
                 player.displayClientMessage(
                         new TranslatableComponent("message.touhou_little_maid.saddle.how_to_eject"), true);
@@ -3200,6 +3326,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
         }
         backpack.onPutOn(stack, player, this);
         this.playSound(SoundEvents.HORSE_SADDLE, 0.5F, 1.0F);
+        // 「背起行囊」进度（上游 HandleBackpackEvent）
+        if (player instanceof ServerPlayer serverPlayer) {
+            InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.MAID_BACKPACK);
+        }
         return InteractionResult.SUCCESS;
     }
 
@@ -3287,6 +3417,10 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                     new ItemStack(Items.EXPERIENCE_BOTTLE, count));
             this.playSound(SoundEvents.ITEM_PICKUP, 0.2F,
                     ((this.level.random.nextFloat() - this.level.random.nextFloat()) * 0.7F + 1.0F) * 2.0F);
+            // 「榨干她的经验」进度（上游 GetExpBottleEvent）
+            if (player instanceof ServerPlayer serverPlayer) {
+                InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.TAKE_MAID_XP);
+            }
         }
         return InteractionResult.SUCCESS;
     }

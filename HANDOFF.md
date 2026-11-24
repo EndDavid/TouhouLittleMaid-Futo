@@ -320,6 +320,62 @@ text 没事是因为 `Font#drawInBatch` 的顶点 z 固定是 0，天然和底�
 验证：build SUCCESSFUL、四道闸全绿、`runClient` 到主菜单无崩溃。
 观感需真人确认（我看不到屏幕）。
 
+### 进度（成就）系统：54 条全量移植（本轮 2026-11-24）
+
+用户要求「各个时候可能会触发的消息弹窗全量移植」之后，接的是进度系统。
+
+**搬了什么**：上游 **Forge 1.18.2** jar 里的 54 个 `data/.../advancements/**` 逐字复制
+（`base/` 10、`maid_base/` 25、`favorability/` 8、`challenge/` 9 = 52 条新搬，根目录那 2 条是本仓库原有的），
+外加 `textures/advancements/backgrounds/stone.png` 与 `loot_tables/advancement/{cake,power_point}.json`。
+**不需要**按 1.20.1 改写配方 id —— 本仓库配方目录就是 `recipes/altar/`，
+所以 `touhou_little_maid:altar/spawn_box` 天然对得上（1.20.1 才是 `altar_recipe/spawn_box`）。
+
+**新类**（6 个）：
+
+| 文件 | 作用 |
+|---|---|
+| `item/ItemAdvancementIcon` | 八件「只用于图标」的物品，统一名字、不进物品栏 |
+| `item/ItemEntityPlaceholder` | 「生成？？？」，NBT 里存 `RecipeId`，右键可生成配方产物 |
+| `client/model/EntityPlaceholderIconModel` | 占位物品的零厚度扁平图标（同 `PicnicBasketIconModel`） |
+| `client/renderer/item/EntityPlaceholderItemRenderer` | 按配方文件名换贴图，找不到退回 `entity_placeholder.png` |
+| `entity/passive/MaidKillRecordManager` | 四个击杀计数（总 / 史莱姆 / 凋灵 / 末影龙），写进 NBT `KillRecord` |
+| `event/MaidKillRecordEvent` | `ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY` → 交给上面那个 |
+
+**补齐 23 处触发点**（之前 `TriggerType` 里 48 个常量只有 25 个真有人打）：
+`EntityMaid`（驯服 / 雷劈 / 装备槽 / 牛奶 / 附魔金苹果 / 玻璃瓶 / 鞍 / 背包）、
+`FavorabilityManager`、`MaidFarmPlantTask`、`MaidFeedAnimalTask`、`MaidFeedOwnerTask`、
+`MaidFishingHook`、`EntityPowerPoint`、`MaidConfigPacket`（换模型 + 换任务）。
+
+**顺带修掉一个真 bug**：`EntityMaid#thunderHit` 之前只置了个 `struckByLightning` 位，
+**没有**上游那句「首次被雷劈 +20 生命上限」。补上之后 `maid_100_healthy`（要 100 生命）
+才凑得出来。同时把 `StruckByLightning` 写进 NBT —— 否则 `refreshAttributes()`
+每次读档都会把上限重建回 20，彩蛋凭空消失。
+
+**踩到的坑（都值得记）**：
+
+1. `ServerLivingEntityEvents` **不存在**于本工程的依赖里。fabric-entity-events 在这里解析到
+   **1.4.x**（1.18.2 的 fabric-api 0.76），`ServerLivingEntityEvents` 是 1.6.0+ 才加进来的。
+   等价物是 `ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY`（1.4.x 就有），
+   签名 `(ServerLevel, Entity killer, LivingEntity killed)`。
+2. `ResourceManager#getResource` 在 1.18.2 返回 `Resource` 并抛 `IOException`，
+   **没有** `Optional<Resource>` 形式 —— 只能用 `hasResource(...)`。这个坑之前在气泡那轮踩过一次。
+3. 用 Python 批量改 Java 文件时必须**探测每个文件自己的行尾**再加新行：
+   本仓库 `MaidFeedAnimalTask.java` 是 LF，同目录另外两个任务是 CRLF。
+4. 用 `grep` 验证 `TriggerType.X` 是否真有触发点时，会被**注释里的示例**骗到
+   （`MaidEventTrigger` 的 javadoc 就写着 `trigger(player, TriggerType.SWITCH_TASK)`，
+   而实际没人打）。要按「非注释行」或按文件白名单判。
+
+**仍然点不亮的一条**：`base/change_maid_sound`。它要「每只女仆各自的音效包 id」这个子系统
+（上游 `SetMaidSoundIdMessage` + `client/sound/CustomSoundLoader` + `MaidSoundPackGui`），
+本仓库只把模型的 `use_sound_pack_id` 读进了 `MaidModelInfo`，没同步到实体、也没界面。
+等做「女仆音效包」那轮再补一行判据（`TriggerType.CHANGE_MAID_SOUND` 常量已就位）。
+
+**验证**：build SUCCESSFUL；四道闸全绿；打分包里 54 个 JSON；
+`runServer` 日志 `Loaded 1195 advancements` 且**零条** `Parsing error loading custom advancement`
+（判据 id 写错只会在这一行暴露）。
+`/advancement grant` 在无玩家时只回 `No player was found`（选择器先于 id 解析），
+所以 **RCON 无法**验证进度存在性 —— 真人验收时用 `/advancement grant @s only <id>` 逐条点。
+
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；

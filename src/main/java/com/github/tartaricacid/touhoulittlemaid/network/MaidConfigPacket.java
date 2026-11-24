@@ -323,7 +323,11 @@ public final class MaidConfigPacket {
         }
         TaskManager.findTask(taskUid)
                 .filter(task -> task.isEnable(maid))
-                .ifPresent(maid::setTask);
+                .ifPresent(task -> {
+                    maid.setTask(task);
+                    // 「安排工作」进度（上游 MaidTaskMessage 在写入成功后打判据）
+                    InitTrigger.MAID_EVENT.trigger(player, TriggerType.SWITCH_TASK);
+                });
     }
 
     /**
@@ -411,6 +415,8 @@ public final class MaidConfigPacket {
             return;
         }
         maid.setModelId(modelId);
+        // 「换个模样」进度（上游 MaidModelMessage 在写入成功后打判据）
+        InitTrigger.MAID_EVENT.trigger(player, TriggerType.CHANGE_MAID_MODEL);
     }
 
     private static void handleRideable(ServerPlayer player, boolean value, int entityId) {
