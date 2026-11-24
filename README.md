@@ -4199,6 +4199,50 @@ AI 回复里的 `tts_text` 现在会被真的念出来。链路与上游一致�
 - `runServer` 启动日志：`Loaded 1195 advancements`，**零条** `Parsing error loading custom advancement`
   —— 判据 id 写错 / 字段名写错都会在这一行暴露，所以这一条是有效性证据。
 - `/advancement grant` 在无玩家时只回 `No player was found`（选择器先于 id 解析），
-  因此**无法**用 RCON 验证进度是否真的存在。
+  因此**空服时没法**用 RCON 验证进度是否存在；**有玩家在线时就可以** ——
+  本轮的修复轮用 `advancement grant Dev only touhou_little_maid:base/craft_gohei`
+  验证过，回 `Granted the advancement [advancements.touhou_little_maid.base.craft_gohei.title]`。
 - **未验证**：真人游玩下每一条进度是否真的点亮（尤其 `kill_slime_300` 这种要累计 300 次的），
   以及进度页面里九个自绘图标的观感。
+
+### 「进度页里只有三个原版标签」：1.18.2 的渐进式同步（已修复）
+
+**现象**：打开「进度」页只有「农牧业 / 冒险 / Minecraft」三个原版标签，看不到模组的「基础 / 女仆 / 好感度 / 挑战」。
+
+**这不是数据没注册**。服务端日志 `Loaded 1195 advancements`（原版 1141 + 本模组 54），零条 `Parsing error loading custom advancement`；玩家在线时 `/advancement grant Dev only touhou_little_maid:base/craft_gohei` 也能正常授予，回 `Granted the advancement [advancements.touhou_little_maid.base.craft_gohei.title]`。
+
+**根因**：1.18.2 的进度是**渐进式同步**，链路分三段：
+
+1. `PlayerAdvancements` 维护一个 `visible` 集合，只有它的元素才会被 `ClientboundUpdateAdvancementsPacket` 发给客户端；
+2. `visible` 的填充入口 `ensureAllVisible()` **只从「已完成的进度」出发**，而 `shouldBeVisible()` 又要求「自己或子树有点亮过」—— 所以一条都没点亮时，整棵树（连 root 一起）都发不出去；
+3. 客户端的标签页只由「收到的、`parent == null` 的进度」生成（`AdvancementList#add` → `onAddAdvancementRoot` → `AdvancementTab#create`）。**没同步到的 root 就等于不存在的标签页。**
+
+**用真实存档复现**：拿 2026-11-24 那次会话的玩家进度跑同一套算法的 Python 复刻（`port/sim_adv_visibility.py`，只读，不参与构建），可见集正好 **214** 条，与客户端日志的 `Loaded 214 advancements` 逐字吻合；其中可见的 root 只有 `story / adventure / husbandry` 三个 —— 正是玩家看到的三个原版标签。本模组 4 个 root 当时一个都没点亮，于是全军覆没。
+
+**为什么上游没这问题**：1.20.1 换成了 `AdvancementVisibilityEvaluator` —— 没有 parent 的节点判为 `ALWAYS_SHOW`，再配合 `VISIBILITY_DEPTH = 2`，等价于「root 及其往下两代可见」，且从 root 出发整棵树遍历。1.18.2 既没有 `ALWAYS_SHOW`，入口也不是 root。**数据文件与上游逐字相同**，所以这是版本行为差异，不是移植搬错。
+
+**修法**：新增 `mixin/PlayerAdvancementsMixin`，精确复刻 1.20.1 的规则，并且**只作用于 `touhou_little_maid` 命名空间**：
+
+- 注入 `shouldBeVisible` 的 `HEAD`：沿 parent 链向上最多 2 层，摸到本模组的 root 就返回 `true`（= 补上 `ALWAYS_SHOW`）；
+- 注入 `load` 的 `TAIL`：从本模组每个 root 出发，按同样的 2 层深度把节点写进 `visible` / `visibilityChanged`，让首次同步包把它们带上。登录与 `/reload` 都会走到 `load`，所以两条路径都覆盖。
+
+限定命名空间是必须的：原版 `minecraft:recipes/root` 有 display 却永远完不成，若对所有命名空间套用 `ALWAYS_SHOW`，进度页会凭空多出一个「配方」标签。
+
+**验证（本轮实测数字）**
+
+- 修复前：该专用服务器存档的可见集预测 **23** 条、模组 root 全部不可见；修复后预测 **63** 条（23 原版 + 40 条深度 0~2 且带 display 的模组进度）。
+- 实跑 `runServer` + `runClient -PjoinServer`，客户端日志 `Loaded 63 advancements` —— **与预测逐字吻合**。
+- RCON `reload` 之后客户端再次 `Loaded 63 advancements`，说明 `/reload` 路径也生效。
+- 零 mixin 应用失败、零 `Server informed client about progress for unknown advancement`。
+- RCON 授予两条模组进度后 `save-all`，玩家存档里正好多出这 4 条（`base/craft_gohei`、`maid_base/switch_task` 加上原本就完成的 `give_smart_slab`、`grant_book_on_first_join`）—— 说明「可见」不等于「凭空造进度」，存档没有膨胀。
+
+**修复后的观感（与上游 1.20.1 一致）**
+
+- 进度页一开始就有 4 个模组标签：基础 / 女仆 / 好感度 / 挑战。
+- 每个标签里露出 root 及其往下两代节点（未解锁的显示为灰色问号，这是 vanilla 自身行为），更深的节点要等前序完成才出现 —— 这正是 1.20.1 的 `VISIBILITY_DEPTH = 2` 语义。
+- 标签位不紧张：1.18.2 的 `AdvancementTabType` 四个方向各 8 位，共 32 位。
+
+**验证边界**
+
+- 没有做真人点击验收。自动化只能验证到「同步集里包含 4 个 root」，而 `AdvancementsScreen.init` → `setListener` → `onAddAdvancementRoot` 的链路已用字节码反汇编逐行确认（root 带 display 就会建出标签页）。
+- 更深层节点（深度 3、4，共 12 条）要等前序解锁后才可见，本轮没有逐条点亮验证。

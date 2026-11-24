@@ -16,7 +16,8 @@
     "EntityPositionRiderMixin",
     "EntityBroomPhysicalBoxMixin",
     "LivingEntityMaidBedMixin",
-    "LivingEntityAccessor"
+    "LivingEntityAccessor",
+    "PlayerAdvancementsMixin"
   ],
   "client": [
     "client.ClientPacketListenerMixin",

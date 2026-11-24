@@ -374,7 +374,41 @@ text 没事是因为 `Font#drawInBatch` 的顶点 z 固定是 0，天然和底�
 `runServer` 日志 `Loaded 1195 advancements` 且**零条** `Parsing error loading custom advancement`
 （判据 id 写错只会在这一行暴露）。
 `/advancement grant` 在无玩家时只回 `No player was found`（选择器先于 id 解析），
-所以 **RCON 无法**验证进度存在性 —— 真人验收时用 `/advancement grant @s only <id>` 逐条点。
+因此**空服时没法**用 RCON 验证进度存在性；**有玩家在线时就可以**（见下一节）。
+
+### 进度标签页不出现：1.18.2 的渐进式同步（同一轮补修，真人反馈驱动）
+
+**现象**：玩家反馈进度页里只有「农牧业 / 冒险 / Minecraft」三个原版标签。
+
+**根因（已用字节码复核）**：1.18.2 的进度是**渐进式同步**的，
+`PlayerAdvancements` 只把 `visible` 集合里的条目发给客户端；
+而 `visible` 的填充入口 `ensureAllVisible()` **只从「已完成的进度」出发**，
+`shouldBeVisible()` 又要求「自己或子树有点亮过」。客户端那边，
+标签页只由「收到的且 `parent == null`」的进度创建 —— 
+所以**没点亮任何一条时，模组 4 个 root 都不会同步，标签页就不存在**。
+
+**复现证据**：`port/sim_adv_visibility.py` 用 2026-11-24 那次会话的玩家进度
+照抄 1.18.2 的算法，算出可见集正好 **214** 条，与客户端日志 `Loaded 214 advancements` 逐字吻合；
+可见 root 正好是 story/adventure/husbandry 三个 —— 与玩家看到的三个标签完全对应。
+
+**为什么上游没有**：1.20.1 的 `AdvancementVisibilityEvaluator` 把没有 parent 的节点判为 `ALWAYS_SHOW`，
+配合 `VISIBILITY_DEPTH = 2` 等价于「root 往下两代可见」，且从 root 出发遍历。
+数据文件本身与上游逐字相同，所以这是**版本行为差异**，不是搬错。
+
+**修法**：新增 `mixin/PlayerAdvancementsMixin`（已登记进 `touhou_little_maid.mixins.json` 的 `mixins` 数组）：
+- `shouldBeVisible` HEAD 注入：沿 parent 链向上 2 层内摸到**本模组** root 就返回 true；
+- `load` TAIL 注入：从本模组每个 root 出发，按 2 层深度写入 `visible` / `visibilityChanged`。
+
+**必须限定命名空间**：原版 `minecraft:recipes/root` 有 display 却永远完不成，
+若对所有命名空间套 `ALWAYS_SHOW`，进度页会凭空多出「配方」标签。
+
+**验证**：修复前预测 63 条之前先验了 23 条基线；实跑 `runServer` + `runClient -PjoinServer` 得到
+`Loaded 63 advancements`（23 原版 + 40 条深度 0~2 且带 display 的模组进度），与预测逐字吻合；
+`/reload` 后再来一次仍是 63；零 mixin 失败；RCON 授予两条后 `save-all`，
+存档只多出这 4 条（没有因为「可见」而膨胀）。
+
+**仍未做**：真人打开进度页确认那 4 个标签的观感（自动化只验证到「4 个 root 进了同步集」，
+而 `AdvancementsScreen.init` → `setListener` → `onAddAdvancementRoot` 的链路已用反汇编逐行确认）。
 
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
