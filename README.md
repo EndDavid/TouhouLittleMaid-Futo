@@ -4408,3 +4408,119 @@ baseline 里只有两张**从没被引用**的旧贴图（`textures/entity/yukku
 - 关闭 `ReplaceSlimeModel` 的退回路径没有单独跑过（代码是直接委托给内部的 `MagmaCubeRenderer`，风险很低）。
 - 旧的两张 64×64 贴图（`textures/entity/yukkuri.png`、`textures/entity/marisa_yukkuri.png`）仍留在原地，
   目前没有任何代码引用它们。
+
+## 配方补全与 REI 联动
+
+### 先做一次盘点：真正缺的只有两条
+
+把 `InitItems` 里注册的 69 件物品与 47 条配方的产出逐一对照，再把两份上游 jar 的
+`data/touhou_little_maid/recipes/` 与之对比，结论是：
+
+| 缺口 | 1.18.2 | 1.20.1 | 处理 |
+|---|---|---|---|
+| `entity_id_copy` | 有 | 有 | **本轮补上**（物品 + 配方 + 右键行为） |
+| `altar/snack_cabinet` | **没有** | 有 | **本轮补上**（整块方块系统 + 配方） |
+
+其余 25 件「没有配方」的物品，上游本来也没有：刷怪蛋、8 件进度图标、三份魂符、
+三份残局道具、好感度工具、手办、照片、P 点、神社、替身地藏、模型切换器、
+「生成？？？」—— 它们分别靠创造物品栏、战利品、祭坛/特殊交互或干脆是内部占位物品获得。
+所以「补全配方」这件事的真实工作量就是上面两行。
+
+### `entity_id_copy`：资产早就在，只缺注册
+
+baseline 里已经有 `models/item/entity_id_copy.json`、`textures/item/entity_id_copy.png`，
+以及三条语言键（物品名 / tooltip / 复制成功提示）。缺的只有两样：
+
+1. **物品注册** —— 没有物品的配方会被数据包解析成「未知物品」整条丢弃，这也是之前那条
+   `recipes/entity_id_copy.json` 一直没补的直接原因；
+2. **右键行为** —— 上游是 Forge 的 `PlayerInteractEvent.EntityInteract`，只在该客户端执行；
+   Fabric 上换成 `UseEntityCallback`（与 `MaidClientInteractEvents` 同一套路），
+   复制 `Registry.ENTITY_TYPE.getKey(entity.getType())` 到剪贴板并在聊天栏回一行提示。
+
+返回 `SUCCESS` 而不是 `PASS` 是必须的：否则对着女仆右键会顺手把女仆界面打开。
+
+### `snack_cabinet`：1.20.1 新增方块，需要整块补
+
+它是 1.20.1 才有的内容，1.18.2 的 jar 里连类都没有。baseline 拷了它的基岩模型 / 贴图 /
+物品模型，但方块、方块实体、界面全缺 —— 于是那条祭坛配方无从落地。本轮补齐：
+
+| 文件 | 作用 |
+|---|---|
+| `block/BlockSnackCabinet` | 方块本体（`FACING` + `TYPE`，`ENTITYBLOCK_ANIMATED`） |
+| `tileentity/TileEntitySnackCabinet` | 27 格容器，带开合音效与战利品表支持 |
+| `client/renderer/tileentity/TileEntitySnackCabinetRenderer` | 基岩模型渲染（复用 `BedrockBlockModels`） |
+| `inventory/chest/SnackCabinetType` | 让隙间（无线 I/O）能把它当目标 |
+| `blockstates/` + `models/block/snack_cabinet.json` | 从上游逐字节拷（只有 particle，几何在渲染器里） |
+| `loot_tables/blocks/snack_cabinet.json` | 拆掉掉自己 |
+| `recipes/altar/snack_cabinet.json` | 从上游逐字节拷 |
+| `data/c/tags/items/glass_panes.json` | 配方要 `c:glass_panes`，仓库原来没有这个标签 |
+
+**界面不需要自己写**：27 格正好是原版六行箱子的容量，所以 `createMenu` 直接返回
+`ChestMenu.sixRows(...)`，客户端也不用注册 Screen —— 原版 `MenuScreens` 早就把
+`MenuType.GENERIC_9x3` 绑到了 `ChestScreen`（重复注册只会多一条无用表项）。
+
+**踩到的一个 1.18.2 差异**：`ContainerOpenersCounter#incrementOpeners` 在 1.18.2 只有 4 个参数，
+第 5 个（`viewDistance`）是 1.19 才加的。照抄 1.20.1 的写法会编译不过。
+
+### REI 联动
+
+移植自上游 `compat/rei/` 那 4 个类（1.18.2 与 1.20.1 的 jar 里都有，源码在 `port/upstream`）：
+
+| 类 | 作用 |
+|---|---|
+| `MaidREIClientPlugin` | 入口：注册分类 / 配方 / 折叠条目 / 排除区 |
+| `ReiAltarRecipeCategory` | 「祭坛合成」分类的画布（3×2 戒指形，160×125） |
+| `ReiAltarRecipeDisplay` | 一条配方在 REI 里的数据载体 |
+| `ReiAltarRecipeMaker` | 把 `altar_crafting` 配方全量搬进 REI |
+| `util/JERIUtil` | 配方 → 条目的公共转换（上游抽出来给 JEI/REI 共用） |
+
+**Fabric 没有 `@REIPluginClient` 注解** —— 那是 REI 的 Forge 版扫类路径用的。
+Fabric 侧走入口点：把 `MaidREIClientPlugin` 登记在 `fabric.mod.json` 的
+`"rei_client"` 入口点里，REI 启动时自己来取。没装 REI 时没有东西会取它，
+所以 **REI 是可选依赖** —— 不写进 `depends`。
+
+### 依赖：三个 jar 必须显式放上 classpath
+
+REI 8.4.778 的 `fabric.mod.json` 里**只声明了 minecraft**，但它的核心类直接引用
+`dev.architectury.platform.*`（84 个类）与 `me.shedaniel.math.*`（Point / Rectangle）。
+这两个包既不在 REI 的 jar 里，也不在它的依赖声明里，所以编译期必须自己补：
+
+- `architectury-4.12.94-fabric.jar`（1.18.2 版；工作区里现成有）
+- `basic-math-0.6.1.jar`（`me.shedaniel.math` 的 7 个类）
+
+三个 jar 都按仓库既有约定放进 `libs/` 钉死版本，用 `modCompileOnly` + 
+`modLocalRuntime`（后者只影响 `runClient`，不进最终 jar）。
+
+### 验证
+
+- `./gradlew.bat build` = BUILD SUCCESSFUL；四道闸全绿
+  （`SCANNED_FILES=1582 BAD_FILES=0`、`block entity types = 14 renderers = 12 / ALL OK`、
+  `entries=54 categories=3 problems=0`）。
+- jar 内 17 项关键产物全部就位（5 个 REI 类、2 个 entity_id_copy 类、5 个零食柜类、
+  4 份数据文件、2 份资源文件 —— 逐个核对过）。
+- **REI 真的认到了我们**：客户端日志里
+  `[REI] Registered plugin provider MaidREIClientPlugin [touhou_little_maid] for REIClientPlugin`，
+  且 `REIClientPlugin starting main-reload` 的插件列表里能看到它（优先级 0.00）。
+- **物品与配方真的存在**（RCON，有玩家在线时）：
+  `give Dev touhou_little_maid:entity_id_copy 1` → `Gave 1 [item.touhou_little_maid.entity_id_copy]`；
+  `give Dev touhou_little_maid:snack_cabinet 1` → `Gave 1 [block.touhou_little_maid.snack_cabinet]`；
+  `recipe give Dev touhou_little_maid:entity_id_copy` → `Unlocked 1 recipes`。
+- **零食柜能放、方块实体在**：`setblock ... touhou_little_maid:snack_cabinet` → `Changed the block`，
+  随后 `data get block` 读到 `Items: []` 与正确的 `id`。
+- **模型加载成功**：`[Futo] Block model snack_cabinet loaded: 3 bones, bbox y[0.000..2.000]`，
+  客户端零 `Missing texture`、零渲染异常、零 crash-report。
+
+### 验证边界
+
+- **没有做视觉验收**：REI 的祭坛分类画布长什么样、零食柜在游戏里好不好看，都要真人看。
+- `recipe give` 对祭坛配方回 `No new recipes were learned` 是**预期的** ——
+  那个命令只认原版配方书类型（crafting / smelting …），`altar_crafting` 是自定义类型、
+  本来就不进配方书。要确认祭坛配方在不在，看的是「零 `Parsing error`」与 REI 里的分类。
+- **上游还有两段 REI 功能没搬**：`registerScreens`（背包界面的「点一下切到配方」热区）与
+  `registerTransferHandlers`（把配方一键摆进工作台/熔炉背包）。它们依赖
+  `CraftingTableBackpackContainerScreen` / `FurnaceBackpackContainerScreen` ——
+  本移植版还没有那两套界面（背包目前是挂在实体上的数据容器，没有对应 GUI 与 Menu）。
+  等界面做出来，把上游那 4 行 handler 注册补回来即可，插件结构不用改。
+- 零食柜的 `TYPE` 属性（空 / 满 / 半）只做了 state 与默认值，
+  **没有实现「蹲下点顶面往上叠一个半高柜」** 那段传染逻辑。它只影响外观分层，
+  不影响「27 格能装、能开界面、能被隙间当目标」这些核心功能。

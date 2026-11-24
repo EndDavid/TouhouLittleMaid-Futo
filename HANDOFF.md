@@ -466,6 +466,77 @@ RCON 召唤 Size=3 与 Size=1 各一只，客户端零 missing texture、零渲�
 
 **没做**：视觉验收（要真人看）。关闭开关的退回路径没单独跑（直接委托，风险低）。
 
+### 配方补全 + REI 联动（同一轮续）
+
+**先盘点**：把 69 件注册物品与 47 条配方的产出逐一对照，再对比两份上游 jar，
+结论是「真正缺的只有 2 条配方」：
+
+- `entity_id_copy`（1.18.2 与 1.20.1 都有）—— 资产早就拷进来了（模型 / 贴图 / 三条语言键全在），
+  缺的只是**物品注册**与右键行为，于是那条「皮革 + 纸」的配方永远无从落地
+  （没物品的配方会被数据包丢弃）。
+- `altar/snack_cabinet`（**只有 1.20.1 有**）—— 1.18.2 的 jar 里连类都没有，
+  所以这不是「补配方」而是「补一整块方块系统」。
+
+其余 25 件没有配方的物品，上游本来也没有（刷怪蛋 / 进度图标 / 魂符 / 残局道具 /
+好感度工具 / 手办 / 照片 / P 点 / 神社 / 替身地藏 / 模型切换器 / 生成？？？）。
+
+**`entity_id_copy` 的右键行为**：上游是 Forge 的 `PlayerInteractEvent.EntityInteract`，只在客户端执行；
+Fabric 换成 `UseEntityCallback`（与 `MaidClientInteractEvents` 同一套路），
+复制 `Registry.ENTITY_TYPE.getKey(...)` 到剪贴板 + 聊天栏提示。
+**返回 SUCCESS 而不是 PASS** —— 否则对着女仆右键会顺手打开女仆界面。
+
+**`snack_cabinet` 的方块系统**：`BlockSnackCabinet`（FACING + TYPE，ENTITYBLOCK_ANIMATED）
++ `TileEntitySnackCabinet`（27 格，RandomizableContainerBlockEntity，带开合音效）
++ `TileEntitySnackCabinetRenderer`（走 BedrockBlockModels，与野餐垫同一条管线）
++ `SnackCabinetType`（登记进 ChestManager，让隙间认它）。
+另外从上游逐字节拷了 blockstates / models/block / loot_table / 配方。
+
+**界面白捡**：27 格 = 原版六行箱子，`createMenu` 返回 `ChestMenu.sixRows`，
+客户端不用注册 Screen（原版 MenuScreens 早把 GENERIC_9x3 绑到 ChestScreen 了）。
+
+**踩到的 1.18.2 差异**：`ContainerOpenersCounter#incrementOpeners` 在 1.18.2 只有 4 个参数，
+第 5 个 `viewDistance` 是 1.19 才加的 —— 照抄 1.20.1 会编译不过。
+
+**还发现一个标签缺口**：配方要 `c:glass_panes`，仓库原来没有这个标签（原版 1.18.2 也没有），
+于是补了 `data/c/tags/items/glass_panes.json`（列全 17 种玻璃板）。
+手册校验器原本为此报 `ALTAR EMPTY c: TAG`，补完 `problems` 从 2 归零。
+
+### REI 联动
+
+移植上游 `compat/rei/` 四个类 + `util/JERIUtil`（源码在 `port/upstream`，1.18.2 与 1.20.1 的 jar 都有这套）。
+
+**Fabric 没有 `@REIPluginClient` 注解** —— 那是 Forge 版扫类路径用的。
+Fabric 走入口点：把 `MaidREIClientPlugin` 登记到 `fabric.mod.json` 的 `"rei_client"`，
+REI 启动时自己来取；没装 REI 就没人取，所以 **REI 是可选的，不写进 depends**。
+
+**三个 jar 必须显式上 classpath**：REI 8.4.778 的 fabric.mod.json **只声明了 minecraft**，
+但它的核心类直接引用 `dev.architectury.platform.*`（84 个类）与 `me.shedaniel.math.*`，
+这两个包既不在 REI jar 里也没在依赖里声明。所以补了 `architectury-4.12.94-fabric.jar`
+与 `basic-math-0.6.1.jar`（都从工作区现成 jar 拷进 `libs/`，钉死版本）。
+
+**验证**：
+
+- build SUCCESSFUL；四道闸全绿（`SCANNED_FILES=1582`、`block entity types = 14 renderers = 12`、
+  `entries=54 problems=0`）。
+- **REI 真的认到了**：日志
+  `[REI] Registered plugin provider MaidREIClientPlugin [touhou_little_maid] for REIClientPlugin`，
+  且 `REIClientPlugin starting main-reload` 的插件列表里有它。
+- **物品与配方真的在**（RCON 有玩家时）：`give ... entity_id_copy` / `give ... snack_cabinet` 都成功；
+  `recipe give Dev touhou_little_maid:entity_id_copy` → `Unlocked 1 recipes`。
+- **零食柜能放**：`setblock ... snack_cabinet` → `Changed the block`，
+  `data get block` 读到 `Items: []` 与正确 id；
+  模型日志 `[Futo] Block model snack_cabinet loaded: 3 bones, bbox y[0.000..2.000]`。
+- 客户端零 missing texture、零渲染异常。
+
+**没做**：
+
+- 视觉验收（REI 画布观感、零食柜外观）。
+- 上游 REI 的 `registerScreens` / `registerTransferHandlers` 两段：
+  依赖 `CraftingTableBackpackContainerScreen` / `FurnaceBackpackContainerScreen`，
+  本移植版还没有那两套背包界面。等界面做出来补 4 行注册即可。
+- 零食柜 `TYPE`（空/满/半）的「蹲下点顶面往上叠半高柜」传染逻辑：
+  只影响外观分层，不影响 27 格容器与隙间目标功能。
+
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；

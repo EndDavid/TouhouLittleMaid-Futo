@@ -22,6 +22,9 @@
 		"client": [
 			"com.github.tartaricacid.touhoulittlemaid.client.TouhouLittleMaidFutoClient",
 			"com.github.tartaricacid.touhoulittlemaid.client.init.InitStatueClient"
+		],
+		"rei_client": [
+			"com.github.tartaricacid.touhoulittlemaid.compat.rei.MaidREIClientPlugin"
 		]
 	},
 	"mixins": [

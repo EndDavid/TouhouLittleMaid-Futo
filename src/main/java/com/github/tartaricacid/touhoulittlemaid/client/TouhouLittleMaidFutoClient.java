@@ -47,6 +47,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.screenhandler.v1.ScreenRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitMenu.PICNIC_BASKET,
                 com.github.tartaricacid.touhoulittlemaid.client.gui.item.PicnicBasketContainerScreen::new);
+        // 零食柜（1.20.1 新增）不需要在这里注册界面：
+        // 它的菜单是原版 ChestMenu.sixRows，用的是 MenuType.GENERIC_9x3，
+        // 而原版的 MenuScreens 早就把这个类型绑到了 ChestScreen —— 重复注册只会多一条无用表项。
 
         EntityRendererRegistry.register(InitEntities.EXTINGUISHING_AGENT, EntityExtinguishingAgentRenderer::new);
         EntityRendererRegistry.register(InitEntities.MAID_FISHING_HOOK, MaidFishingHookRenderer::new);
@@ -146,6 +149,13 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.init.InitItems.PICNIC_BASKET,
                 new com.github.tartaricacid.touhoulittlemaid.client.renderer.item.PicnicBasketItemRenderer());
 
+        // 零食柜（1.20.1 新增）。与野餐垫同一条基岩模型管线；
+        // 界面复用原版六行箱子 —— 27 格正好是 ChestMenu.sixRows 的容量，
+        // 所以 Screen 直接注册原版 ChestScreen，不需要自己写界面。
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SNACK_CABINET_TE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntitySnackCabinetRenderer::new);
+
         // 「生成？？？」占位物品：进度图标用它画「祭坛这条配方做出来的东西」。
         // 与野餐篮同一套 —— 烘焙一块扁平图层 + BuiltinItemRenderer 换贴图。
         // 物品本身不进创造物品栏（除了主栏里那些非物品类配方的副本）。
@@ -193,6 +203,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.TTSSystemAudioToClientPacket.initClient();
         // 对着可聊天的女仆按聊天键（默认 T）开界面
         com.github.tartaricacid.touhoulittlemaid.client.event.PressAIChatKeyEvent.init();
+        // 实体 ID 复制器：手持它右键任意实体，把注册名复制到剪贴板（上游 CopyEntityIdEvent）。
+        // 必须是客户端：剪贴板与聊天提示都是本地的东西。
+        com.github.tartaricacid.touhoulittlemaid.client.event.CopyEntityIdEvent.init();
 
 
         // 座位实体不该被看见，但必须有渲染器：未注册类型的

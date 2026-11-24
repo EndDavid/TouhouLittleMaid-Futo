@@ -1528,5 +1528,7 @@
   "gui.touhou_little_maid.button.maid_ai_chat_config.edit_custom_setting.export.clipboard": "Copied to the clipboard. Paste it under config/touhou_little_maid/settings/",
   "ai.touhou_little_maid.chat.setting.title.tip": "View / regenerate the character setting file",
   "ai.touhou_little_maid.chat.setting.regenerate.tip": "Let the model rewrite this model's setting file (never overwrites a hand-written one)",
-  "ai.touhou_little_maid.chat.setting.export.tip": "Copy the character setting body as a YAML file"
+  "ai.touhou_little_maid.chat.setting.export.tip": "Copy the character setting body as a YAML file",
+  "block.touhou_little_maid.snack_cabinet": "Snack Cabinet",
+  "block.touhou_little_maid.snack_cabinet.tip": "Storage container for items. Maids will eat block food placed on top and place block food from their inventory."
 }

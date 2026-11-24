@@ -1509,5 +1509,7 @@
   "gui.touhou_little_maid.button.maid_ai_chat_config.edit_custom_setting.export.clipboard": "已复制到剪贴板，粘贴到 config/touhou_little_maid/settings/ 下即可使用",
   "ai.touhou_little_maid.chat.setting.title.tip": "查看 / 重新生成模型包里那份角色设定",
   "ai.touhou_little_maid.chat.setting.regenerate.tip": "让模型重写当前模型的角色设定文件（不会覆盖已有的手写文件）",
-  "ai.touhou_little_maid.chat.setting.export.tip": "把角色设定正文复制成一份 yml"
+  "ai.touhou_little_maid.chat.setting.export.tip": "把角色设定正文复制成一份 yml",
+  "block.touhou_little_maid.snack_cabinet": "零食柜",
+  "block.touhou_little_maid.snack_cabinet.tip": "可以存储物品。女仆会食用放在顶部的食物方块，还会把其物品栏中的食物方块放置到上方。"
 }

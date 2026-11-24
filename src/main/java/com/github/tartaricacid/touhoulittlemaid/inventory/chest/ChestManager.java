@@ -26,6 +26,8 @@ public final class ChestManager {
         ChestManager manager = new ChestManager();
         manager.add(new VanillaChestType());
         manager.add(new BarrelChestType());
+        // 零食柜（1.20.1 新增的方块）：隙间能把它当目标往里塞食物
+        manager.add(new SnackCabinetType());
         allChestTypes = List.copyOf(allChestTypes);
     }
 
@@ -40,4 +42,3 @@ public final class ChestManager {
         allChestTypes.add(chestType);
     }
 }
-

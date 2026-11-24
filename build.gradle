@@ -99,6 +99,30 @@ dependencies {
 	// 它们不是 mod（没有 fabric.mod.json），因此用 implementation。
 	implementation files("libs/concentus-1.0.2.jar")
 	implementation files("libs/vorbis-java-core-0.8.jar")
+        // ------------------------------------------------------------------ 可选联动（REI）
+        //
+        // REI 里要能看到「祭坛合成」这一分类，靠的是我们自己写一个
+        // me.shedaniel.rei.api.client.plugins.REIClientPlugin 实现，并把它登记在
+        // fabric.mod.json 的 rei_client 入口点里 —— REI 启动时才会去找这个入口点，
+        // 没装 REI 时这段代码根本不会被加载，所以这里是可选依赖（compileOnly），
+        // 绝不写进 fabric.mod.json 的 depends。
+        //
+        // 注意 REI 8.4.778 的 jar 里没有声明对 architectury 的依赖（虽然它的核心类
+        // 直接引用 dev.architectury.platform.*），所以编译期必须把 architectury 也放上
+        // classpath，否则 javac 解析 REI 的 API 签名时会报「找不到符号」。
+        // 运行期同理：装 REI 就必须同时装 Architectury API，这是 REI 自己的要求。
+        modCompileOnly files("libs/REI-RoughlyEnoughItems-8.4.778-fabric-1.18.2.jar")
+        modCompileOnly files("libs/architectury-4.12.94-fabric.jar")
+        // basic-math：REI 的坐标类（me.shedaniel.math.Point / Rectangle）在这里。
+        // REI 把它当独立库用，但它的 jar 里既没有这 7 个类，也没有在 fabric.mod.json
+        // 里声明依赖，所以编译期必须显式放上 classpath。
+        modCompileOnly files("libs/basic-math-0.6.1.jar")
+        // modLocalRuntime：让 gradlew runClient 里真的带上 REI，用来做端到端验证。
+        // 只影响开发环境，不会进最终 jar（Loom 的 localRuntime 不参与 remapJar）。
+        modLocalRuntime files("libs/REI-RoughlyEnoughItems-8.4.778-fabric-1.18.2.jar")
+        modLocalRuntime files("libs/architectury-4.12.94-fabric.jar")
+        modLocalRuntime files("libs/basic-math-0.6.1.jar")
+
 }
 
 processResources {

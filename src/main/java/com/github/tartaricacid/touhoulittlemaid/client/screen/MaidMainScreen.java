@@ -30,6 +30,22 @@ public class MaidMainScreen extends AbstractMaidScreen<MaidMainContainer> {
         super(menu, inventory, title);
     }
 
+    /**
+     * 界面左上角的绝对 X 坐标（{@code leftPos} 是 {@code AbstractContainerScreen} 的 protected 字段）。
+     *
+     * <p>给 REI 的「排除区」用：REI 要在容器界面旁边画物品面板，需要知道本界面占了多大的屏幕区域，
+     * 才不会把自己的面板压在我们的立绘 / 槽位上。1.18.2 的原版没有 {@code getGuiLeft()} /
+     * {@code getGuiTop()}（那两个是 1.19.3 才加的），所以只能在这里开个口子。</p>
+     */
+    public int futo$guiLeft() {
+        return this.leftPos;
+    }
+
+    /** 界面左上角的绝对 Y 坐标。见 {@link #futo$guiLeft()}。 */
+    public int futo$guiTop() {
+        return this.topPos;
+    }
+
     @Override
     protected int getCurrentTab() {
         return TabIndex.MAIN;
@@ -58,4 +74,3 @@ public class MaidMainScreen extends AbstractMaidScreen<MaidMainContainer> {
         }
     }
 }
-

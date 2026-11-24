@@ -576,6 +576,30 @@ public final class InitItems {
             TouhouLittleMaid.rl("entity_placeholder"),
             new com.github.tartaricacid.touhoulittlemaid.item.ItemEntityPlaceholder());
 
+    /**
+     * 实体 ID 复制器（上游 {@code InitItems.ENTITY_ID_COPY}）。
+     *
+     * <p>贴图 / 模型 / 语言键在 baseline 里就存在，缺的只是注册 —— 于是
+     * {@code recipes/entity_id_copy.json}（皮革 + 纸）一直没能补上：
+     * 没有物品的配方会被数据包解析成「未知物品」并整条丢弃。</p>
+     */
+    public static final Item ENTITY_ID_COPY = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("entity_id_copy"),
+            new com.github.tartaricacid.touhoulittlemaid.item.ItemEntityIdCopy());
+
+    /**
+     * 零食柜（上游 1.20.1 的 {@code InitItems.SNACK_CABINET}）。
+     *
+     * <p>它是 1.20.1 新增的方块，1.18.2 没有。物品模型 baseline 里已有
+     * （{@code models/item/snack_cabinet.json} 与 {@code snack_cabinet_in_hand.json}），
+     * 缺的只是方块与物品注册 —— 于是 {@code recipes/altar/snack_cabinet.json} 一直无从落地。</p>
+     */
+    public static final Item SNACK_CABINET = Registry.register(Registry.ITEM,
+            TouhouLittleMaid.rl("snack_cabinet"),
+            new net.minecraft.world.item.BlockItem(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SNACK_CABINET,
+                    new FabricItemSettings().tab(MAIN_TAB)));
+
     private static Item registerAdvancementIcon(String name) {
         return Registry.register(Registry.ITEM, TouhouLittleMaid.rl(name),
                 new com.github.tartaricacid.touhoulittlemaid.item.ItemAdvancementIcon());
