@@ -74,3 +74,4 @@ public class MaidMainScreen extends AbstractMaidScreen<MaidMainContainer> {
         }
     }
 }
+

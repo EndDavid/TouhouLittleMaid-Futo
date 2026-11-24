@@ -91,6 +91,8 @@ dependencies {
 	// 这里直接从上游 Forge jar 的 META-INF/jarjar 里解出来放进 libs/，
 	// 与 night-config 的做法一致：离线可用、版本钉死。
 	// 它不是一个 mod（没有 fabric.mod.json），所以用 implementation 而不是 modImplementation。
+	// 注意：implementation 只把它们放进开发环境的 runtimeClasspath，**不会**进产物 jar ——
+	// 真正让它们进 jar 的是本文件末尾 jar { from(zipTree(...)) } 那三段。
 	implementation files("libs/snakeyaml-2.4.jar")
 	// concentus：纯 Java 的 Opus 解码器（上游 Forge 版通过 JiJ 内嵌 1.0.2）。
 	// vorbis-java-core：拆 ogg 容器，负责把 opus 的音频包一个个喂给 concentus。
@@ -178,6 +180,41 @@ java {
 
 jar {
 	inputs.property "archivesName", project.base.archivesName
+
+	// ------------------------------------------------------------------
+	// 把三个「纯 Java、且不是 mod」的库合并进主 jar。
+	//
+	// 为什么必须这样：`implementation files(...)` 只把它们放到 Gradle 的
+	// runtimeClasspath 上 —— 也就是**只对 `gradlew runClient` 有效**。产出的 jar
+	// 里没有它们，玩家把 jar 丢进自己的 mods 目录后会在启动阶段炸：
+	//
+	//   java.lang.NoClassDefFoundError: org/yaml/snakeyaml/Yaml
+	//       at ...ai.manager.setting.AvailableSites.readSites
+	//       at ...config.subconfig.AIConfig.init
+	//
+	// 也不能改用 Loom 的 `include`：那会把 jar 塞进 META-INF/jars 交给 Fabric Loader
+	// 当作**独立 mod** 加载，而这三个 jar 里都没有 fabric.mod.json，加载器会拒绝。
+	// 所以直接把类合并进来。
+	//
+	// 排除项只留「合并后会坏掉」的那几类：
+	//   - MANIFEST / 签名：多个 MANIFEST 合并没有意义，签名与合并后的内容也不再匹配；
+	//   - module-info：snakeyaml 带 META-INF/versions/9/module-info.class（multi-release），
+	//     而本 jar 的 MANIFEST 没有 Multi-Release: true，留着反而可能被误解析。
+	// META-INF/maven/**（里面有各自的 pom 与 LICENSE）**不排除** —— 那是版权声明。
+	// ------------------------------------------------------------------
+	from(zipTree("libs/snakeyaml-2.4.jar")) {
+		exclude 'META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+		exclude 'META-INF/versions/**', 'module-info.class'
+	}
+	from(zipTree("libs/concentus-1.0.2.jar")) {
+		exclude 'META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+		exclude 'META-INF/versions/**', 'module-info.class'
+	}
+	from(zipTree("libs/vorbis-java-core-0.8.jar")) {
+		exclude 'META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+		exclude 'META-INF/versions/**', 'module-info.class'
+	}
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 // ---------------------------------------------------------------------------

@@ -21,7 +21,13 @@ $want = @(
     'assets/touhou_little_maid/textures/item/spawn_box.png',
     'assets/touhou_little_maid/textures/item/camera.png',
     'com/github/tartaricacid/touhoulittlemaid/client/resource/BedrockBlockModels.class',
-    'com/github/tartaricacid/touhoulittlemaid/client/renderer/tileentity/GeoBlockRenderer.class'
+    'com/github/tartaricacid/touhoulittlemaid/client/renderer/tileentity/GeoBlockRenderer.class',
+    # 这三个是「纯 Java、且不是 mod」的库，靠 jar { from(zipTree(...)) } 合并进来。
+    # 它们缺失过一次：jar 装进正式实例后直接 NoClassDefFoundError 崩在入口点阶段，
+    # 而 runClient 永远发现不了（Gradle 把它们放在开发环境的 classpath 上）。
+    'org/yaml/snakeyaml/Yaml.class',
+    'io/github/jaredmdobson/concentus/OpusDecoder.class',
+    'org/gagravarr/ogg/OggFile.class'
 )
 foreach ($w in $want) {
     $e = $z.Entries | Where-Object { $_.FullName -eq $w }
@@ -39,4 +45,3 @@ $z.Dispose()
 
 [System.IO.File]::WriteAllText($out, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
 Write-Host 'checked'
-

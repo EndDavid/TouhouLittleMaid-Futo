@@ -4524,3 +4524,83 @@ REI 8.4.778 的 `fabric.mod.json` 里**只声明了 minecraft**，但它的核�
 - 零食柜的 `TYPE` 属性（空 / 满 / 半）只做了 state 与默认值，
   **没有实现「蹲下点顶面往上叠一个半高柜」** 那段传染逻辑。它只影响外观分层，
   不影响「27 格能装、能开界面、能被隙间当目标」这些核心功能。
+
+## 装进正式实例：两处「开发环境能跑、真 jar 崩」的坑
+
+用户把 jar 丢进 HMCL 实例后客户端在**入口点阶段**就崩（附带的崩溃报告：
+`minecraft-exported-crash-info-2026-11-24T22-24-42.zip`）。这类问题的共同点是
+**`gradlew runClient` 永远发现不了** —— 那里 classpath 由 Gradle 拼、资源是
+`build/resources/main` 的真实目录。修了两处。
+
+### 1. 纯 Java 库根本没进 jar
+
+```
+Caused by: java.lang.NoClassDefFoundError: org/yaml/snakeyaml/Yaml
+    at ...ai.manager.setting.AvailableSites.readSites
+    at ...config.subconfig.AIConfig.init
+```
+
+`snakeyaml` / `concentus` / `vorbis-java-core` 三个库一直是用
+`implementation files("libs/...")` 引入的。`implementation` **只把它们放到 Gradle 的
+runtimeClasspath 上**，也就是只对开发环境有效，`remapJar` 不会带上它们。
+
+为什么不能改用 Loom 的 `include`：那会把 jar 塞进 `META-INF/jars` 交给 Fabric Loader
+当作**独立 mod** 加载，而这三个 jar 里都没有 `fabric.mod.json`，加载器会直接拒绝。
+
+所以现在在 `jar` task 里用 `from(zipTree(...))` 把三个库的类直接合并进主 jar，只排除
+「合并后会坏掉」的那几类（`MANIFEST` / 签名 / `module-info`），`META-INF/maven/**`
+（内含各自 pom 与 LICENSE）**保留** —— 那是版权声明。
+
+产物因此从 39.7 MB 变成 40.6 MB。
+
+### 2. 遍历 jar 内资源时调了 `Path#toFile()`
+
+```
+Caused by: java.lang.UnsupportedOperationException
+    at jdk.zipfs/jdk.zipfs.ZipPath.toFile
+    at ...ai.manager.setting.SettingReader$1.visitFile(SettingReader.java:161)
+```
+
+`SettingReader#readConfigSetting` 用 `Files.walkFileTree` 扫
+`ModContainer#findPath("assets")/.../settings/*.yml`，然后对每个文件调 `file.toFile()`。
+在开发环境里那是真实目录，能 `toFile()`；**装进实例后这些路径位于模组 jar 内部（zipfs）**，
+`ZipPath#toFile()` 直接抛 `UnsupportedOperationException`。
+
+改成 `Files.newInputStream(file)`（`CharacterSetting` 本来就有 `InputStream` 构造器）。
+顺手把 `readCustomPack` 里的 `folder.toFile().isDirectory()` 换成 `Files.isDirectory(folder)`。
+
+### 验证方式（这次真的在正式实例里启动过）
+
+不能只用 `runClient` 验证。这次是**直接拿用户实例的启动命令跑**：
+
+1. `port/deploy-jar.ps1` 把新 jar 拷进 `D:\MCHMCL\.minecraft\versions\1.18.2-Fabric-test\mods`
+   （旧 jar 自动备份到同级的 `mods_backup_tlm`，sha256 双向校验）；
+2. 用工单里那份 `launch.bat` 的完整命令行启动 —— 注意 HMCL 导出的命令里
+   access token 是 `<access token>` 占位符，**尖括号会被 cmd 当成重定向**，
+   必须先替换成合法 token，否则会得到「系统找不到指定的文件」而不是真正的崩溃；
+3. 轮询该实例的 `logs/latest.log`。
+
+结果：日志出现 `Sound engine started`，且
+
+```
+[Futo] AI sites in use: 0 chat / 1 tts (enabled only)     <- snakeyaml 读到了 available_sites.yml
+[Futo] loaded 6 character settings for AI chat            <- SettingReader 读到了 jar 内 6 份 yml
+[Futo] Touhou Little Maid initialized.
+```
+
+`NoClassDefFoundError` / `UnsupportedOperationException` / `Could not execute entrypoint`
+全部为零。之后用 PID 精确关掉了这次启动的客户端（只匹配
+`1.18.2-Fabric-test` + `KnotClient`，不碰其它 java 进程）。
+
+### 仍然需要用户自己装的模组
+
+| 模组 | 原因 |
+|---|---|
+| Fabric API | `depends` 已声明 |
+| ForgeConfigAPIPort | `depends` 已声明（它自带 night-config） |
+| Cloth Config | `suggests`；不装则没有配置界面 |
+| Patchouli | `suggests`；不装则没有手册（也会有下载提示） |
+| REI + Architectury | 都装了才会点亮「祭坛合成」分类 |
+
+**不再需要**额外放 snakeyaml / concentus / vorbis —— 它们现在在 jar 里。
+

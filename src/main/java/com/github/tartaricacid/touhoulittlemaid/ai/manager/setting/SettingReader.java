@@ -125,7 +125,9 @@ public final class SettingReader {
     }
     public static void readCustomPack(Path rootPath, String domain) {
         Path folder = rootPath.resolve("assets").resolve(domain).resolve(SETTING_FOLDER_NAME);
-        if (!folder.toFile().isDirectory()) {
+        // 用 Files.isDirectory 而不是 folder.toFile().isDirectory()：当 rootPath 位于
+        // 一个 jar 内（zipfs）时，Path#toFile 会抛 UnsupportedOperationException。
+        if (!Files.isDirectory(folder)) {
             return;
         }
         try {
@@ -158,8 +160,15 @@ public final class SettingReader {
             public FileVisitResult visitFile(@NotNull Path file, BasicFileAttributes attributes) throws IOException {
                 String fileName = file.getFileName().toString();
                 if (fileName.endsWith(YAML_SUFFIX)) {
-                    CharacterSetting setting = new CharacterSetting(file.toFile());
-                    setting.getModelId().forEach(id -> SETTINGS.put(id, setting));
+                    // 必须走 InputStream，不能 file.toFile()：
+                    // 生产环境的设置文件在 *模组 jar 内部*（readBuiltinSettings 扫的是
+                    // ModContainer#findPath("assets")），那里的 Path 是 jdk.zipfs 的 ZipPath，
+                    // 对它调 toFile() 会直接抛 UnsupportedOperationException —— 表现为
+                    // 「开发环境能启动、把 jar 丢进正式实例就崩在 entrypoint」。
+                    try (InputStream stream = Files.newInputStream(file)) {
+                        CharacterSetting setting = new CharacterSetting(stream);
+                        setting.getModelId().forEach(id -> SETTINGS.put(id, setting));
+                    }
                 }
                 return super.visitFile(file, attributes);
             }

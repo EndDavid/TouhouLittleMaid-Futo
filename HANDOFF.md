@@ -537,6 +537,75 @@ REI 启动时自己来取；没装 REI 就没人取，所以 **REI 是可选的�
 - 零食柜 `TYPE`（空/满/半）的「蹲下点顶面往上叠半高柜」传染逻辑：
   只影响外观分层，不影响 27 格容器与隙间目标功能。
 
+### 装进正式实例崩在入口点（本轮，用户提供崩溃报告）
+
+用户把 jar 丢进 HMCL 实例（`D:\MCHMCL\.minecraft\versions\1.18.2-Fabric-test`）后
+客户端在**入口点阶段**就崩。报告：
+`D:\MCHMCL\minecraft-exported-crash-info-2026-11-24T22-24-42.zip`。
+
+**共同点：`gradlew runClient` 永远发现不了** —— 那里 classpath 由 Gradle 拼、
+资源是 `build/resources/main` 的真实目录。修了两处，都是这一类。
+
+**坑 1：三个纯 Java 库根本没进 jar**
+
+```
+NoClassDefFoundError: org/yaml/snakeyaml/Yaml
+    at ...ai.manager.setting.AvailableSites.readSites
+    at ...config.subconfig.AIConfig.init
+```
+
+`snakeyaml` / `concentus` / `vorbis-java-core` 一直是 `implementation files(...)`。
+`implementation` 只把它们放到 Gradle 的 runtimeClasspath 上，**remapJar 不带它们**。
+
+不能用 Loom 的 `include`：那会把 jar 塞进 `META-INF/jars` 当**独立 mod** 加载，
+而这三个 jar 都没有 `fabric.mod.json`，加载器会拒绝。
+
+改法：`jar { from(zipTree("libs/...")) }` 三段直接合并类进主 jar，
+只排除 MANIFEST / 签名 / `module-info`；`META-INF/maven/**` 保留（版权声明）。
+产物 39.7 MB → 40.6 MB。
+
+**坑 2：遍历 jar 内资源时调了 `Path#toFile()`**
+
+```
+UnsupportedOperationException
+    at jdk.zipfs.ZipPath.toFile
+    at ...SettingReader$1.visitFile(SettingReader.java:161)
+```
+
+`SettingReader#readConfigSetting` 扫 `ModContainer#findPath("assets")/.../settings/*.yml`
+后对每个文件调 `file.toFile()`。开发环境是真实目录，能过；**装进实例后这些路径在
+模组 jar 内部（zipfs）**，`ZipPath#toFile()` 直接抛异常。
+
+改成 `Files.newInputStream(file)`（`CharacterSetting` 本来就有 InputStream 构造器），
+顺手把 `readCustomPack` 里的 `folder.toFile().isDirectory()` 换成 `Files.isDirectory(folder)`。
+
+**验证方式很关键：必须真的在正式实例里启动**
+
+`runClient` 不算验证。这次是：
+
+1. `port/deploy-jar.ps1` 拷进实例 mods（旧 jar 自动备份到 `mods_backup_tlm` + sha256 校验）；
+2. 用工单里 `launch.bat` 的完整命令行启动 —— **注意 HMCL 导出的命令里 access token
+   是 `<access token>` 占位符，尖括号会被 cmd 当成重定向**，不替换只会得到
+   「系统找不到指定的文件」，看不到真正的崩溃；
+3. 轮询该实例的 `logs/latest.log`。
+
+结果：`Sound engine started` 出现，且
+
+```
+[Futo] AI sites in use: 0 chat / 1 tts (enabled only)   <- snakeyaml 读到 available_sites.yml
+[Futo] loaded 6 character settings for AI chat          <- SettingReader 读到 jar 内 6 份 yml
+[Futo] Touhou Little Maid initialized.
+```
+
+`NoClassDefFoundError` / `UnsupportedOperationException` / `Could not execute entrypoint`
+全零。之后按 PID 精确关掉（匹配 `1.18.2-Fabric-test` + `KnotClient`，不碰其它 java）。
+
+**闸门**：`port/check-jar.ps1` 的 `$want` 里加了这三个类，将来再漏会直接报 `MISSING`。
+
+**不需要用户额外装的**：snakeyaml / concentus / vorbis（已在 jar 内）。
+仍需自装：Fabric API、ForgeConfigAPIPort（depends），Cloth Config、Patchouli（suggests），
+REI + Architectury（要「祭坛合成」分类才需要）。
+
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；
