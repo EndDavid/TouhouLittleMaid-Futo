@@ -4246,6 +4246,7 @@ AI 回复里的 `tts_text` 现在会被真的念出来。链路与上游一致�
 
 - 没有做真人点击验收。自动化只能验证到「同步集里包含 4 个 root」，而 `AdvancementsScreen.init` → `setListener` → `onAddAdvancementRoot` 的链路已用字节码反汇编逐行确认（root 带 display 就会建出标签页）。
 - 更深层节点（深度 3、4，共 12 条）要等前序解锁后才可见，本轮没有逐条点亮验证。
+
 ## 史莱姆换成灵梦油库里（材质按上游 1.20.1 重绘后的那张）
 
 原版史莱姆被替换成「灵梦油库里」。上游 1.20.1 在这次替换里**重画了贴图**，本轮把那张新图搬了过来。
@@ -4327,8 +4328,83 @@ baseline 里只有两张**从没被引用**的旧贴图（`textures/entity/yukku
 
 - **没有做视觉验收**。自动化只能证明「渲染器构造成功 + 贴图存在且路径正确 + 无缺失贴图警告」，
   证明不了「画面里那只油库里长得对」。这一条要真人进游戏看。
-- **岩浆怪（MagmaCube）那套没做**。上游 1.20.1 把它换成了 `marisa_yukkuri`，但那次不只是换材质：
-  贴图从 64×64 变成 **128×128**，几何 UV 全换（(45,16)、(0,42)……），与 1.18.2 的手写网格**不兼容**。
-  要移植它，必须先有实体 bedrock 模型加载器。属于下一个特性，本轮刻意不做。
+- **岩浆怪那一半已于后续一轮补齐**（见下一节）。它不能照抄手写网格，改走 bedrock JSON。
 - 旧的 `textures/entity/yukkuri.png` 与 `textures/entity/marisa_yukkuri.png` 留在原地未删（上游 1.20.1 也把它们
   留在 `legacy_pack` 里）；目前没有任何代码引用它们。
+
+## 岩浆怪换成魔理沙油库里（直接吃上游 1.20.1 的基岩模型）
+
+史莱姆那一半是「换材质」，这一半是**换整套外观**，所以实现方式也不同。
+
+### 为什么不能照抄手写网格
+
+| | 1.18.2 | 1.20.1（本实现） |
+|---|---|---|
+| 贴图 | 64×64（2520 B） | **128×128**（1753 B） |
+| 几何 | 手写 `LayerDefinition`，9 根骨骼 | `marisa_yukkuri.json`，14 个 bone |
+| UV | (0,18) / (46,14) / (0,49) / (48,0) … | (45,16) / (45,33) / (0,42) / (0,61) / (64,33) … **全换** |
+
+史莱姆那两版是「逐盒等价、只重画贴图」，所以能照抄 1.18.2 的网格贴 1.20.1 的图。
+岩浆怪不是：UV 一个都对不上，手写网格等于把 JSON 手工重排一遍，抄错一个 uv 就是贴图错位、而且极难定位。
+
+### 做法：复用仓库已有的 geckolib 管线
+
+新增 `client/resource/BedrockEntityModels`，读 `models/bedrock/entity/<name>.json`。
+它和 `BedrockBlockModels`（方块）用的是同一条管线：
+
+`Converter.fromJsonString` → `RawGeometryTree#parseHierarchy` → `GeoBuilder#constructGeoModel` → `AnimatedGeoModel`
+
+这套管线只处理几何，不读 `geometry.<identifier>`、也不要求有动画，所以「方块」与「实体」的唯一区别就是目录。
+渲染走 `GeoBlockRenderer.render(...)`（内部是 `renderRecursively`），几何与贴图都保持上游原样。
+
+**坐标不需要额外换算**，这一点值得写下来，因为很容易想歪：
+
+- `GeoCube` 构造时已经把 texel 除以 16、并把 x 轴翻成 Minecraft 方向；
+- **cube 的 `origin` 是绝对模型坐标，不是相对于 bone 的 pivot** —— pivot 只用于绕点旋转；
+- y 轴两边同向（向上），所以模型画出来的位置就是 JSON 里写的绝对位置。
+
+按这条规则量出来：y ∈ [−0.13, 1.09]、x ∈ [−0.44, 0.44]、z ∈ [−0.43, 0.45]（单位：格），
+底面就在脚底平面上，**不需要竖直平移**。
+
+### 为什么继承 `EntityRenderer` 而不是 `MobRenderer`
+
+`LivingEntityRenderer#render` 会给矩阵栈套上 `scale(-1, -1, 1)` 和 `translate(0, -1.501, 0)`，
+那是给「y 向下」的原版 `EntityModel` 准备的。基岩几何是 y 向上、原点在脚底，直接画会上下颠倒。
+
+想用 `MobRenderer` 就得在 `renderToBuffer` 里做逆变换，而那个逆变换依赖 `scale()` 算出来的压缩比例
+（每个 tick 都随 `squish` 变化），**无法静态抵消**。
+
+`EntityRenderer#render` 拿到的矩阵栈只有「平移到实体脚下」，正是基岩几何要的坐标系 ——
+女仆渲染器（`GeoReplacedEntityRenderer`）也是这么绕开 `LivingEntityRenderer` 的。
+
+阴影不受影响：它由 `EntityRenderDispatcher` 按渲染器的 `shadowRadius` / `shadowStrength` 绘制，
+与是否继承 `MobRenderer` 无关（已用 javap 在 1.18.2 的 `EntityRenderDispatcher` 里确认调用点在 dispatcher 而不是 render 内部）。
+
+### 其余行为
+
+- `getBlockLightLevel` 恒为 15 —— 岩浆怪自发光，上游那半个渲染器也这么写；
+- `shadowRadius = 0.25 * size`，跟着体型走；
+- `squish` 形变逐字照抄原版 `SlimeRenderer#scale`（先 `scale(0.999)`，再按 `squish / (size*0.5+1)` 算压缩），
+  所以弹跳手感与原版一致；
+- `ReplaceSlimeModel = false`、或模型文件缺失/解析失败时，一律**退回原版** `MagmaCubeRenderer` ——
+  宁可画成普通岩浆怪，也不要让它凭空消失。
+
+### 验证
+
+- `./gradlew.bat build` = BUILD SUCCESSFUL；四道闸全绿（`SCANNED_FILES=1563 BAD_FILES=0`、
+  `entity types = 11 renderers = 11 / ALL OK`、`entries=54 problems=0`）。
+- jar 里 `EntityMarisaYukkuriSlimeRender.class`、`BedrockEntityModels.class`、
+  `models/bedrock/entity/marisa_yukkuri.json`、`textures/bedrock/entity/marisa_yukkuri.png` 都在，
+  且 class 常量池里的贴图路径与模型名与文件逐字相同。
+- 客户端启动日志出现 `[Futo] Entity bedrock model marisa_yukkuri loaded: 13 bones` ——
+  这是资源重载时的**预热**打出来的，说明 JSON 在启动阶段就解析成功（不是等召唤时才试）。
+- `runServer` + `runClient -PjoinServer`，用 RCON 召唤 `{Size:3}` 与 `{Size:1}` 两只岩浆怪：
+  客户端**零** `Missing texture` / `Unable to load`、零渲染异常、零 crash-report。
+
+### 验证边界
+
+- **没有做视觉验收**。自动化只证明到「模型解析成功 + 贴图存在且路径正确 + 渲染无异常」，
+  证明不了「画面里那只魔理沙油库里朝向、比例都对」。这一条要真人进游戏看。
+- 关闭 `ReplaceSlimeModel` 的退回路径没有单独跑过（代码是直接委托给内部的 `MagmaCubeRenderer`，风险很低）。
+- 旧的两张 64×64 贴图（`textures/entity/yukkuri.png`、`textures/entity/marisa_yukkuri.png`）仍留在原地，
+  目前没有任何代码引用它们。

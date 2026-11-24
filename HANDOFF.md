@@ -433,8 +433,38 @@ text 没事是因为 `Font#drawInBatch` 的顶点 z 固定是 0，天然和底�
 `runServer` + `runClient -PjoinServer` 后用 RCON summon 史莱姆，
 客户端零 `Missing texture` 警告、零渲染异常（史莱姆还能把玩家打死，说明确实在 tick）。
 
-**没做**：视觉验收（要真人看）；岩浆怪那套（上游 1.20.1 换成 128x128 新几何，与手写网格不兼容，
-需要先有实体 bedrock 模型加载器）。旧的两张图留在原地不删（上游也留在 legacy_pack 里）。
+**没做**：视觉验收（要真人看）。旧的两张图留在原地不删（上游也留在 legacy_pack 里）。
+岩浆怪那一半见下一节。
+
+### 岩浆怪换成魔理沙油库里：直接吃上游 1.20.1 的基岩模型（同一轮续）
+
+**为什么不能照抄手写网格**：史莱姆那两版是「逐盒等价 + 只重画贴图」，岩浆怪不是 ——
+贴图 64x64 → **128x128**，UV 全换（(0,18) → (45,16)、(46,14) → (45,33)、(0,49) → (0,0)…），
+骨骼 9 根 → 14 个 bone。手写网格等于把 JSON 手工重排一遍，抄错一个 uv 就是贴图错位且极难定位。
+
+**做法**：新增 `client/resource/BedrockEntityModels`（读 `models/bedrock/entity/<name>.json`），
+复用仓库已有的 geckolib 管线（`Converter` → `RawGeometryTree` → `GeoBuilder` → `AnimatedGeoModel`），
+渲染走 `GeoBlockRenderer.render(...)`。与 `BedrockBlockModels` 的唯一区别就是目录。
+
+**坐标不用换算**（很容易想歪，记下来）：`GeoCube` 已经把 texel 除以 16 并翻转 x 轴；
+**cube 的 `origin` 是绝对坐标，不是相对 bone pivot**（pivot 只用于绕点旋转）；
+y 轴两边同向。实测量出 y ∈ [−0.13, 1.09]、x ∈ [−0.44, 0.44]、z ∈ [−0.43, 0.45]，底面就在脚底，不需要平移。
+
+**必须继承 `EntityRenderer` 而不是 `MobRenderer`**：`LivingEntityRenderer#render`
+会套 `scale(-1,-1,1)` + `translate(0,-1.501,0)`（给 y 向下的原版 EntityModel 用），
+而基岩几何是 y 向上。想在 `renderToBuffer` 里抵消它也不行 —— 那个变换依赖 `scale()`
+算出的压缩比（每 tick 随 squish 变）。`EntityRenderer#render` 拿到的栈只有「平移到脚下」，正好合用；
+女仆渲染器（`GeoReplacedEntityRenderer`）也是这么绕开的。阴影不受影响：
+javap 确认 1.18.2 的 `EntityRenderDispatcher.render` 自己按 `shadowRadius` 画，不在 render 内部。
+
+**行为**：`getBlockLightLevel` 恒 15（自发光，同上游）；`shadowRadius = 0.25*size`；
+squish 形变照抄原版 `SlimeRenderer#scale`；开关关闭 / 模型缺失时**退回原版** `MagmaCubeRenderer`。
+
+**验证**：build SUCCESSFUL；四道闸全绿；jar 里两个 class + JSON + 贴图都在，class 常量池路径逐字一致；
+客户端启动日志 `[Futo] Entity bedrock model marisa_yukkuri loaded: 13 bones`（资源重载预热时就成功）；
+RCON 召唤 Size=3 与 Size=1 各一只，客户端零 missing texture、零渲染异常。
+
+**没做**：视觉验收（要真人看）。关闭开关的退回路径没单独跑（直接委托，风险低）。
 
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）

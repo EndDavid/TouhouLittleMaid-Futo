@@ -68,6 +68,12 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.client.model.EntityYukkuriModel::createBodyLayer);
         EntityRendererRegistry.register(net.minecraft.world.entity.EntityType.SLIME,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityYukkuriSlimeRender::new);
+        // 岩浆怪同理换成「魔理沙油库里」。这一版几何与贴图都是上游 1.20.1 的基岩模型
+        // （128x128、14 根骨骼，与 1.18.2 的手写网格不兼容），因此不需要烘焙模型层 ——
+        // 几何在首次渲染时由 BedrockEntityModels 从 JSON 读入。
+        EntityRendererRegistry.register(net.minecraft.world.entity.EntityType.MAGMA_CUBE,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityMarisaYukkuriSlimeRender::new);
+
         // 原版物品图标替换：附魔之瓶 → 蓝色「点」、不死图腾 → 「命点」
         // （上游 1.20.1 的 InitSpecialItemRender，走 Fabric 的 ModelVariantProvider）
         com.github.tartaricacid.touhoulittlemaid.client.init.InitSpecialItemRender.init();
@@ -344,6 +350,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                         com.github.tartaricacid.touhoulittlemaid.client.renderer.ai.IconTextureSizes.clear();
                         // 方块基岩模型同样要丢缓存，否则资源包换了模型还在用旧的
                         com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.clear();
+                        // 实体基岩模型（岩浆怪的油库里）同理：几何与贴图是一起换的
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockEntityModels.clear();
+
                         // 预热两个方块模型：首次渲染时再加载会卡一帧，而且模型写错
                         // 只会在「方块看不见」这种很难定位的现象里暴露，这里提前解析一遍，
                         // 失败会打 error 日志（BedrockBlockModels#load 里）。
@@ -359,6 +368,10 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                         com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("wchess_pieces");
                         // 坐垫模型必须【在女仆模型之后】加载：GeckoLibCache 在上面那行被整体清空过
                         com.github.tartaricacid.touhoulittlemaid.client.resource.ChairModelLoader.reload();
+                        // 岩浆怪的油库里模型也预热：JSON 写错只会在「岩浆怪看不见」这种
+                        // 很难定位的现象里暴露，这里提前解析一遍，失败会打 error 日志。
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockEntityModels.get("marisa_yukkuri");
+
                     }
 
                 });
