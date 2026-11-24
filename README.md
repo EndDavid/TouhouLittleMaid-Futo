@@ -4246,3 +4246,89 @@ AI 回复里的 `tts_text` 现在会被真的念出来。链路与上游一致�
 
 - 没有做真人点击验收。自动化只能验证到「同步集里包含 4 个 root」，而 `AdvancementsScreen.init` → `setListener` → `onAddAdvancementRoot` 的链路已用字节码反汇编逐行确认（root 带 display 就会建出标签页）。
 - 更深层节点（深度 3、4，共 12 条）要等前序解锁后才可见，本轮没有逐条点亮验证。
+## 史莱姆换成灵梦油库里（材质按上游 1.20.1 重绘后的那张）
+
+原版史莱姆被替换成「灵梦油库里」。上游 1.20.1 在这次替换里**重画了贴图**，本轮把那张新图搬了过来。
+
+### 上游到底改了什么
+
+| | 1.18.2 Forge | 1.20.1（Fabric / Forge 一致） |
+|---|---|---|
+| 史莱姆贴图 | `textures/entity/yukkuri.png`（2520 B） | `textures/bedrock/entity/reimu_yukkuri.png`（1917 B，**重绘**） |
+| 岩浆怪贴图 | `textures/entity/marisa_yukkuri.png`（2520 B，64×64） | `textures/bedrock/entity/marisa_yukkuri.png`（1753 B，**128×128，几何也换了**） |
+| 模型 | 手写 `LayerDefinition` | `models/bedrock/entity/*.json` |
+
+史莱姆那张是**纯材质改动**：尺寸仍是 64×64，UV 布局一个字节都没动，只有内容被重画。
+用 `port/CmpPng.java`（JDK `ImageIO`，不依赖 PIL）逐像素比对：
+**4096 个像素里有 577 个不同（14.1%）**，差异分布在整个上半身，alpha 覆盖率不变（1072 个非透明像素）。
+
+### 本仓库原有状态
+
+baseline 里只有两张**从没被引用**的旧贴图（`textures/entity/yukkuri.png`、
+`marisa_yukkuri.png`），以及一个**只定义没接线**的配置项：
+@code 块里写着「尚未移植」，`VanillaConfig.REPLACE_SLIME_MODEL` 在整个 `src/main/java` 里搜不到第二处。
+也就是说这次不是「改材质」，而是**把整个替换层接上，并且用上游的新材质**。
+
+### 实现
+
+| 文件 | 作用 |
+|---|---|
+| `client/model/EntityYukkuriModel` | 灵梦油库里的网格（照抄上游 1.18.2 的 `LayerDefinition`） |
+| `client/renderer/entity/EntityYukkuriSlimeRender` | 覆盖原版 `EntityType.SLIME` 的渲染器，贴图指向 1.20.1 的新图 |
+| `textures/bedrock/entity/reimu_yukkuri.png` | 上游 1.20.1 重绘的那张（1917 B） |
+| `VanillaConfig#replaceSlimeModel()` | 把原本没接线的开关接上，关掉就退回原版 `SlimeRenderer` |
+
+注册照抄仓库里经验球替换那套（`TouhouLittleMaidFutoClient`）：先 `EntityModelLayerRegistry.registerModelLayer`，
+再 `EntityRendererRegistry.register(EntityType.SLIME, ...)` —— Fabric 的这个 API 就是往 `EntityRenderers` 的 Map 里 put，
+后注册覆盖原版那一项。
+
+### 为什么用手写网格，而不是搬 1.20.1 的 bedrock JSON
+
+1.20.1 的 `SimpleBedrockModel` 那套实体模型加载器**本仓库还没有**（只有方块的 `BedrockBlockModels`）。
+但两边的几何是**逐盒等价**的，UV 一个不差：
+
+| bone | 1.18.2 `texOffs` | 1.20.1 `uv` | 尺寸 |
+|---|---|---|---|
+| bone 主体 | (0,18) | (0,18) | 8×8×8 |
+| bone 外层 | (0,0) | (0,0) | 9×9×9 |
+| bone 耳朵 | (38,0) | (38,0) | 2×4×2，inflate -0.35，一只 mirror |
+| bone 头饰 | (0,0) | (0,0) | 2×3×0 |
+| bone2 / bone3 | (48,14) | (48,14) | 7×4×1，inflate -0.2 |
+| bone4 / bone5 | (50,20) | (50,20) | 6×4×1，inflate -0.3 |
+| bone6 / bone7 | (48,0) | (48,0) | 2×7×6 |
+| bone8（尾巴） | (54,35) | (54,35) | 4×9×1 |
+
+贴图尺寸都是 64×64，所以 1.20.1 的新图**可以直接贴这套网格**。既然几何等价，用手写网格是成本更低、
+外观完全一致的等价替代（这也是仓库约定里「打不通的接口走等价替代并写明原因」的那种情况）。
+
+### 缩放与开关
+
+`scale` 照抄原版 `SlimeRenderer`：先 `scale(0.999, 0.999, 0.999)` 再按 `squish` 与体型算压缩比例，
+所以油库里的大小、弹跳时的「挤压」手感与原版史莱姆完全一致；`shadowRadius` 跟着体型走。
+`ReplaceSlimeModel = false` 时渲染器把调用原样转给内部的 `SlimeRenderer`。
+
+### 验证
+
+- `./gradlew.bat build` = BUILD SUCCESSFUL；四道闸全绿（`SCANNED_FILES=1560 BAD_FILES=0`、
+  `entity types = 11 renderers = 11 / ALL OK`、`entries=54 problems=0`）。
+- 打包产物里：`EntityYukkuriModel.class`、`EntityYukkuriSlimeRender.class` 都在，
+  贴图 `assets/touhou_little_maid/textures/bedrock/entity/reimu_yukkuri.png` 也在（1917 B），
+  且 class 常量池里的路径与它逐字相同。
+- `runServer` + `runClient -PjoinServer`，进世界后用 RCON 
+  `execute at Dev run summon minecraft:slime ~2 ~ ~2 {Size:3}` 召唤史莱姆：
+  - 客户端**零** `Missing texture` / `Unable to load` 警告；
+  - 零渲染异常、零 `crash-report`；
+  - 史莱姆确实在 tick（日志里有 `Dev was slain by Slime`）。
+- 模型层是不是真的烘焙了：渲染器的构造函数里就调 `context.bakeLayer(LAYER)`，
+  Minecraft 重建 `EntityRenderers` 时会调用每个注册项；没抛 `Unable to find model layer`，
+  即 layer 名与注册一致。
+
+### 验证边界
+
+- **没有做视觉验收**。自动化只能证明「渲染器构造成功 + 贴图存在且路径正确 + 无缺失贴图警告」，
+  证明不了「画面里那只油库里长得对」。这一条要真人进游戏看。
+- **岩浆怪（MagmaCube）那套没做**。上游 1.20.1 把它换成了 `marisa_yukkuri`，但那次不只是换材质：
+  贴图从 64×64 变成 **128×128**，几何 UV 全换（(45,16)、(0,42)……），与 1.18.2 的手写网格**不兼容**。
+  要移植它，必须先有实体 bedrock 模型加载器。属于下一个特性，本轮刻意不做。
+- 旧的 `textures/entity/yukkuri.png` 与 `textures/entity/marisa_yukkuri.png` 留在原地未删（上游 1.20.1 也把它们
+  留在 `legacy_pack` 里）；目前没有任何代码引用它们。

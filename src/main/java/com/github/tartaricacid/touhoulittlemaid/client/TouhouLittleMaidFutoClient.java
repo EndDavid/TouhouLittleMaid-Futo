@@ -60,6 +60,14 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 同一个 EntityType 注册两次渲染器只是替换表项，不会报错。
         EntityRendererRegistry.register(net.minecraft.world.entity.EntityType.EXPERIENCE_ORB,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.ReplaceExperienceOrbRenderer::new);
+        // 覆盖原版史莱姆的渲染器：换成「灵梦油库里」（上游 ReplaceSlimeModel 开关控制）。
+        // 贴图用的是上游 1.20.1 重绘的 textures/bedrock/entity/reimu_yukkuri.png。
+        // 模型层必须先烘焙 —— EntityYukkuriSlimeRender 的构造函数里会 bakeLayer。
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.EntityYukkuriModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.EntityYukkuriModel::createBodyLayer);
+        EntityRendererRegistry.register(net.minecraft.world.entity.EntityType.SLIME,
+                com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityYukkuriSlimeRender::new);
         // 原版物品图标替换：附魔之瓶 → 蓝色「点」、不死图腾 → 「命点」
         // （上游 1.20.1 的 InitSpecialItemRender，走 Fabric 的 ModelVariantProvider）
         com.github.tartaricacid.touhoulittlemaid.client.init.InitSpecialItemRender.init();

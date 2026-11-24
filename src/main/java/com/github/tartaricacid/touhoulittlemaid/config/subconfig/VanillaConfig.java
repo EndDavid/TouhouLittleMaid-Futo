@@ -5,8 +5,9 @@ import net.minecraftforge.common.ForgeConfigSpec;
 /**
  * 原版替换相关配置，移植自上游 {@code config/subconfig/VanillaConfig}。
  *
- * <p>这些开关决定「史莱姆换成油库里」「经验球贴图换成点数」等替换，属于渲染 / 实体替换层，
- * 尚未移植；配置项先建好，等替换层就位后直接读取即可。</p>
+ * <p>这些开关决定「史莱姆换成油库里」「经验球贴图换成点数」等替换，属于渲染 / 实体替换层。
+ * 目前史莱姆（{@code ReplaceSlimeModel}）与经验球（{@code ReplaceXPTexture}）已接上；
+ * 图腾 / 附魔之瓶走的是物品模型层的替换。</p>
  */
 public final class VanillaConfig {
     public static ForgeConfigSpec.BooleanValue REPLACE_SLIME_MODEL;
@@ -52,11 +53,15 @@ public final class VanillaConfig {
     public static boolean replaceXpTexture() {
         return boolOr(REPLACE_XP_TEXTURE, true);
     }
+
     /**
-     * 是否把原版附魔之瓶的图标换成模组的「点」（上游 {@code ReplaceXPBottleTexture}）。
+     * 是否把原版史莱姆换成油库里模型（上游 {@code ReplaceSlimeModel}）。
+     *
+     * <p>由 {@code EntityYukkuriSlimeRender} 读取；关闭时该渲染器直接转发给原版
+     * {@code SlimeRenderer}。</p>
      */
-    public static boolean replaceXpBottleTexture() {
-        return boolOr(REPLACE_XP_BOTTLE_TEXTURE, true);
+    public static boolean replaceSlimeModel() {
+        return boolOr(REPLACE_SLIME_MODEL, true);
     }
 
     /**
@@ -64,6 +69,13 @@ public final class VanillaConfig {
      */
     public static boolean replaceTotemTexture() {
         return boolOr(REPLACE_TOTEM_TEXTURE, true);
+    }
+
+    /**
+     * 是否把原版附魔之瓶的图标换成模组的「点」（上游 {@code ReplaceXPBottleTexture}）。
+     */
+    public static boolean replaceXpBottleTexture() {
+        return boolOr(REPLACE_XP_BOTTLE_TEXTURE, true);
     }
 
 }

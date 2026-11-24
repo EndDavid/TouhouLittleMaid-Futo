@@ -410,6 +410,32 @@ text 没事是因为 `Font#drawInBatch` 的顶点 z 固定是 0，天然和底�
 **仍未做**：真人打开进度页确认那 4 个标签的观感（自动化只验证到「4 个 root 进了同步集」，
 而 `AdvancementsScreen.init` → `setListener` → `onAddAdvancementRoot` 的链路已用反汇编逐行确认）。
 
+### 史莱姆换成灵梦油库里：材质按上游 1.20.1 重绘版（本轮 2026-11-24）
+
+**发现**：baseline 里只有两张**没被任何代码引用**的旧贴图（`textures/entity/yukkuri.png`、
+`marisa_yukkuri.png`），配置项 `VanillaConfig.REPLACE_SLIME_MODEL` 只定义没接线 ——
+「史莱姆替换层」整个没移植。所以本轮不是"改一张图"，而是**把替换层接上 + 用上游新材质**。
+
+**上游改了什么**：1.20.1 把史莱姆贴图换成 `textures/bedrock/entity/reimu_yukkuri.png`（1917 B），
+与 1.18.2 的 `textures/entity/yukkuri.png`（2520 B）**同为 64x64、UV 布局不变**，
+但 `port/CmpPng.java`（JDK ImageIO）逐像素比出 **577/4096 = 14.1% 不同**，是真的重画了。
+
+**为什么用手写网格**：1.20.1 的 `SimpleBedrockModel` 实体模型加载器本仓库没有。
+但 reimu 的 bedrock json 与 1.18.2 的 `LayerDefinition` **逐盒等价**（UV 全是 (0,18)/(0,0)/(38,0)/
+(48,14)/(50,20)/(48,0)/(54,35)，尺寸与 inflate 也一致），所以直接照抄上游 1.18.2 的网格 + 贴 1.20.1 的新图。
+
+**新增**：`client/model/EntityYukkuriModel`、`client/renderer/entity/EntityYukkuriSlimeRender`、
+`assets/touhou_little_maid/textures/bedrock/entity/reimu_yukkuri.png`、`VanillaConfig#replaceSlimeModel()`；
+注册在 `TouhouLittleMaidFutoClient` 里紧跟经验球那一段（先 `registerModelLayer` 再
+`EntityRendererRegistry.register(EntityType.SLIME, ...)`，覆盖原版表项）。
+
+**验证**：build SUCCESSFUL；四道闸全绿；jar 里两个 class + 贴图都在，class 常量池路径与贴图路径逐字相同；
+`runServer` + `runClient -PjoinServer` 后用 RCON summon 史莱姆，
+客户端零 `Missing texture` 警告、零渲染异常（史莱姆还能把玩家打死，说明确实在 tick）。
+
+**没做**：视觉验收（要真人看）；岩浆怪那套（上游 1.20.1 换成 128x128 新几何，与手写网格不兼容，
+需要先有实体 bedrock 模型加载器）。旧的两张图留在原地不删（上游也留在 legacy_pack 里）。
+
 ---
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；
