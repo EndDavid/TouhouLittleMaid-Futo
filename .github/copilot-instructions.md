@@ -26,7 +26,8 @@
   - `src/main/java/com/github/tartaricacid/touhoulittlemaid/entity/passive/EntityMaid.java`（约 3300 行）
   - `src/main/resources/assets/touhou_little_maid/lang/zh_cn.json`
   - `src/main/resources/assets/touhou_little_maid/lang/en_us.json`
-  - `README.md`
+  - `docs_dev/03-content-modules.md`（约 2100 行）
+  - `docs_dev/02-core-systems.md`（约 1200 行）
 - 对它们：先只读需要的那一段，一次只改一个 hunk，改完立刻 `git diff --stat` 自查。
 - 不要顺手重构、不要重排 import、不要改行尾：本仓库按字节管理（`.gitattributes` 里 `* -text`，`.java` 是 CRLF）。
 

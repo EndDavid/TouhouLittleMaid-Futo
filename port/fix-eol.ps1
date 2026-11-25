@@ -5,7 +5,13 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 $targets = @(
     'README.md',
     'src\main\resources\assets\touhou_little_maid\lang\en_us.json',
-    'src\main\resources\assets\touhou_little_maid\lang\zh_cn.json'
+    'src\main\resources\assets\touhou_little_maid\lang\zh_cn.json',
+    'docs_dev\README.md',
+    'docs_dev\01-build-and-toolchain.md',
+    'docs_dev\02-core-systems.md',
+    'docs_dev\03-content-modules.md',
+    'docs_dev\04-rendering-and-models.md',
+    'docs_dev\05-progress-and-known-issues.md'
 )
 
 foreach ($rel in $targets) {

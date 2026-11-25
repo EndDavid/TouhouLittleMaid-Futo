@@ -1,7 +1,7 @@
 # 交接单（HANDOFF）
 > **用法**：新开对话后，第一条消息只写「读 HANDOFF.md，然后继续」。
-> **不要整份读 `README.md`**（3400+ 行，光读一遍就几十万 token）。需要细节时按小节
-> `grep -n "^### " README.md` 找到行号，再 `sed -n 'A,Bp' README.md` 取那一段。
+> **开发笔记已从 `README.md` 迁到 `docs_dev/`**（5 个文件、约 4700 行；根 README 只剩使用与构建说明）。
+> 需要细节时按小节找：`grep -rn "^### " docs_dev/` 定位文件与行号，再 `sed -n 'A,Bp' <该文件>` 取那一段。
 ---
 ## 1. 当前状态：模型切换器 / 帕秋莉手册 / 三个附魔 / 坐船钓鱼 均已提交
 上游对应 `block/BlockModelSwitcher`、`tileentity/TileEntityModelSwitcher`、
@@ -16,7 +16,7 @@
 | `port/check-encoding.ps1` | `BAD_FILES=0` |
 | `runServer` + RCON | 红石切换 / 边沿 / 回绕 / 空列表 / 拆方块掉物品，全部断言通过 |
 | `runClient` 到主菜单 | 无 `Missing model` / `missing texture`，`crash-reports` 为空 |
-详细结论写在 README 文末「模型切换器」一节，**不要重新推导**。
+详细结论写在 `docs_dev/03-content-modules.md` 的「模型切换器」一节，**不要重新推导**。
 
 ### 之后又完成的两块（都在 `main` 上）
 - **帕秋莉手册封板**：54 条目 / 3 分类，条目集 = 1.18.2 Forge 的 52 条全集 + 本模组特有的
@@ -610,7 +610,7 @@ REI + Architectury（要「祭坛合成」分类才需要）。
 ## 2. 省 token 的操作约定（上个会话烧掉几十块换来的）
 1. **一个对话只做一个特性**，做完就 commit。对话越长，每一轮要重发的上下文越多；
    新对话 + 干净工作区 = 每轮只带当前特性，成本能低一个数量级。
-2. **不要整份读大文件**。`EntityMaid.java`（3300 行）、两份 `lang`、`README.md` 都是雷区。
+2. **不要整份读大文件**。`EntityMaid.java`（3300 行）、两份 `lang`、`docs_dev/03-content-modules.md`（2100 行）都是雷区。
    用 `grep -n` 定位，`sed -n 'A,Bp'` 取窗口。
 3. **终端输出先落盘再筛**：`cmd > /tmp/x.log 2>&1; tail -20 /tmp/x.log`。
    一次几百行回显会原样进上下文，而且会打掉后续所有缓存命中。
@@ -618,7 +618,7 @@ REI + Architectury（要「祭坛合成」分类才需要）。
 5. 需要「等构建」时轮询产物（`grep -q 'BUILD SUCCESSFUL' /tmp/x.log`），**别 sleep**。
 ---
 ## 3. 本仓库改文件的硬约束（踩过的坑）
-- **`insert_edit_into_file` 对 `README.md` / 两份 `lang` 这类大文件不可靠**：
+- **`insert_edit_into_file` 对大文件不可靠**（两份 `lang`、`docs_dev/03-content-modules.md`）：
   实测会「把要替换的段落再插一遍」或整份回显。改用 Python 脚本做精确替换
   （`io.open(..., newline='')` 保留 CRLF），写后立刻 `git diff --stat` 自查。
 - **`sed -i` 会吃掉 CRLF**（MSYS 的 sed 按文本模式处理），一次 `sed -i` 就能把 3342 行
@@ -636,8 +636,8 @@ REI + Architectury（要「祭坛合成」分类才需要）。
   写完立刻 `git diff --stat <file>` —— 只应看到几十行 `+`，没有 `-`。
   规则：**超过 1000 行的文件一律只用 Python 脚本改**。
 - **判断 CRLF 再读写**：`raw = open(p,'rb').read(); crlf = b'\r\n' in raw`，
-  改完 `t.replace('\n','\r\n') if crlf else t`。`EntityMaid.java` / `README.md` / `HANDOFF.md`
-  都是 CRLF；`TouhouLittleMaidFutoClient.java` 在库里是 LF。
+  改完 `t.replace('\n','\r\n') if crlf else t`。`EntityMaid.java` / `README.md` / `HANDOFF.md` /
+  `docs_dev/*.md` 都是 CRLF；`TouhouLittleMaidFutoClient.java` 在库里是 LF。
 - **终端回显里的 `touhoullittlemaid`（三个 l）是真故障**：编辑工具回写时出现过 3 处，
   编译会报 `程序包不存在`。用 `grep -c touhoullittlemaid <file>` 自查。
 - **两份 `lang/*.json` 是「混合行尾」（约 458 行 CRLF + 1400 行 LF）**，
@@ -915,4 +915,40 @@ mixin 里的贴图路径、尺寸常量全部不用动。
 
 **没验的**：游戏内观感（ModMenu 列表 + 创造页签）仍需人眼确认；本次没动代码，
 渲染管线与上一轮完全一致。
+
+## 本轮：开发文档迁到 `docs_dev/`，README 回归「门面」
+
+**起因**：`README.md` 4763 行全是移植笔记，用户要求把开发过程的文档搬走、不占用 README。
+
+**做法**：按主题把 README 的 44 个 `##` 章节原样切到 5 个文件，内容一字未改（不重排、不改写），
+只去掉段尾的 `---` 分隔线并统一 CRLF：
+
+| 文件 | 行数 | 章节数 |
+|---|---|---|
+| `docs_dev/01-build-and-toolchain.md` | 318 | 5 |
+| `docs_dev/02-core-systems.md` | 1185 | 10 |
+| `docs_dev/03-content-modules.md` | 2117 | 18 |
+| `docs_dev/04-rendering-and-models.md` | 770 | 7 |
+| `docs_dev/05-progress-and-known-issues.md` | 326 | 4 |
+| `docs_dev/README.md`（索引） | 88 | — |
+
+- 新 `README.md` 70 行：简介 / 上游链接 / 环境要求（照 `fabric.mod.json` 的 `depends` + `suggests` 抄）
+  / 安装 / 构建 / 文档表 / 许可。
+- **文件名一律 ASCII**：仓库此前 0 个非 ASCII 文件名，而 `port/*.ps1` 是纯 ASCII 脚本
+  （PS 5.1 对无 BOM 脚本按 GBK 解析），中文路径会坏。中文只出现在标题与正文。
+- 指针同步：本文件头部「不要整份读 `README.md`」改成 `grep -rn "^### " docs_dev/`；
+  `insert_edit_into_file` 的雷区清单从 `README.md` 换成 `03` / `02`；
+  仓库内 `.github/copilot-instructions.md` 的「大文件」列表同样替换；
+  `port/fix-eol.ps1` 的 targets 加上 6 个 docs 文件。
+
+**怎么验的**
+
+- 完整性：44 个 `##`、198 个 `###` 全部出现在 `docs_dev`（0 缺失）；原文 3010 条长度 > 20 的行里，
+  只有 front matter 那 8 行不在 docs —— 它们被新 README 的简介/要求/许可段改写替代。
+- 相对链接 0 断链（含 `../HANDOFF.md`、`../port/`）；代码围栏全部配对。
+- 7 个文件全部 CRLF、UTF-8 无 BOM、`U+FFFD` = 0。
+- `./gradlew.bat build` → BUILD SUCCESSFUL；jar 内**没有** `docs_dev/`（docs 不进包）；
+  `check-encoding.ps1` → `SCANNED_FILES=1605 BAD_FILES=0 FFFD_CHARS=0`；`port/check-jar.ps1` → checked。
+
+**没验的**：GitHub / IDE 里的 Markdown 渲染效果（相对链接已按文件系统逐个校验）。
 
