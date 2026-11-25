@@ -25,9 +25,10 @@ History worth remembering: an earlier revision of this script downsampled
 32x32 -> 16x16 here, and its output looked like a smear in game.  Part of the
 blame was this very file's `read_png`: the filter-type-3 (Average) branch
 forgot to add the row above, and `pack.png` uses that filter, so every
-downsample was computed from a garbled image.  `pack.png` has no soft alpha and
-594 opaque pixels; if `soft_alpha` below reports anything else, the decoder is
-broken again.
+downsample was computed from a garbled image.  `pack.png` has no soft alpha
+(the current artwork has 570 opaque pixels; the number changes when the art is
+replaced), so if `soft_alpha` below reports anything but 0 the decoder is broken
+again.
 
 Usage (from the repository root, no Pillow needed):
     python port/make-icons.py

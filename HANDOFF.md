@@ -889,3 +889,30 @@ blit(pose, x, y, width, height, u, v, uWidth, vHeight, texW, texH)
 **没验的**：仍需真人打开创造栏看一眼（裁剪已修，但 16×16 只有原图 1/4 的像素，
 这张立绘在 16×16 下五官会比较紧凑 —— 这是 GUI 分辨率的硬限制，不是渲染错误）。
 
+## 本轮：把三处 32×32 图标换成新版美术（代码零改动）
+
+用户提供了重绘后的 `物部布都_pack_32x32_1.png`（32×32 RGBA，1610 字节），要求替换之前那版。
+
+**只需替换源图** —— 上一轮已经把 `icon.png` 与 `gui/tab_icon.png` 设计成 `pack.png` 的逐字节副本，
+所以流程就是：拷贝新图到 `pack.png` → `python port/make-icons.py` → `build`。
+mixin 里的贴图路径、尺寸常量全部不用动。
+
+**结果**
+
+- `pack.png` / `icon.png` / `gui/tab_icon.png` 三份都是新版，1610 字节，互为副本。
+- 解码自检：570 个不透明像素、0 个半透明像素（旧版是 594 —— 新版裁掉了底部那条红/洋红带，
+  与截图一致）。README 与脚本 docstring 里写死的 594 已同步改成 570，并注明「换美术后这个数字会变，
+  但半透明像素应恒为 0」。
+- `models/item/maid_spawn_egg.json` 与刷怪蛋贴图**没有**动 —— 那是 16×16 的另一张图，
+  不在「32×32 贴图」范围内。
+
+**怎么验的**
+
+- `python port/make-icons.py` → 打印 `570 opaque / 0 soft`，三个文件 sha256 相同。
+- `./gradlew.bat build` → BUILD SUCCESSFUL；jar 内三张图标均为 32×32 / 1610 字节，
+  且 sha256 与磁盘上的 `pack.png` 一致（说明打包没混进旧图）。
+- `check-encoding` → 0；`port/check-jar.ps1` → checked；已 `deploy-jar` 进 `1.18.2-Fabric-test`。
+
+**没验的**：游戏内观感（ModMenu 列表 + 创造页签）仍需人眼确认；本次没动代码，
+渲染管线与上一轮完全一致。
+
