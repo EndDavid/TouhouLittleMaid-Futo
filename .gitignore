@@ -1,6 +1,8 @@
 # prompt custom
 .github/copilot-instructions.md
 
+HANDOFF.md
+
 # builds
 build/
 .gradle/
