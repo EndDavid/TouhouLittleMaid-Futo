@@ -60,6 +60,17 @@ loom_version=1.15.5
 
   正确姿势是**先读原始字节、只在目标位置插入、再原样写回**；或事后跑
   `port/fix-eol.ps1` 统一行尾。注意 `lang/en_us.json`、`lang/zh_cn.json` 的**原始行尾是 mixed**，
+
+### 模组图标（ModMenu）：`logo.png` 不能直接用
+
+`fabric.mod.json` 原来引用的是上游那张 1200×240 横幅 `logo.png`。ModMenu 读图标走的是
+`FabricIconHandler.createIcon`，里面有一句 `Validate.validState(w == h, "Must be square icon")`，
+所以横幅一律被拒、退回默认图标，日志就是 `Invalid mod icon for icon source touhou_little_maid:logo.png`
+（上游 1.20.1 Fabric 版同样有这个缺陷；Forge 那边反而是对的，`mods.toml` 本来就把 `logoFile` 当横幅画）。
+
+修法是另存一张正方形图标：`src/main/resources/icon.png`（128×128，Fabric 约定的图标尺寸），
+由 `port/make-icon.py` 从横幅居中裁 240×240、再按面积平均缩到 128 生成。脚本不依赖 Pillow，
+同参数输出字节完全相同（`sha256` 可复现）。`logo.png` 保留不动 —— `META-INF/mods.toml` 还在引用它。
   整体转换同样会造出近两千行 diff —— 只有字节级插入才能保住「1 行」的 diff。
 
 ---

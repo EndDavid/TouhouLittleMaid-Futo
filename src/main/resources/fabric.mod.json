@@ -3,17 +3,17 @@
 	"id": "touhou_little_maid",
 	"version": "${version}",
 	"name": "Touhou Little Maid: Futo",
-	"description": "车万女仆（Touhou Little Maid）的 Fabric 1.18.2 移植版 —— 布都。",
+	"description": "Touhou Little Maid Unofficial Fabric 1.18.2 Port.",
 	"authors": [
-		"TartaricAcid",
-		"Futo port contributors"
+		"TartaricAcid (Original Author)",
+		"EndDavid_Iku"
 	],
 	"contact": {
 		"homepage": "https://github.com/TartaricAcid/TouhouLittleMaid",
 		"sources": "https://github.com/TartaricAcid/TouhouLittleMaid"
 	},
 	"license": "CC-BY-NC-SA-4.0",
-	"icon": "logo.png",
+	"icon": "icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [

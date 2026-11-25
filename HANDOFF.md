@@ -696,3 +696,43 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./port/book_pages_held_back/
   1.18.2 上游的 `MenuIntegration` 也不含这一项，所以界面里不出现。
 - 女仆妖精的新模型没有幼年变体（`baby_maid_fairy.json` 是 1.20.1 才有的，
   与 1.18.2 的 `EntityFairy#isBaby()` 逻辑不配套）。
+## 本轮：ModMenu 显示不出图标的真正原因（`logo.png` 不是正方形）
+
+`fabric.mod.json` 的 `icon` 原本指向上游横幅 `logo.png`（1200×240，三份上游 jar 里字节相同）。
+ModMenu 3.2.5 的 `FabricIconHandler.createIcon` 里有一句
+`Validate.validState(image.getWidth() == image.getHeight(), "Must be square icon")`，
+非正方形直接抛异常然后退回默认图标：
+
+```
+Invalid mod icon for icon source touhou_little_maid:logo.png
+java.lang.IllegalStateException: Must be square icon
+```
+
+上游 1.20.1 Fabric 版同样中招（那边 `icon` 也写的 `logo.png`），所以这不是移植引入的 bug。
+也不能把横幅整体缩成正方形：7.5:1 压进 32×32 只会糊成一条。Forge 的 `mods.toml` 本来就把
+`logoFile` 当横幅画，所以上游一直没暴露。
+
+**改了什么**
+
+- 新增 `src/main/resources/icon.png`：128×128（Fabric 约定的图标尺寸），从横幅居中裁 240×240
+  再按面积平均（box filter）缩到 128，不是点采样。实测 5245 种颜色、亮度 stddev 38.8 ——
+  裁到的是有内容的画面，不是一片渐变。
+- 新增 `port/make-icon.py`：可复现的生成脚本，纯标准库（不需要 Pillow）。默认窗口是全横幅
+  961 个候选里「横向边缘密度」最高的那一个，正好是中心（x=480）。写完会把产物读回来断言是正方形，
+  所以裁剪出错在脚本这一步就炸，而不是等到进游戏。同一参数两次运行 sha256 相同。
+- `fabric.mod.json`：`"icon": "logo.png"` → `"icon": "icon.png"`。`logo.png` 保留不动，
+  `META-INF/mods.toml` 还在引用它。
+- README 的「构建 / 运行」章末补了一节，把这条约束和复现方法写进去。
+
+**怎么验的（可复现）**
+
+```
+python port/make-icon.py                 # 生成 + 自校验（打印窗口位置与产物尺寸）
+./gradlew.bat build
+powershell -NoProfile -ExecutionPolicy Bypass -File ./check-encoding.ps1
+```
+
+再读 jar 确认：`icon.png` 在包根、128×128、sha256 与磁盘文件一致、`fabric.mod.json`
+的 `icon` 字段是 `icon.png`；`check-encoding.ps1` 输出 0。
+**没验的**：游戏里 ModMenu 实际画出来的样子 —— 需要真人看一眼裁到的位置是否好看。
+想换窗口：`python port/make-icon.py --x 560`（不传就是中心），改完重新 `build` 即可。
