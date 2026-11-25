@@ -798,3 +798,52 @@ python port/make-icons.py            # 生成 + 自检（打印不透明像素�
 16×16 会把这个 32×32 立绘压掉一半细节；嫌糊可以换滤镜再生成：
 `python port/make-icons.py --filter box`（面积平均，更柔和）或 `--filter nearest`（硬边，可能丢眼睛高光）。
 
+## 本轮：页签图标糊 —— 根因是脚本解码器 + 画得太小
+
+**现象**：上一轮的创造页签图标「糊得不能看」，用户问能不能直接用 32×32 材质。
+
+**两个独立原因**
+
+1. `port/make-icons.py` 的 `read_png` 里 filter type 3（Average）写错了：
+   `line[i] + ((line[i-bpp] if i>=bpp else 0) >> 1)` 漏了**上一行**的 `prev[i]`，
+   正确式是 `(left + up) >> 1`。PNG 允许逐行换滤波，而这张 `pack.png` 正好用了 Average，
+   于是之前那次「多数色降到 16×16」是在**错乱的像素**上算出来的 —— 游戏里自然糊成一片。
+   修好后的判据：`pack.png` 解出 **594 个不透明像素 / 0 个半透明像素**；
+   坏解码器会立刻产生 1/2/4/8/16 这类古怪 alpha（这正是当时看到的现象）。脚本现在每次运行
+   都打印这两个数。
+2. 就算解码正确，页签原来也只画 16×16 —— 32×32 的立绘只剩 1/4 的像素，脸必然糊。
+
+**改了什么**
+
+- `assets/touhou_little_maid/textures/gui/tab_icon.png`：由 16×16 换成 32×32，与 `pack.png`
+  逐字节相同。
+- `CreativeModeInventoryScreenMixin`：
+  - 新增 `futo$tabIconSize = 24`；blit 的源区域取满 32×32（`u/v = 0, w/h = 32`），
+    目标放大到 24×24，步长 `int((d+0.5)*32/24)` 即 GPU 点采样。
+  - 位置以原版给的槽位中心为准，左上角回挪 `(size-16)/2`。放大是安全的：页签底图 28×32，
+    原图标在底图里留了 6（左右）/ 9（上）的边距，24×24 横向还剩 2 像素、纵向 3 像素。
+  - 顺手确认了 `CreativeModeInventoryScreen` 里没有任何 `enableScissor`，放大不会被裁掉。
+- `port/make-icons.py`：删掉全部离线缩放（box / majority / nearest 三个 `--filter` 及 `--tab-size`），
+  现在只做「`pack.png` → `icon.png` / `tab_icon.png` 逐字节拷贝」，并修复解码器、
+  把 `soft_alpha` 统计纳入自检。**离线缩放本身是错的**：绘制时 GPU 已经采一次，
+  再离线缩一次等于缩两遍，而且会把尺寸焊死（同一张贴图要服务 16 / 20 / 24 三种画法）。
+- README 的「图标与美术资源」一节同步更新，并把解码器这个坑写进去。
+
+**怎么验的**
+
+```bash
+python port/make-icons.py     # 打印 594 opaque / 0 soft，三个文件互为副本
+./gradlew.bat build           # BUILD SUCCESSFUL
+```
+
+- jar 内 `icon.png` / `pack.png` / `tab_icon.png` 均为 32×32、1695 字节。
+- 采样效果离线模拟过（按 `floor((d+0.5)*32/24)` 逐点取色，打印字符图）：24×24 能看出帽带、眼睛、
+  衣领的绿红镶边；16×16 只剩色块。
+- 守卫脚本：`check-encoding` → `BAD_FILES=0 FFFD_CHARS=0`；`check-dangling` / `check-jar` → checked；
+  `check-renderers` → `ALL OK`。已 `deploy-jar` 进 `1.18.2-Fabric-test`。
+
+**没验的**：这次没有重新 `runClient`。理由：上一轮已经验证过这条注入链（用户也真的在游戏里
+看到了图标，只是糊），本轮两条注入的注解与目标**一字未改**，只改了 blit 的尺寸与源区域；
+而「画不对」这类问题只有真的打开创造栏才会暴露，启动一次也验不到。
+页签尺寸 24 的实际观感仍需人眼确认。
+

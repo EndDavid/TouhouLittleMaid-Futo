@@ -44,19 +44,38 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  *
  * <h2>坐标与深度</h2>
  *
- * <p>重定向拿到的是原版算好的 {@code x, y}，也就是那个 16×16 物品图标的位置，直接照搬即可。
- * 深度用 100：原版在画图标之前把 {@code itemRenderer.blitOffset} 设成 100 让物品盖在页签底图上，
- * 我们顶替的正是那一层，所以取同一个值，既盖住底图也不会突出到别的东西前面。</p>
+ * <p>重定向拿到的是原版算好的 {@code x, y}，也就是那个 16×16 物品图标槽位的左上角。
+ * 这里以它为基准保持中心不变、把边长放大到 {@link #futo$tabIconSize}，所以左上角要
+ * 往回挪 {@code (size - 16) / 2}。放大是安全的：页签底图是 28×32，原版的图标位置在
+ * 底图里留了 6（左右）/ 9（上）的边距，24×24 撑满后横向还剩 2 像素、纵向还剩 3 像素，
+ * 不会盖到页签的圆角或边框上。</p>
+ *
+ * <p>深度用 100：原版在画图标之前把 {@code itemRenderer.blitOffset} 设成 100
+ * 让物品盖在页签底图上，我们顶替的正是那一层，所以取同一个值，
+ * 既盖住底图也不会突出到别的东西前面。</p>
  */
 @Mixin(CreativeModeInventoryScreen.class)
 public class CreativeModeInventoryScreenMixin {
     /**
-     * 主页签图标。由 {@code port/make-icons.py} 从 {@code pack.png}（32×32）按多数色
-     * 降采样到 16×16 —— 页签里的位置就是 16×16，尺寸对上了就不用运行期缩放。
+     * 主页签图标，与 {@code pack.png} / {@code icon.png} 字节相同的 32×32 原图。
+     *
+     * <p><b>不做离线缩放</b>：离线先降到 16×16 等于在脚本里就丢掉一半信息 —— 面积平均会
+     * 造出一百多种中间色（糊成一团），多数色虽然保住调色板但 2×2 合并后五官错位。
+     * 保持 32×32 原图、交给 GPU 在画的时候点采样，颜色才全部来自原图。
+     * 而且同一个文件可以随 {@link #futo$tabIconSize} 调大而自动变清楚。</p>
      */
     @Unique
     private static final ResourceLocation futo$tabIcon =
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/gui/tab_icon.png");
+
+    /**
+     * 图标画多大（GUI 像素）。原版那个物品图标槽位是 16×16，但页签底图本身是 28×32，
+     * 图标位置在底图里留了 6 / 9 的边距 —— 24×24 居中放进 28×32 还剩 2~3 像素边距，
+     * 是能塞下的最大值。16×16 只留得下 32×32 原图四分之一的像素，脸会糊成一团；
+     * 24×24 能留下 56%。嫌太满就改成 20（边距 4）或 16（原版尺寸）。
+     */
+    @Unique
+    private static final int futo$tabIconSize = 24;
 
     @Unique
     private PoseStack futo$tabPoseStack;
@@ -87,9 +106,12 @@ public class CreativeModeInventoryScreenMixin {
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderTexture(0, futo$tabIcon);
-        // blit(pose, x, y, blitOffset, u, v, w, h, texWidth, texHeight)：贴图就是 16×16，
-        // 所以 uv 直接 0..16 整张贴满，不会出现「只采到一角」。
-        GuiComponent.blit(this.futo$tabPoseStack, x, y, 100, 0.0F, 0.0F, 16, 16, 16, 16);
+        // 原版给的 x, y 是那个 16×16 物品图标槽位的左上角。这里保持中心不动、把边长放大到
+        // futo$tabIconSize，于是左上角要往回挪 (size - 16) / 2。
+        // blit(pose, x, y, blitOffset, u, v, w, h, texWidth, texHeight)：源区域取满整张 32×32
+        // 贴图（u/v = 0、w/h = 32），目标就是算出来的正方形 —— 32→size 由 GPU 点采样一次完成。
+        int inset = (futo$tabIconSize - 16) / 2;
+        GuiComponent.blit(this.futo$tabPoseStack, x - inset, y - inset, 100, 0.0F, 0.0F,
+                futo$tabIconSize, futo$tabIconSize, 32, 32);
     }
 }
-

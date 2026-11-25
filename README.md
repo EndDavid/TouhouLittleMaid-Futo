@@ -72,7 +72,7 @@ jar 根目录有 `pack.mcmeta`，模组本身就是一个内置资源包，这�
 |---|---|---|
 | `src/main/resources/pack.png` | 内置资源包的图标 | 上游就是这个名字、这个位置 |
 | `src/main/resources/icon.png` | `fabric.mod.json` 的 `icon`，ModMenu 读 | ModMenu 画的是 32×32 的方块，32×32 正好 1:1 |
-| `assets/touhou_little_maid/textures/gui/tab_icon.png` | 主创造模式页签的图标 | 页签里那个位置就是 16×16 |
+| `assets/touhou_little_maid/textures/gui/tab_icon.png` | 主创造模式页签的图标 | 32×32，绘制时由 GPU 采样到 24×24（见下） |
 
 `icon.png` **必须**是正方形：ModMenu 的 `FabricIconHandler.createIcon` 里有
 `Validate.validState(w == h, "Must be square icon")`，非正方形一律被拒、退回默认图标，
@@ -84,18 +84,27 @@ jar 根目录有 `pack.mcmeta`，模组本身就是一个内置资源包，这�
 原版也只在 `CreativeModeInventoryScreen#renderTabButton` 里拿 `getIconItem()` 去
 `renderAndDecorateItem`。所以这里用客户端 mixin
 （`mixin/client/CreativeModeInventoryScreenMixin`）把主页签的那一次调用重定向成贴图，
-别的页签原样转交。**不新增注册物品** —— 凭空多一件「只有贴图」的物品会被 `/give` 和 REI 看到，
-而 mixin 只影响那 16×16 的绘制。
+别的页签原样转交。**不新增注册物品** —— 凭空多一件「只有贴图」的物品会被 `/give` 和 REI 看到。
 
-三张图都由 `port/make-icons.py` 生成（纯标准库，不需要 Pillow）：`icon.png` 是 `pack.png` 的
-原样副本；`tab_icon.png` 从 32×32 按「多数色」降到 16×16 —— 像素画 2:1 缩小要保留作者的调色板
-（实测 28 色），改用面积平均会糊成 136 色的模糊团。换美术只要替换 `pack.png` 再跑一次脚本，
-产物逐字节可复现：
+页签里那个图标**不必**按 16×16 出图。原版给的是 16×16 物品图标的槽位，但页签底图本身是 28×32，
+图标位置在底图里留了 6（左右）/ 9（上）的边距 —— 所以 mixin 保持中心不动，把边长放大到 24×24
+（`futo$tabIconSize`，横向还剩 2 像素、纵向 3 像素，不会压到圆角），贴图仍然用 32×32 原图，
+缩放在绘制时由 GPU 点采样一次完成。16×16 只能留下原图 1/4 的像素，这张立绘的脸会糊成一片；
+24×24 能留下 56%。嫌太满就把那个常量改成 20（边距 4）或 16（原版尺寸），贴图不用动。
+
+三张图都由 `port/make-icons.py` 同步（纯标准库，不需要 Pillow）：两个产物都是 `pack.png` 的
+**逐字节副本**，脚本里没有任何缩放 —— 缩放已经由 GPU 在绘制时做那一次了，离线再缩一次只会
+把信息丢两遍，而且会把尺寸焊死（页签那张要同时服务 16 / 20 / 24 三种画法）。
+一旦换美术，只要替换 `pack.png` 再跑一次：
 
 ```bash
-python port/make-icons.py               # majority（默认）
-python port/make-icons.py --filter box  # 面积平均，仅作对比
+python port/make-icons.py
 ```
+
+> 踩过的坑：早先这脚本会在离线把 32×32 降到 16×16，出来的页签在游戏里糊得不能看。
+> 一半责任在脚本自带的 PNG 解码器 —— filter type 3（Average）那一条忘了加**上一行**的像素，
+> 而这张图正好用了 Average 滤波，于是每次降采样都是在错乱的像素上算的。修好后 `pack.png`
+> 解出 594 个不透明像素、0 个半透明像素；脚本每次运行都会打印这两个数，异常就说明解码器又坏了。
 
 ---
 

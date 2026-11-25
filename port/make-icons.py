@@ -1,50 +1,51 @@
-"""Regenerate the mod's own icons from the artwork committed in `pack.png`.
+"""Keep the mod's icon files in sync with the artwork in `pack.png`.
 
 Why this exists
 ---------------
 `src/main/resources/pack.png` is the built-in resource pack's icon (the jar has
 a root `pack.mcmeta`, so the mod itself is a resource pack).  Its artwork is the
-Boutoku-no-Futatsuhime "pack.png" homage, 32x32, and it is now the single source
-of truth for any icon this mod draws.
+Boutoku-no-Futatsuhime "pack.png" homage, 32x32, and it is the single source of
+truth for every icon the mod draws:
 
-Three consumers need it in three different shapes:
+    src/main/resources/icon.png          fabric.mod.json "icon".  ModMenu blits a
+                                        fixed 32x32 quad, so 32x32 is 1:1.
+    .../textures/gui/tab_icon.png        the main creative tab's icon.  It is blitted
+                                        into a 24x24 square by the mixin (the
+                                        vanilla item-icon slot is 16x16, the tab
+                                        art is 28x32), so the file stays 32x32.
 
-    src/main/resources/icon.png             fabric.mod.json "icon", read by
-                                            ModMenu.  ModMenu's
-                                            FabricIconHandler.createIcon runs
-                                            Validate.validState(w == h, ...), so
-                                            this one MUST be square.  32x32 is
-                                            exactly the size ModMenu blits, so
-                                            no resampling happens at all.
-    .../textures/gui/tab_icon.png           the 16x16 icon of the main creative
-                                            tab (see the client mixin
-                                            CreativeModeInventoryScreenMixin).
-    (pack.png itself is the third consumer, copied verbatim.)
+Both files are byte-for-byte copies of `pack.png`, deliberately.  There is no
+resampling here at all, because the GPU already does exactly one 32 -> drawn
+size point sample at draw time, and a pre-scaled copy would either be a second
+(compounded) resample or freeze the size: the drawn size lives in
+`CreativeModeInventoryScreenMixin#futo$tabIconSize` and the same texture file
+has to serve 16, 20 and 24.
+
+History worth remembering: an earlier revision of this script downsampled
+32x32 -> 16x16 here, and its output looked like a smear in game.  Part of the
+blame was this very file's `read_png`: the filter-type-3 (Average) branch
+forgot to add the row above, and `pack.png` uses that filter, so every
+downsample was computed from a garbled image.  `pack.png` has no soft alpha and
+594 opaque pixels; if `soft_alpha` below reports anything else, the decoder is
+broken again.
 
 Usage (from the repository root, no Pillow needed):
-    python port/make-icons.py                # majority filter (default)
-    python port/make-icons.py --filter box   # area average instead
-    python port/make-icons.py --tab-size 16
+    python port/make-icons.py
 
-The artwork is 32x32 pixel art, so shrinking it to the 16x16 the creative tab
-draws must not blur it: `majority` keeps the author's own palette (each output
-pixel is one colour that actually exists in the source block) while `box`
-averages and therefore invents colours.  Both filters are deterministic:
-running the script twice on the same input produces byte-identical output, so
-`git status` stays clean.
+Re-running is idempotent, so `git status` stays clean.
 """
-import argparse
-import collections
 import struct
 import zlib
 
 REPO_PACK = 'src/main/resources/pack.png'
-REPO_ICON = 'src/main/resources/icon.png'
-REPO_TAB_ICON = ('src/main/resources/assets/touhou_little_maid/textures/gui/tab_icon.png')
+COPIES = (
+    'src/main/resources/icon.png',
+    'src/main/resources/assets/touhou_little_maid/textures/gui/tab_icon.png',
+)
 
 
 def read_png(path):
-    """Return (w, h, color_type, channels, palette, pixels) for a non-interlaced 8-bit PNG."""
+    """Return (w, h, color_type, channels, palette, pixels, trns) for a non-interlaced 8-bit PNG."""
     data = open(path, 'rb').read()
     assert data[:8] == b'\x89PNG\r\n\x1a\n', 'not a png: %s' % path
     pos = 8
@@ -86,8 +87,12 @@ def read_png(path):
             for i in range(stride):
                 line[i] = (line[i] + prev[i]) & 0xFF
         elif f == 3:
+            # Average: raw = line - floor((left + up) / 2).  Dropping the `up`
+            # term here decodes to garbage on rows that use this filter, and the
+            # PNG spec allows a different filter per row.
             for i in range(stride):
-                line[i] = (line[i] + ((line[i - bpp] if i >= bpp else 0) >> 1)) & 0xFF
+                a = line[i - bpp] if i >= bpp else 0
+                line[i] = (line[i] + ((a + prev[i]) >> 1)) & 0xFF
         elif f == 4:
             for i in range(stride):
                 a = line[i - bpp] if i >= bpp else 0
@@ -104,116 +109,42 @@ def read_png(path):
     return w, h, ctype, channels, palette, out, trns
 
 
-def write_png(path, w, h, rows, ctype):
-    """Write 8-bit rows (each a bytes-like of length w*channels) as a PNG of the given colour type."""
-    def chunk(typ, body):
-        return (struct.pack('>I', len(body)) + typ + body
-                + struct.pack('>I', zlib.crc32(typ + body) & 0xFFFFFFFF))
-
-    raw = b''.join(b'\x00' + bytes(r) for r in rows)
-    data = (b'\x89PNG\r\n\x1a\n'
-            + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, ctype, 0, 0, 0))
-            + chunk(b'IDAT', zlib.compress(raw, 9))
-            + chunk(b'IEND', b''))
-    open(path, 'wb').write(data)
+def soft_alpha(px):
+    """Count pixels whose alpha is neither fully opaque nor fully transparent."""
+    return sum(1 for a in px[3::4] if 0 < a < 255)
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--filter', choices=('majority', 'box', 'nearest'), default='majority',
-                    help='how to resample pack.png down to the tab icon size (default majority)')
-    ap.add_argument('--tab-size', type=int, default=16,
-                    help='side of the creative tab icon in GUI pixels (default 16)')
-    args = ap.parse_args()
-
-    w, h, ctype, channels, palette, px, trns = read_png(REPO_PACK)
-    assert ctype == 6, ('pack.png must be 8-bit RGBA, got colour type %d' % ctype)
+    w, h, ctype, channels, _palette, px, _trns = read_png(REPO_PACK)
+    assert ctype == 6 and channels == 4, \
+        'pack.png must be 8-bit RGBA, got colour type %d' % ctype
     assert w == h, 'pack.png must stay square (ModMenu rejects anything else): %dx%d' % (w, h)
-    assert args.tab_size > 0 and w % args.tab_size == 0, \
-        'pack.png side (%d) must be an integer multiple of --tab-size (%d)' % (w, args.tab_size)
+    # A few anti-aliased edge pixels are fine (MC blends them over the tab graphic),
+    # but a large soft-alpha region means the art was scaled by a filter and will
+    # show a halo against the tab.  This art has none at all, and a decoder bug
+    # (see the module docstring) shows up here immediately as stray 1/2/4/8/16
+    # alphas, so the printed numbers double as a decoder self-test.
+    assert soft_alpha(px) * 20 <= w * h, \
+        'pack.png has %d soft-alpha pixels, that looks filtered rather than pixel art' % soft_alpha(px)
+    print('%s: %dx%d, %d opaque / %d soft pixels'
+          % (REPO_PACK, w, h, sum(1 for a in px[3::4] if a == 255), soft_alpha(px)))
 
-    def pixel(x, y):
-        i = (y * w + x) * channels
-        return px[i], px[i + 1], px[i + 2], px[i + 3]
+    master = open(REPO_PACK, 'rb').read()
+    for path in COPIES:
+        open(path, 'wb').write(master)
 
-    # 1. The mod icon is the art itself, byte for byte.  ModMenu blits 32x32, and
-    #    pack.png is 32x32, so nothing is resampled on the way to the screen.
-    raw_pack = open(REPO_PACK, 'rb').read()
-    open(REPO_ICON, 'wb').write(raw_pack)
-    print('wrote %s: %dx%d (verbatim copy of %s)' % (REPO_ICON, w, h, REPO_PACK))
-
-    # 2. The creative tab icon is drawn in a 16x16 slot, so pre-filter it here
-    #    instead of letting the GPU point-sample 32x32 -> 16x16 (which drops
-    #    every other row and can lose a one-pixel feature such as an eye).
-    step = w // args.tab_size
-    rows = []
-    for oy in range(args.tab_size):
-        row = bytearray()
-        for ox in range(args.tab_size):
-            if args.filter == 'nearest':
-                r, g, b, a = pixel(ox * step + step // 2, oy * step + step // 2)
-                a = 255 if a >= 128 else 0
-                row += bytes((r, g, b, a))
-                continue
-            if args.filter == 'majority':
-                # Most frequent colour inside the block, ties broken towards the
-                # brighter one.  Output colours therefore all exist in the
-                # source, which is what keeps 32x32 pixel art looking like pixel
-                # art after the 2:1 shrink.
-                counts = collections.Counter()
-                for sy in range(oy * step, (oy + 1) * step):
-                    for sx in range(ox * step, (ox + 1) * step):
-                        cr, cg, cb, ca = pixel(sx, sy)
-                        if ca >= 128:
-                            counts[(cr, cg, cb)] += 1
-                if sum(counts.values()) * 2 < step * step:
-                    row += b'\x00\x00\x00\x00'
-                else:
-                    r, g, b = max(counts.items(), key=lambda kv: (kv[1], kv[0][0] + kv[0][1] + kv[0][2]))[0]
-                    row += bytes((r, g, b, 255))
-                continue
-            r = g = b = 0.0
-            weight = 0.0
-            covered = 0
-            for sy in range(oy * step, (oy + 1) * step):
-                for sx in range(ox * step, (ox + 1) * step):
-                    cr, cg, cb, ca = pixel(sx, sy)
-                    if ca >= 128:
-                        r += cr
-                        g += cg
-                        b += cb
-                        weight += 1.0
-                        covered += 1
-            # Keep the silhouette hard-edged (MC blits with NEAREST, partial
-            # alpha here would only show up as speckle) but average the colour
-            # over the opaque samples so 2:1 does not turn into a checkerboard.
-            if covered * 2 >= step * step:
-                n = float(covered)
-                row += bytes((int(round(r / n)), int(round(g / n)), int(round(b / n)), 255))
-            else:
-                row += b'\x00\x00\x00\x00'
-        rows.append(row)
-    write_png(REPO_TAB_ICON, args.tab_size, args.tab_size, rows, 6)
-    print('wrote %s: %dx%d (%s filter, %d:%d)'
-          % (REPO_TAB_ICON, args.tab_size, args.tab_size, args.filter, w, args.tab_size))
-
-    # 3. Self-checks: a bad crop or a lost alpha channel should fail here, not
-    #    one game launch later.
-    assert open(REPO_ICON, 'rb').read() == raw_pack, 'icon.png drifted from pack.png'
-    iw, ih = read_png(REPO_ICON)[:2]
-    assert iw == ih, 'icon.png is %dx%d, ModMenu will reject it' % (iw, ih)
-    tw, th, tctype, tchannels, _, tpx, _ = read_png(REPO_TAB_ICON)
-    assert (tw, th) == (args.tab_size, args.tab_size), 'tab icon is %dx%d' % (tw, th)
-    assert tctype == 6 and tchannels == 4, 'tab icon must be RGBA'
-    alphas = set(tpx[3::4])
-    assert alphas <= {0, 255}, 'tab icon alpha must stay binary, got %s' % sorted(alphas)
-    opaque = sum(1 for a in tpx[3::4] if a)
-    assert opaque > args.tab_size * args.tab_size // 4, \
-        'tab icon is only %d opaque pixels, the crop is probably empty' % opaque
-    print('self-check ok: tab icon %d opaque pixels, %d distinct colours'
-          % (opaque, len({bytes(tpx[i * 4:i * 4 + 3]) for i in range(args.tab_size ** 2) if tpx[i * 4 + 3]})))
+    # Self-checks: a stale or hand-edited icon file is the one failure mode this
+    # script exists to prevent, so re-read every product instead of trusting the
+    # write above.
+    for path in COPIES + (REPO_PACK,):
+        cw, ch, cctype, cchannels, _, cpx, _ = read_png(path)
+        assert cw == ch, '%s is %dx%d, ModMenu rejects non-square icons' % (path, cw, ch)
+        assert cctype == 6 and cchannels == 4, '%s must be 8-bit RGBA' % path
+        assert soft_alpha(cpx) == soft_alpha(px), '%s alpha drifted from %s' % (path, REPO_PACK)
+        assert open(path, 'rb').read() == master, '%s drifted from %s' % (path, REPO_PACK)
+        print('ok  %s  %dx%d  %d bytes' % (path, cw, ch, len(master)))
+    print('all three files are byte-identical copies of %s' % REPO_PACK)
 
 
 if __name__ == '__main__':
     main()
-
