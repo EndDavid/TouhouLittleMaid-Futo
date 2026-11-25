@@ -235,6 +235,16 @@ jar {
 		exclude 'META-INF/versions/**', 'module-info.class'
 	}
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+	// ------------------------------------------------------------------
+	// 首次发布版起，把两份许可原文一并打进 jar。
+	//
+	// 本模组的美术 / 模型 / 音效继承上游，以 CC BY-NC-SA 4.0 分发，该许可要求
+	// 随分发附带许可文本；代码侧是 MIT。两份都放到 META-INF 下，与上面合并
+	// 进来的库自带的 META-INF/LICENSE（Apache-2.0）并列，互不覆盖。
+	// ------------------------------------------------------------------
+	from('LICENSE-MIT') { into 'META-INF' }
+	from('LICENSE-CC') { into 'META-INF' }
 }
 
 // ---------------------------------------------------------------------------

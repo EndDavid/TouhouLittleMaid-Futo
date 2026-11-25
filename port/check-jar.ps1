@@ -3,7 +3,13 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $repo = 'D:\codename_EndDavid\hello java\touhou_little_maid_futo'
-$jar  = Join-Path $repo 'build\libs\touhoulittlemaid-fabric-1.18.2-futo-1.2.2-futo.1.jar'
+# Resolve the jar instead of hard-coding a version: the artifact name is
+# derived from mod_version in gradle.properties and changes every release.
+$libs = Join-Path $repo 'build\libs'
+$jars = @(Get-ChildItem -Path $libs -Filter 'touhoulittlemaid-fabric-*.jar' -ErrorAction SilentlyContinue |
+          Where-Object { $_.Name -notlike '*-sources.jar' } | Sort-Object LastWriteTime -Descending)
+if ($jars.Count -eq 0) { throw "no built jar under $libs - run ./gradlew.bat build first" }
+$jar  = $jars[0].FullName
 $out  = Join-Path $repo 'port\_jarcheck.txt'
 $sb = New-Object System.Text.StringBuilder
 

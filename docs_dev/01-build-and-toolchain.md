@@ -301,6 +301,10 @@ Caused by: java.lang.UnsupportedOperationException
 
 1. `port/deploy-jar.ps1` 把新 jar 拷进 `D:\MCHMCL\.minecraft\versions\1.18.2-Fabric-test\mods`
    （旧 jar 自动备份到同级的 `mods_backup_tlm`，sha256 双向校验）；
+   它**还会把 mods/ 里本模组其它版本**（`touhoulittlemaid-fabric-*.jar`）一起移进备份目录 ——
+   产物名带 `mod_version`，每换一次版本就会多留一个旧 jar，而两个同 `modid` 的 jar 会让
+   Fabric Loader 直接拒绝启动（或悄悄加载旧的那个）。脚本也不再写死版本号，改为在
+   `build/libs` 里取最新的非 `-sources` 产物，`port/check-jar.ps1` 同理；
 2. 用工单里那份 `launch.bat` 的完整命令行启动 —— 注意 HMCL 导出的命令里
    access token 是 `<access token>` 占位符，**尖括号会被 cmd 当成重定向**，
    必须先替换成合法 token，否则会得到「系统找不到指定的文件」而不是真正的崩溃；
