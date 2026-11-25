@@ -1,5 +1,0 @@
-- **坐垫**：`other/chair.json`、`other/chair_show.json`。
-- **好感度工具**：`other/favorability_tool.json`（本轮）。`favorability_tool_add` /
-  `_reduce` / `_full` 三个变体一起注册，交互在 `EntityMaid#useFavorabilityTool`
-  （上游 `UseFavorabilityToolEvent`），潜行 1 点、否则 64 点。
-

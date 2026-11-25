@@ -1,28 +1,54 @@
+# 这个仓库只提交「别人 clone 下来就能编译 / 运行」的东西。
+# 构建产物、运行目录、脚本的临时输出一律不入库（「必须入库」的清单见文件末尾）。
+
 # prompt custom
+# 注意：这份文件**已经被跟踪**（仓库里的约束说明要共享），忽略规则只挡
+# 别人在本机另存的副本；想让本地改动生效得先 `git rm --cached` 它。
 .github/copilot-instructions.md
 
-# build artifacts
+# ============================================================ 构建产物
 build/
 .gradle/
 out/
 bin/
 *.class
+# Loom / Gradle 的中间物，以及 JVM 崩溃转储
+loom-cache/
+.fabric/
+remappedJar/
+*.hprof
+hs_err_pid*
+replay_pid*
 
-# run dir
+# ============================================================ 运行目录
+# run/ 是 Loom 的开发运行目录（存档 / 配置 / 日志全在里面）
 run/
+runs/
+run-*/
+crash-reports/
+logs/
 
-# tmps
+# ============================================================ 临时文件
 tmp_*
 *.tmp
 *.bak
 *.orig
 *.rej
+*~
+*.swp
+*#
 
-# logs
+# ============================================================ 日志
+# 覆盖构建日志、开发运行日志，以及 JVM 的 hs_err_pid*.log
 *.log
 *.log.gz
 
-# IDE
+# ============================================================ Python
+# port/ 下的 helper 脚本换一轮就会多一个 __pycache__
+__pycache__/
+*.py[cod]
+
+# ============================================================ IDE
 # .idea/ 里的 workspace.xml / usage.statistics.xml 每次打开都会变；
 # 只保留能表达项目结构的几份共享配置（见下方 ! 例外）。
 .idea/*
@@ -32,7 +58,8 @@ tmp_*
 !.idea/codeStyles/
 !.idea/inspectionProfiles/
 *.iml
-!hello\ java.iml
+# 注意：gitignore 里空格是字面量，不要写成 `hello\ java.iml`
+!hello java.iml
 
 .classpath
 .project
@@ -40,20 +67,33 @@ tmp_*
 .vscode/
 *.code-workspace
 
-# sys
+# ============================================================ 系统
 Thumbs.db
 Desktop.ini
 .DS_Store
 
-# ============================================================ 注意（不属于忽略，写在这里当备忘）
-# 下面这些**必须入库**，否则 clone 下来编译不了：
-#   libs/*.jar          —— build.gradle 用 files("libs/xxx.jar") 硬引用，4 个本地依赖
-#   gradle/wrapper/     —— Gradle wrapper 本体
-#   port/               —— 上游参考源码（改代码时的对照物）
-#   src/main/resources  —— 内置模型 / 贴图 / 音效（约 48 MB）
-
-
-# scratch output from port/ helper scripts
+# ============================================================ 脚本的临时输出
+# port/ 下的 helper 脚本把中间结果写成 port/_xxx.txt。这些是过程产物，
+# 只留给人看，不入库（早年误提交的那批已在本轮 git rm --cached 掉）。
 port/_*
 port_check_status.txt
+
+# 根目录的历史遗留散件
+/check.txt
+
+
+# ============================================================ 必须入库（不属于忽略，写在这里当备忘）
+# 下面这些被误删或误忽略，clone 下来就编译不了：
+#   libs/*.jar          —— build.gradle 用 files("libs/xxx.jar") 硬引用（ForgeConfigAPIPort、
+#                          Patchouli、REI、architectury、basic-math、cloth-config、concentus、
+#                          fiber、modmenu、snakeyaml、toml、vorbis 等）
+#   gradle/wrapper/     —— Gradle wrapper 本体，含 gradle-wrapper.jar
+#   port/               —— 上游参考源码（改代码时的对照物）与守卫脚本
+#   port/upstream*/     —— 上游 1.18.2 Forge 源码，只读参考，不参与编译
+#   src/main/resources  —— 内置模型 / 贴图 / 音效（约 48 MB）
+#   docs_dev/           —— 移植过程笔记，含所有已验结论
+#
+# 反过来：如果哪天要加「*.jar 一律忽略」这类大范围规则，务必先加回来
+#   !libs/*.jar
+#   !gradle/wrapper/gradle-wrapper.jar
 

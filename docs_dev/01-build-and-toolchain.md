@@ -15,6 +15,19 @@ touhou_little_maid_futo/
 └─ port/upstream/                   ← 上游 1.18.2 源码（1110 文件，仅参考，不参与编译）
 ```
 
+### 哪些东西入库、哪些不入库
+
+`.gitignore` 的分组就是规则本身（构建产物 / 运行目录 / 临时文件 / 日志 / Python / IDE / 系统 /
+脚本临时输出），末尾还留着一份「必须入库」的备忘清单。要点：
+
+- **入库**：`libs/*.jar`（`build.gradle` 硬引用）、`gradle/wrapper/`、`src/main/resources/`（约 48 MB 资源）、
+  `port/`（上游参考源码 + 守卫脚本）、`docs_dev/`。
+- **不入库**：`build/` `.gradle/`、`run/`（开发运行目录，含存档与日志）、`loom-cache/` `.fabric/`
+  `crash-reports/`、`__pycache__/`、`*.log` / `*.hprof` / `hs_err_pid*`，以及 `port/_*.txt`
+  （helper 脚本的中间输出）。
+- 想加「`*.jar` 一律忽略」这类大范围规则时，务必同时加回 `!libs/*.jar` 与
+  `!gradle/wrapper/gradle-wrapper.jar`，否则 clone 下来直接编译失败。
+
 ## 构建 / 运行
 
 ```powershell

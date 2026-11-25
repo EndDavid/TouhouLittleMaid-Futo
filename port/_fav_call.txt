@@ -1,7 +1,0 @@
-            // 好感度工具：上游 UseFavorabilityToolEvent（InteractMaidEvent，NORMAL 优先级）。
-            // 三个变体分别加 / 减 / 拉满，潜行时只走 1 点，否则 64 点。
-            InteractionResult favorabilityResult = this.useFavorabilityTool(player, stack);
-            if (favorabilityResult != null) {
-                return favorabilityResult;
-            }
-

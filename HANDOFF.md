@@ -952,3 +952,47 @@ mixin 里的贴图路径、尺寸常量全部不用动。
 
 **没验的**：GitHub / IDE 里的 Markdown 渲染效果（相对链接已按文件系统逐个校验）。
 
+## 本轮：`.gitignore` 补全，并清掉已入库的过程产物
+
+**起因**：用户要求完善 `.gitignore`，避免把无用文件传上去。
+
+**旧规则的缺口**（用 `git check-ignore -v` 逐条实测出来的）：
+
+| 路径 | 旧行为 |
+|---|---|
+| `logs/` | 只被 `*.log` 顺带挡住文件，目录本身没规则 |
+| `loom-cache/` `.fabric/` `crash-reports/` | 完全没覆盖（Loom / 开发运行一次就会生成） |
+| `*.hprof` `hs_err_pid*` `replay_pid*` | 没覆盖（JVM 崩溃转储，动辄上百 MB） |
+| `__pycache__/` `*.pyc` | 只是被 `port/_*` 里的 `_*` 巧合匹配，`port/x/__pycache__` 就漏了 |
+| `!.idea/...` 之外的 `*~` `*.swp` | 没覆盖 |
+| `!hello\ java.iml` | **写错了**：gitignore 里空格是字面量，反斜杠让它永远匹配不上 |
+
+**新 `.gitignore`**：按用途分组（构建产物 / 运行目录 / 临时文件 / 日志 / Python / IDE / 系统 /
+脚本临时输出），每组一行注释说明为什么；末尾保留并扩充了「必须入库」备忘清单，
+并明确写出「若加 `*.jar` 规则，必须同时加回 `!libs/*.jar` 与 `!gradle/wrapper/gradle-wrapper.jar`」。
+同时给 `.github/copilot-instructions.md` 那条加了注：它**已被跟踪**，忽略规则只挡别人本机的副本。
+
+**清掉的过程产物**（`git rm --cached`，磁盘文件都保留）：
+
+- `/check.txt` —— 1 行 `??YES` 的散件；
+- `port/_fav_*.txt`（5）、`port/_hb_*.txt`（4）、`port/_msg4.txt` / `_msg7.txt`、
+  `port/_readme_*.txt`（2）、`port/_v2_*.txt` / `_v3_*.txt` —— 共 15 个 grep 片段与提交信息草稿，
+  本来就落在已声明的 `port/_*` 临时区里，属于早年误提交。
+
+**怎么验的**
+
+- `git check-ignore -v --no-index` 逐条确认新规则命中（`loom-cache/` `.fabric/` `crash-reports/`
+  `logs/` `run-1/` `__pycache__/` `*.hprof` `hs_err_pid*` `replay_pid*` `*~` `/check.txt` `port/_*`）。
+- 反向确认**没误伤**：`libs/modmenu-3.2.5.jar`、`gradle/wrapper/gradle-wrapper.jar`、
+  `port/upstream/README.md`、`port/check-jar.ps1`、`docs_dev/README.md`、`src/main/resources/icon.png`
+  全部 `NOT ignored`。
+- `git ls-files -i -c --exclude-standard`（已跟踪却被忽略）从 17 项降到 1 项 —— 只剩
+  `.github/copilot-instructions.md`（有意保留跟踪）。
+- `./gradlew.bat build` → BUILD SUCCESSFUL（忽略规则没动到编译输入）；
+  `check-encoding.ps1` → `SCANNED_FILES=1605 BAD_FILES=0 FFFD_CHARS=0`；`port/check-jar.ps1` → checked。
+
+**文档**：`docs_dev/01-build-and-toolchain.md` 的「目录结构」下补了「哪些东西入库、哪些不入库」小节。
+
+**没做的**：没有手工删任何磁盘文件（`git rm --cached` 只动索引）；没有动 `port/upstream*/`
+（1112 + 73 + 6 个文件，是有意入库的对照物）、`libs/*.jar`、`tlm_custom_pack/*.zip`（随 jar 发布的资源）。
+
