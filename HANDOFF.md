@@ -847,3 +847,45 @@ python port/make-icons.py     # 打印 594 opaque / 0 soft，三个文件互为�
 而「画不对」这类问题只有真的打开创造栏才会暴露，启动一次也验不到。
 页签尺寸 24 的实际观感仍需人眼确认。
 
+## 本轮：把页签图标改回 32×32 材质按 16×16 显示（并修掉误用 blit 重载导致的裁切）
+
+**现象**：用户截图里页签图标「怪怪的」，并问「32×32 的材质能不能按 16×16 显示」。
+
+**根因（这是真 bug，不是审美问题）**：`GuiComponent.blit` 有两个重载，语义不同 ——
+
+```java
+// 9 参：UV 跨度 == 目标尺寸。内部 innerBlit(..., w, h, u, v, texW, texH)
+blit(pose, x, y, blitOffset, u, v, w, h, texW, texH)
+// 11 参：目标尺寸与 UV 范围是两组参数。内部 innerBlit(..., uWidth, vHeight, u, v, texW, texH)
+blit(pose, x, y, width, height, u, v, uWidth, vHeight, texW, texH)
+```
+
+上一轮用的是 9 参版、写 `(16, 16, 32, 32)`，以为「目标 16×16、贴图 32×32 会自动缩」，
+实际 UV 只覆盖 0..16/32 = 左上角**四分之一** —— 页签上显示的是立绘的左上角，所以看着像被裁。
+（javap 出来的字节码可证：9 参版把 `w/h` 直接当 uv 跨度传进 innerBlit。）
+
+**改了什么**
+
+- 换成 11 参重载：目标 `(16, 16)`、UV 取满 `(0, 0, 32, 32)`、贴图 `32×32`，
+  即真正的 2:1 点采样。remapJar 后确认是 `class_332.method_25293(Lclass_4587;IIIIFFIIII)V`，
+  与 intermediary jar 里的签名对得上。
+- 该重载 z 固定为 0，所以外面包一层 `pushPose()` + `translate(0, 0, 100)` + `popPose()`，
+  补回原版 `itemRenderer.blitOffset = 100` 的层级（等价于 vanilla 自己画物品图标那一层）。
+- `futo$tabIconSize` 默认改为 **16**（原版尺寸）。想放大仍可改成 20 / 24，贴图不用动；
+  默认值时 `inset = (16-16)/2 = 0`，位置与原版槽位完全重合。
+- README 的「图标与美术资源」一节同步改写，把 9 参 / 11 参这个坑写进去。
+
+**怎么验的**
+
+- `./gradlew.bat build` → BUILD SUCCESSFUL。
+- 读 jar：mixin 里是 `method_25293` + `(Lnet/minecraft/class_4587;IIIIFFIIII)V`，与上一轮的
+  `method_25291`（9 参）不同，说明用的确实是另一个重载；intermediary jar 里 `class_332` 确实有
+  `method_25293(PoseStack, int, int, int, int, float, float, int, int, int, int)`。
+- 按 `UV 中心 → 源像素 2d+1` 离线模拟了 16×16 采样并打印字符图：帽子、眼睛、发饰都还在，
+  且每格颜色都取自原图（无中间色）。
+- 守卫脚本：`check-encoding` → 0；`check-dangling` / `check-jar` → checked；`check-renderers` → ALL OK。
+  已 `deploy-jar` 进 `1.18.2-Fabric-test`。
+
+**没验的**：仍需真人打开创造栏看一眼（裁剪已修，但 16×16 只有原图 1/4 的像素，
+这张立绘在 16×16 下五官会比较紧凑 —— 这是 GUI 分辨率的硬限制，不是渲染错误）。
+

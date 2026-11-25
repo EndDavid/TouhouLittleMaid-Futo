@@ -72,7 +72,7 @@ jar 根目录有 `pack.mcmeta`，模组本身就是一个内置资源包，这�
 |---|---|---|
 | `src/main/resources/pack.png` | 内置资源包的图标 | 上游就是这个名字、这个位置 |
 | `src/main/resources/icon.png` | `fabric.mod.json` 的 `icon`，ModMenu 读 | ModMenu 画的是 32×32 的方块，32×32 正好 1:1 |
-| `assets/touhou_little_maid/textures/gui/tab_icon.png` | 主创造模式页签的图标 | 32×32，绘制时由 GPU 采样到 24×24（见下） |
+| `assets/touhou_little_maid/textures/gui/tab_icon.png` | 主创造模式页签的图标 | 32×32，绘制时由 GPU 采样到 16×16（见下） |
 
 `icon.png` **必须**是正方形：ModMenu 的 `FabricIconHandler.createIcon` 里有
 `Validate.validState(w == h, "Must be square icon")`，非正方形一律被拒、退回默认图标，
@@ -86,15 +86,28 @@ jar 根目录有 `pack.mcmeta`，模组本身就是一个内置资源包，这�
 （`mixin/client/CreativeModeInventoryScreenMixin`）把主页签的那一次调用重定向成贴图，
 别的页签原样转交。**不新增注册物品** —— 凭空多一件「只有贴图」的物品会被 `/give` 和 REI 看到。
 
-页签里那个图标**不必**按 16×16 出图。原版给的是 16×16 物品图标的槽位，但页签底图本身是 28×32，
-图标位置在底图里留了 6（左右）/ 9（上）的边距 —— 所以 mixin 保持中心不动，把边长放大到 24×24
-（`futo$tabIconSize`，横向还剩 2 像素、纵向 3 像素，不会压到圆角），贴图仍然用 32×32 原图，
-缩放在绘制时由 GPU 点采样一次完成。16×16 只能留下原图 1/4 的像素，这张立绘的脸会糊成一片；
-24×24 能留下 56%。嫌太满就把那个常量改成 20（边距 4）或 16（原版尺寸），贴图不用动。
+页签里那个图标**不必**按 16×16 出图：贴图保持 32×32，绘制时压进 16×16，由 GPU 点采样
+（`futo$tabIconSize` 控制目标边长，默认 16 = 原版尺寸）。
+
+**这里有个坑，值得记住。** `GuiComponent.blit` 有两个重载，长得很像但语义不同：
+
+```java
+// 9 参：UV 跨度 == 目标尺寸，写 (16, 16, 32, 32) 等于"取原图左上角 16×16 那四分之一"
+blit(pose, x, y, blitOffset, u, v, w, h, texW, texH)
+// 11 参：目标尺寸与 UV 范围分开，这才是「32×32 缩到 16×16」
+blit(pose, x, y, width, height, u, v, uWidth, vHeight, texW, texH)
+```
+
+一开始误用了 9 参版本，结果页签上只出现立绘的左上角 —— 看上去像「被裁掉」。用 11 参版本、
+目标 16×16、UV 取满 0..32 才是正确缩放；这个重载 z 固定为 0，所以用 `poseStack.translate(0, 0, 100)`
+补回原版 `itemRenderer.blitOffset = 100` 的层级。
+
+嫌图标小可以把 `futo$tabIconSize` 改成 24：页签底图 28×32，原版图标位置留了 6（左右）/ 9（上）
+的边距，24 撑满后横向还剩 2 像素、纵向 3 像素，不会压到圆角。贴图不用动。
 
 三张图都由 `port/make-icons.py` 同步（纯标准库，不需要 Pillow）：两个产物都是 `pack.png` 的
 **逐字节副本**，脚本里没有任何缩放 —— 缩放已经由 GPU 在绘制时做那一次了，离线再缩一次只会
-把信息丢两遍，而且会把尺寸焊死（页签那张要同时服务 16 / 20 / 24 三种画法）。
+把信息丢两遍，而且会把尺寸焊死（页签那张要同时服务 16 / 20 / 24 几种画法）。
 一旦换美术，只要替换 `pack.png` 再跑一次：
 
 ```bash
