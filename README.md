@@ -60,18 +60,42 @@ loom_version=1.15.5
 
   正确姿势是**先读原始字节、只在目标位置插入、再原样写回**；或事后跑
   `port/fix-eol.ps1` 统一行尾。注意 `lang/en_us.json`、`lang/zh_cn.json` 的**原始行尾是 mixed**，
-
-### 模组图标（ModMenu）：`logo.png` 不能直接用
-
-`fabric.mod.json` 原来引用的是上游那张 1200×240 横幅 `logo.png`。ModMenu 读图标走的是
-`FabricIconHandler.createIcon`，里面有一句 `Validate.validState(w == h, "Must be square icon")`，
-所以横幅一律被拒、退回默认图标，日志就是 `Invalid mod icon for icon source touhou_little_maid:logo.png`
-（上游 1.20.1 Fabric 版同样有这个缺陷；Forge 那边反而是对的，`mods.toml` 本来就把 `logoFile` 当横幅画）。
-
-修法是另存一张正方形图标：`src/main/resources/icon.png`（128×128，Fabric 约定的图标尺寸），
-由 `port/make-icon.py` 从横幅居中裁 240×240、再按面积平均缩到 128 生成。脚本不依赖 Pillow，
-同参数输出字节完全相同（`sha256` 可复现）。`logo.png` 保留不动 —— `META-INF/mods.toml` 还在引用它。
   整体转换同样会造出近两千行 diff —— 只有字节级插入才能保住「1 行」的 diff。
+
+### 图标与美术资源：`pack.png` 是唯一来源
+
+模组自带的图标美术都来自同一张 32×32 的立绘，源文件就是 `src/main/resources/pack.png`：
+jar 根目录有 `pack.mcmeta`，模组本身就是一个内置资源包，这张图正是它在「资源包」界面里的图标
+（上游同样如此）。三处用途、三种尺寸：
+
+| 文件 | 用途 | 为什么是这个尺寸 |
+|---|---|---|
+| `src/main/resources/pack.png` | 内置资源包的图标 | 上游就是这个名字、这个位置 |
+| `src/main/resources/icon.png` | `fabric.mod.json` 的 `icon`，ModMenu 读 | ModMenu 画的是 32×32 的方块，32×32 正好 1:1 |
+| `assets/touhou_little_maid/textures/gui/tab_icon.png` | 主创造模式页签的图标 | 页签里那个位置就是 16×16 |
+
+`icon.png` **必须**是正方形：ModMenu 的 `FabricIconHandler.createIcon` 里有
+`Validate.validState(w == h, "Must be square icon")`，非正方形一律被拒、退回默认图标，
+日志是 `Invalid mod icon for icon source touhou_little_maid:logo.png`。上游 1.20.1 Fabric 版把
+`icon` 指向 1200×240 的横幅 `logo.png`，所以这条日志上游也有；Forge 那边没事，是因为
+`mods.toml` 本来就把 `logoFile` 当横幅画。`logo.png` 仍然保留 —— `META-INF/mods.toml` 还在引用它。
+
+页签图标换不了配置项：Fabric 的 `FabricItemGroupBuilder.icon(Supplier<ItemStack>)` 只收物品栈，
+原版也只在 `CreativeModeInventoryScreen#renderTabButton` 里拿 `getIconItem()` 去
+`renderAndDecorateItem`。所以这里用客户端 mixin
+（`mixin/client/CreativeModeInventoryScreenMixin`）把主页签的那一次调用重定向成贴图，
+别的页签原样转交。**不新增注册物品** —— 凭空多一件「只有贴图」的物品会被 `/give` 和 REI 看到，
+而 mixin 只影响那 16×16 的绘制。
+
+三张图都由 `port/make-icons.py` 生成（纯标准库，不需要 Pillow）：`icon.png` 是 `pack.png` 的
+原样副本；`tab_icon.png` 从 32×32 按「多数色」降到 16×16 —— 像素画 2:1 缩小要保留作者的调色板
+（实测 28 色），改用面积平均会糊成 136 色的模糊团。换美术只要替换 `pack.png` 再跑一次脚本，
+产物逐字节可复现：
+
+```bash
+python port/make-icons.py               # majority（默认）
+python port/make-icons.py --filter box  # 面积平均，仅作对比
+```
 
 ---
 

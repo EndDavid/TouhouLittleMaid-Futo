@@ -736,3 +736,65 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./check-encoding.ps1
 的 `icon` 字段是 `icon.png`；`check-encoding.ps1` 输出 0。
 **没验的**：游戏里 ModMenu 实际画出来的样子 —— 需要真人看一眼裁到的位置是否好看。
 想换窗口：`python port/make-icon.py --x 560`（不传就是中心），改完重新 `build` 即可。
+## 本轮：图标美术换成布都立绘（模组图标 / 主创造页签 / 女仆刷怪蛋）
+
+**现象**（上一轮遗留）：ModMenu 里显示的是「上游横幅裁成正方形」的那张 —— 那是宣传图，当图标不合适。
+用户提供了两张自制美术：一张 32×32 的 `pack.png` 仿制（灵梦换布都），一张 16×16 的女仆刷怪蛋仿制。
+
+**改了什么**
+
+- `src/main/resources/pack.png`：整张换成 32×32 的布都立绘。jar 根有 `pack.mcmeta`，
+  所以这张同时是「模组这个内置资源包」在资源包界面里的图标。
+- `src/main/resources/icon.png`：同一张图的原样副本，`fabric.mod.json` 的 `icon` 仍指向它。
+  32×32 是量过的：`ModListEntry#bindIconTexture` 只把 `64 * guiScale` 当尺寸提示，
+  真正绘制的是固定 32×32 的四边形，所以 32×32 正好 1:1，路上不重采样。
+- `assets/touhou_little_maid/textures/item/maid_spawn_egg.png`：换成新的 16×16 布都刷怪蛋
+  （`models/item/maid_spawn_egg.json` 不用动，路径没变）。
+- `assets/touhou_little_maid/textures/gui/tab_icon.png`（新）：16×16 的主页签图标。
+- `mixin/client/CreativeModeInventoryScreenMixin`（新，已登记进 `mixins.json` 的 client 列表）：
+  1.18.2 的页签图标只有一个来源 —— `CreativeModeTab#getIconItem()` 返回的物品栈交给
+  `ItemRenderer#renderAndDecorateItem` 画成 16×16；Fabric 的 `FabricItemGroupBuilder.icon` 也只收物品栈，
+  没有任何「直接给贴图」的口子。所以在 `renderTabButton` 里把**那一次**调用重定向：
+  主页签改画贴图，别的页签原样转交。`PoseStack` 与页签对象在 HEAD 处存进两个 `@Unique` 字段
+  （重定向处理器入参里没有外层方法的参数）。深度取 100 —— 原版画图标前把
+  `itemRenderer.blitOffset` 设成 100，我们顶替的正是这一层。
+  没有为此新增注册物品：那种「只有贴图」的物品会出现在 `/give` 与 REI 里，
+  而 mixin 只影响那 16×16 的绘制。
+- `port/make-icons.py`（新，取代已删除的 `port/make-icon.py`）：`icon.png` = `pack.png` 的原样副本；
+  `tab_icon.png` = 32×32 → 16×16 按**多数色**降采样。选多数色是因为这是像素画：2:1 缩小要保留
+  作者的调色板（实测 28 色），面积平均会造出 136 种中间色、看起来糊成一团（实测两种都生成过）。
+  纯标准库，两次运行 sha256 相同；写完会把产物读回来自检（正方形 / 尺寸 / alpha 只能 0 或 255 /
+  不透明像素数不为 0）。
+- README 的「模组图标」一节整节重写为「图标与美术资源」，顺带修掉上一轮错位到该节末尾的半句话
+  （「整体转换同样会造出近两千行 diff…」本来就该接在上面的行尾条目后面）。
+
+**怎么验的（可复现）**
+
+```bash
+python port/make-icons.py            # 生成 + 自检（打印不透明像素数与色数）
+./gradlew.bat build                  # BUILD SUCCESSFUL
+```
+
+- 读产物：`icon.png` 32×32 且与 `pack.png` 字节相同；`tab_icon.png` 16×16；
+  jar 里 `assets/touhou_little_maid/textures/gui/tab_icon.png` 在，`fabric.mod.json` 的 `icon` 是 `icon.png`。
+- **mixin 只在运行期生效，所以专门跑了一次 `runClient`**：临时在
+  `TouhouLittleMaidFutoClient#onInitializeClient` 里加了一句
+  `Class.forName("...CreativeModeInventoryScreen", false, loader)` 把目标类在启动阶段强制加载
+  （不这样做，只有玩家按 E 开创造栏才会触发转换，等于没验）。日志出现
+  `[FUTO-PROBE] creative screen loaded ok`，且整份日志没有任何 `InvalidInjectionException` /
+  `Mixin apply failed` —— `defaultRequire: 1` 下注入点对不上会直接抛异常，所以这等于两条注入都命中。
+  探针随后已整段删除，`git diff` 里该文件为空。
+- 正式环境的重映射也看过：jar 里该 mixin 的注解已被 remapJar 改写成 intermediary
+  （`method_2468` = `renderTabButton`、`method_4023` = `renderAndDecorateItem`、
+  `method_25291` = `GuiComponent#blit`、`method_34542` = `GameRenderer#getPositionTexShader`），
+  不依赖 refmap。
+- 那次启动的日志里没有 `Invalid mod icon for icon source` / `Must be square icon`；9 条 ERROR
+  全是上游同款的 `No data fixer registered for ...`，与本次无关。
+- 守卫脚本：`check-encoding.ps1` → `SCANNED_FILES=1599 BAD_FILES=0 FFFD_CHARS=0`；
+  `port/check-dangling.ps1` → checked；`port/check-renderers.ps1` → `ALL OK`；`port/check-jar.ps1` → checked。
+- 已用 `port/deploy-jar.ps1` 把新 jar 装进 `1.18.2-Fabric-test` 实例（旧 jar 有备份，sha256 双向匹配）。
+
+**没验的**：页签图标与人眼观感 —— 需要真人开一次创造模式物品栏看一眼。
+16×16 会把这个 32×32 立绘压掉一半细节；嫌糊可以换滤镜再生成：
+`python port/make-icons.py --filter box`（面积平均，更柔和）或 `--filter nearest`（硬边，可能丢眼睛高光）。
+

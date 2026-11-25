@@ -21,6 +21,7 @@
   ],
   "client": [
     "client.ClientPacketListenerMixin",
+    "client.CreativeModeInventoryScreenMixin",
     "client.LivingEntityBreakItemAccessor",
     "client.HumanoidModelMixin",
     "client.ItemInHandRendererMixin",

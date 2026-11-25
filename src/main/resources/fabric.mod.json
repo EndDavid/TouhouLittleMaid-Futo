@@ -6,7 +6,8 @@
 	"description": "Touhou Little Maid Unofficial Fabric 1.18.2 Port.",
 	"authors": [
 		"TartaricAcid (Original Author)",
-		"EndDavid_Iku"
+                "Touhou Little Maid Contributors",
+		"EndDavid_Iku (Fabric 1.18.2 Port)"
 	],
 	"contact": {
 		"homepage": "https://github.com/TartaricAcid/TouhouLittleMaid",
