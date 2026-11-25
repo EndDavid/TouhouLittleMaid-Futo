@@ -25,6 +25,9 @@
 		],
 		"rei_client": [
 			"com.github.tartaricacid.touhoulittlemaid.compat.rei.MaidREIClientPlugin"
+		],
+		"modmenu": [
+			"com.github.tartaricacid.touhoulittlemaid.compat.modmenu.ModMenuApiImpl"
 		]
 	},
 	"mixins": [
@@ -39,6 +42,7 @@
 	},
 	"suggests": {
 		"cloth-config": ">=6.0.0 <7.0.0",
-		"patchouli": "*"
+		"patchouli": "*",
+		"modmenu": ">=3.0.0"
 	}
 }

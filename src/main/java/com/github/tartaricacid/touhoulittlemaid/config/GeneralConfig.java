@@ -14,6 +14,15 @@ import net.minecraftforge.common.ForgeConfigSpec;
  * <p>上游还有 {@code AIConfig}（AI 聊天 / TTS / STT），本轮已移植并接在这里。</p>
  */
 public final class GeneralConfig {
+    /**
+     * 构建好的 COMMON spec。
+     *
+     * <p>Cloth Config 界面里的 {@code setSaveConsumer} 只改内存中的值，
+     * 必须有人调 {@link ForgeConfigSpec#save()} 才会落盘 —— 上游靠 Forge 自己的
+     * 配置界面顺手保存，本移植版是自建界面，所以这里留一个引用给它用。</p>
+     */
+    private static ForgeConfigSpec spec;
+
     private GeneralConfig() {
     }
 
@@ -25,7 +34,14 @@ public final class GeneralConfig {
         MiscConfig.init(builder);
         VanillaConfig.init(builder);
         RenderConfig.init(builder);
-        return builder.build();
+        spec = builder.build();
+        return spec;
+    }
+
+    /** 配置界面点「保存」时调用：把内存里的值写回 {@code config/touhou_little_maid-common.toml}。 */
+    public static void save() {
+        if (spec != null && spec.isLoaded()) {
+            spec.save();
+        }
     }
 }
-

@@ -162,6 +162,17 @@ public final class MaidTipsOverlay {
             if (item == Items.SADDLE && enabled(RenderConfig.ENABLE_SADDLE_TIP)) {
                 return new TranslatableComponent("overlay.touhou_little_maid.saddle.tips");
             }
+            // 书与笔 / 成书：右键女仆可以写入聊天气泡台本（上游同一分支）。
+            if ((item == Items.WRITABLE_BOOK || item == Items.WRITTEN_BOOK)
+                    && enabled(RenderConfig.ENABLE_SCRIPT_BOOK_TIP)) {
+                return new TranslatableComponent("overlay.touhou_little_maid.script_book.tips");
+            }
+            // AI 聊天：对着已配置好站点的女仆按下聊天键就能说话。
+            // 只在自己拥有、且聊天功能开着的女仆上提示 —— 别人的女仆不能聊。
+            if (enabled(RenderConfig.ENABLE_AI_CHAT_TIP)
+                    && com.github.tartaricacid.touhoulittlemaid.config.subconfig.AIConfig.CHAT_ENABLED.get()) {
+                return new TranslatableComponent("overlay.touhou_little_maid.can_ai_chat.tips");
+            }
         }
         return specialTip(stack, maid, player);
     }
@@ -175,9 +186,11 @@ public final class MaidTipsOverlay {
         if (!maid.isOwnedByPlayer(player) && maid.getNtrItem().test(stack)) {
             return new TranslatableComponent("overlay.touhou_little_maid.ntr_item.tips");
         }
-        // 自己的女仆 + 剪刀 + 当前有背包
+        // 自己的女仆 + 剪刀 + 当前有背包。
+        // 受 {@code EnableShearsTip} 开关控制 —— 上游同一处也是先判配置。
         if (maid.isOwnedByPlayer(player) && maid.hasBackpack()
-                && stack.getItem() instanceof net.minecraft.world.item.ShearsItem) {
+                && stack.getItem() instanceof net.minecraft.world.item.ShearsItem
+                && enabled(RenderConfig.ENABLE_SHEARS_TIP)) {
             return new TranslatableComponent("overlay.touhou_little_maid.remove_backpack.tips");
         }
         return null;
@@ -214,4 +227,3 @@ public final class MaidTipsOverlay {
                 Items.GLASS_BOTTLE, "overlay.touhou_little_maid.glass_bottle.tips");
     }
 }
-

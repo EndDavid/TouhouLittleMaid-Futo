@@ -2,9 +2,11 @@ package com.github.tartaricacid.touhoulittlemaid.client.renderer.entity;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.model.EntityFairyModel;
+import com.github.tartaricacid.touhoulittlemaid.config.subconfig.MiscConfig;
 import com.github.tartaricacid.touhoulittlemaid.entity.monster.EntityFairy;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Vector3f;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
@@ -12,16 +14,16 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 女仆妖精渲染器，移植自上游（1.18.2）{@code client/renderer/entity/EntityFairyRenderer}。
  *
- * <p><b>与上游的差异：</b>上游按配置 {@code UseNewMaidFairyModel} 在
- * 「旧模型 / 新模型 / 幼年模型」之间三选一分派渲染器。本移植版<b>只实现了旧模型</b> ——
- * 新模型是 {@code simplebedrockmodel} 的 JSON 模型，而工作区里只有它的贴图
- * （{@code textures/entity/new_maid_fairy/*.png}，128×128），没有对应的 JSON。
- * 硬接会直接抛「找不到模型」。因此这里的配置项被忽略，统一走旧模型；等 JSON 补齐后，
- * 再把 {@code NewEntityFairyRenderer} 接上即可，选择逻辑本身不需要改。</p>
+ * <p>它本身只负责<b>旧模型</b>（{@link EntityFairyModel}），并按
+ * {@code MiscConfig#USE_NEW_MAID_FAIRY_MODEL} 决定要不要把整帧交给
+ * {@link NewEntityFairyRenderer}（新模型）。这与上游一致：
+ * 上游在这个类里持有 {@code newEntityFairyRenderer} 并在 {@code render} 开头分派，
+ * 而不是在注册处二选一 —— 那样配置改了还得重启。</p>
  *
  * <p><b>悬空时的 8° 前倾：</b>上游用 {@code Vector3f.XN.rotation} 实现。1.18.2 的
  * {@code com.mojang.math.Vector3f} 是 Mojang 自己的类，{@code XN} 是「绕 X 轴负方向」的
- * 单位向量常量，{@code rotation(rad)} 返回对应的四元数。</p>
+ * 单位向量常量，{@code rotation(rad)} 返回对应的四元数。两个渲染器都要倾斜，
+ * 所以两边各写一份（上游也是各写一份）。</p>
  */
 public class EntityFairyRenderer extends MobRenderer<EntityFairy, EntityFairyModel> {
     /**
@@ -36,8 +38,12 @@ public class EntityFairyRenderer extends MobRenderer<EntityFairy, EntityFairyMod
         }
     }
 
+    /** 新模型那一路。构造时就会烘焙它自己的模型层，所以注册处必须先登记图层。 */
+    private final NewEntityFairyRenderer newEntityFairyRenderer;
+
     public EntityFairyRenderer(EntityRendererProvider.Context context) {
         super(context, new EntityFairyModel(context.bakeLayer(EntityFairyModel.LAYER)), 0.5F);
+        this.newEntityFairyRenderer = new NewEntityFairyRenderer(context);
     }
 
     @Override
@@ -58,5 +64,14 @@ public class EntityFairyRenderer extends MobRenderer<EntityFairy, EntityFairyMod
         }
         return TEXTURES[ordinal];
     }
-}
 
+    @Override
+    public void render(EntityFairy fairy, float entityYaw, float partialTicks, PoseStack poseStack,
+                       MultiBufferSource buffer, int packedLight) {
+        if (MiscConfig.USE_NEW_MAID_FAIRY_MODEL.get()) {
+            this.newEntityFairyRenderer.render(fairy, entityYaw, partialTicks, poseStack, buffer, packedLight);
+        } else {
+            super.render(fairy, entityYaw, partialTicks, poseStack, buffer, packedLight);
+        }
+    }
+}

@@ -125,6 +125,15 @@ dependencies {
         modLocalRuntime files("libs/architectury-4.12.94-fabric.jar")
         modLocalRuntime files("libs/basic-math-0.6.1.jar")
 
+        // ------------------------------------------------------------------ 可选联动（ModMenu）
+        //
+        // 上游 1.20.1 Fabric 版把「模组列表里的配置齿轮」交给 ModMenu 的
+        // `modmenu` 入口点。这里同样如此：只在编译期与开发运行期需要 ModMenu，
+        // 正式产物的 fabric.mod.json 里**不写** depends —— 没装 ModMenu 时
+        // 入口点不会被执行，玩家改用「打开配置界面」按键（默认未绑定）。
+        modCompileOnly files("libs/modmenu-3.2.5.jar")
+        modLocalRuntime files("libs/modmenu-3.2.5.jar")
+
 }
 
 processResources {
@@ -159,6 +168,17 @@ loom {
 			if (project.hasProperty('joinServer')) {
 				programArgs "--server", "127.0.0.1", "--port", "25565"
 			}
+			// 配置界面自检。加 -PclothSelftest 启动时会给客户端 JVM 带上
+			// -Dfuto.cloth.selftest=true，于是 compat/cloth/ClothConfigSelfTest
+			// 会在标题画面出现后自动构建、打开并保存一次配置界面，把结果写进日志。
+			//
+			// 为什么用 Gradle 属性而不是直接 jvmArgs 常量：日常构建与 runClient
+			// 不该带上它 —— 自检会把界面顶到前台，还会改一次 toml（随即还原）。
+			// 用法：gradlew runClient -PclothSelftest
+			if (project.hasProperty('clothSelftest')) {
+				vmArgs "-Dfuto.cloth.selftest=true"
+			}
+
 		}
 	}
 }

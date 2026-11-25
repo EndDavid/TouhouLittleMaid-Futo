@@ -129,5 +129,23 @@ public class TaskCrossBowAttack implements IRangedAttackTask {
     private boolean farAway(LivingEntity target, EntityMaid maid) {
         return maid.distanceTo(target) > MAX_STOP_ATTACK_DISTANCE;
     }
-}
 
+    /**
+     * 可见性判定：按配置的弩射程（{@code CrossbowRange}）过滤目标。
+     *
+     * <p>与弓那一路（{@link TaskBowAttack#canSee}）同一个理由：{@code MAX_STOP_ATTACK_DISTANCE}
+     * 是「放弃追击的距离」，不是「能发现目标的最大距离」。1.20.1 上游在这里同样走
+     * {@code targetConditionsTest(maid, target, MaidConfig.CROSS_BOW_RANGE)}。</p>
+     */
+    @Override
+    public boolean canSee(EntityMaid maid, LivingEntity target) {
+        return IRangedAttackTask.targetConditionsTest(maid, target,
+                com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.CROSS_BOW_RANGE,
+                com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.crossBowRange());
+    }
+
+    @Override
+    public float searchRadius(EntityMaid maid) {
+        return com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.crossBowRange();
+    }
+}

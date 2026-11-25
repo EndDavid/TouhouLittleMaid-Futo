@@ -16,14 +16,13 @@ import net.minecraft.world.entity.Entity;
  * 「打开这只女仆的 AI 设置界面」的 S2C 包，移植自上游
  * {@code network/message/OpenMaidAIDataScreenMessage}。
  *
- * <h2>与上游的差异（框架差异，不是设计选择）</h2>
+ * <h2>与上游的差异</h2>
  * <p>上游这里打开的是 <b>Cloth Config</b> 的配置界面
  * （{@code ClothConfigCompat.openPartAiSettingScreen}，装着 {@code PartAIIntegration}），
  * 只有在没装 Cloth 时才退回 {@code ClothConfigScreen.open()}。</p>
- * <p>本移植版没有移植那套 Cloth 集成（它要用 {@code ConfigBuilder} 的 Forge 风格条目
- * 逐项绑定 setter，且会额外引入一整套「全局配置界面」），改成手写的
- * {@code MaidAISettingScreen}：同样的 6 个字段、同样的保存包，
- * 只是界面长得朴素一些。这样不依赖 Cloth 是否加载，行为在专用服务器上也一致。</p>
+ * <p>本移植版<b>也走同一条路</b>：装了 Cloth 就开 {@code PartAIIntegration}。
+ * 额外的兜底是「没装 Cloth 时开手写的 {@code MaidAISettingScreen}」——
+ * 上游那一版会直接弹出「请安装 Cloth」，等于功能缺失；这里保证不装 Cloth 也能改设置。</p>
  *
  * <p>只在客户端<b>当前开着聊天界面</b>时才切换到设置界面（与上游一致）：
  * 玩家可能已经按 ESC 关掉界面了，这时再弹出设置界面会很突兀。</p>
@@ -74,11 +73,18 @@ public final class OpenMaidAIDataScreenPacket {
         }
         Entity entity = minecraft.level.getEntity(entityId);
         if (entity instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) {
-            minecraft.setScreen(
-                    new com.github.tartaricacid.touhoulittlemaid.client.screen.ai.MaidAISettingScreen(maid, data));
+            // 装了 Cloth Config 就走上游那套 PartAIIntegration —— 它的下拉框能直接列出
+            // available_sites.yml 里的站点与模型，而手写的 MaidAISettingScreen 只有固定的
+            // 几个扁平按钮。没装 Cloth 才退回手写界面（保证功能不缺失）。
+            if (com.github.tartaricacid.touhoulittlemaid.compat.cloth.ClothConfigCompat.isAvailable()) {
+                com.github.tartaricacid.touhoulittlemaid.compat.cloth.ClothConfigCompat
+                        .openPartAiSettingScreen(maid);
+            } else {
+                minecraft.setScreen(new com.github.tartaricacid.touhoulittlemaid.client.screen.ai
+                        .MaidAISettingScreen(maid, data));
+            }
         } else {
             TouhouLittleMaid.LOGGER.debug("[Futo] AI setting target {} is not a loaded maid", entityId);
         }
     }
 }
-

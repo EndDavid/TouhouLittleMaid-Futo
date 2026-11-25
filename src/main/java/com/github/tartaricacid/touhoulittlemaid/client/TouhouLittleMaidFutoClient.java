@@ -85,10 +85,15 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 残局道具的棋盘缩略图 tooltip（上游 InitClientTooltip，Fabric 用 TooltipComponentCallback）
         com.github.tartaricacid.touhoulittlemaid.client.init.InitClientTooltip.init();
 
-        // 女仆妖精：模型层必须先烘焙，渲染器的构造函数里会 bakeLayer
+        // 女仆妖精：模型层必须先烘焙，渲染器的构造函数里会 bakeLayer。
+        // 两套模型都要登记 —— EntityFairyRenderer 的构造函数里同时 new 了
+        // NewEntityFairyRenderer，即使配置关着（走旧模型）也会去 bakeLayer 新模型那一层。
         net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
                 com.github.tartaricacid.touhoulittlemaid.client.model.EntityFairyModel.LAYER,
                 com.github.tartaricacid.touhoulittlemaid.client.model.EntityFairyModel::createBodyLayer);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                com.github.tartaricacid.touhoulittlemaid.client.model.NewEntityFairyModel.LAYER,
+                com.github.tartaricacid.touhoulittlemaid.client.model.NewEntityFairyModel::createBodyLayer);
         EntityRendererRegistry.register(InitEntities.FAIRY,
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.EntityFairyRenderer::new);
 
@@ -206,6 +211,20 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 实体 ID 复制器：手持它右键任意实体，把注册名复制到剪贴板（上游 CopyEntityIdEvent）。
         // 必须是客户端：剪贴板与聊天提示都是本地的东西。
         com.github.tartaricacid.touhoulittlemaid.client.event.CopyEntityIdEvent.init();
+        // 「打开模组配置界面」按键（默认未绑定）。
+        // 上游在 Forge 上靠 ConfigGuiHandler 暴露配置界面，Fabric 上那个入口由 ModMenu 提供，
+        // 而 ModMenu 是可选的 —— 没装的玩家就完全没有入口。这个键补上那个缺口。
+        com.github.tartaricacid.touhoulittlemaid.client.input.OpenConfigKey.init();
+        // 装了 OptiFine 就在第一次进标题画面时弹一页警告（上游 ShowOptifineScreen）。
+        // 受 MiscConfig#CloseOptifineWarning 控制 —— 那个开关此前没有任何消费者。
+        com.github.tartaricacid.touhoulittlemaid.client.event.ShowOptifineScreen.init();
+        // 配置界面自检：只在 JVM 参数 -Dfuto.cloth.selftest=true 时激活。
+        // Boolean.getBoolean 为假时右侧整个短路，ClothConfigSelfTest 连加载都不会发生，
+        // 所以玩家和「没装 Cloth」的环境都不会碰到它。
+        if (Boolean.getBoolean("futo.cloth.selftest")
+                && com.github.tartaricacid.touhoulittlemaid.compat.cloth.ClothConfigCompat.isAvailable()) {
+            com.github.tartaricacid.touhoulittlemaid.compat.cloth.ClothConfigSelfTest.init();
+        }
 
 
         // 座位实体不该被看见，但必须有渲染器：未注册类型的

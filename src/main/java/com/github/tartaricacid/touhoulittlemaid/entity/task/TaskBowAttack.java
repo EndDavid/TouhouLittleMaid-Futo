@@ -175,5 +175,27 @@ public class TaskBowAttack implements IRangedAttackTask {
     private boolean farAway(LivingEntity target, EntityMaid maid) {
         return maid.distanceTo(target) > MAX_STOP_ATTACK_DISTANCE;
     }
-}
 
+    /**
+     * 可见性判定：按配置的弓箭射程（{@code BowRange}）过滤目标。
+     *
+     * <p>与 1.20.1 上游一致 —— 用 {@code javap} 核对过它的字节码，那里就是
+     * {@code targetConditionsTest(maid, target, MaidConfig.BOW_RANGE)}。</p>
+     *
+     * <p><b>为什么不是 {@link #MAX_STOP_ATTACK_DISTANCE}：</b>那个常量语义是
+     * 「追出这么远就<b>放弃</b>」，与「最多能在多远<b>发现</b>目标」是两件事。
+     * 混用会让 {@code BowRange} 调小之后依然能锁定 16 格外的敌人。</p>
+     */
+    @Override
+    public boolean canSee(EntityMaid maid, LivingEntity target) {
+        return IRangedAttackTask.targetConditionsTest(maid, target,
+                com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.BOW_RANGE,
+                com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.bowRange());
+    }
+
+    /** 搜索半径同样跟着配置走，否则「射程调大了但根本搜不到那么远的目标」。 */
+    @Override
+    public float searchRadius(EntityMaid maid) {
+        return com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.bowRange();
+    }
+}

@@ -384,6 +384,34 @@ public final class MaidConfigPacket {
     }
 
     /**
+     * 服务端写入 {@code ModelId}。
+     *
+     * <p>校验三件事：女仆归请求者所有、模型 id 能解析成合法 {@code ResourceLocation}、
+     * 长度合理。上游只做第一项；这里多挡一层，是因为这个包完全是玩家可控的 ——
+     * 写进一个随意的长字符串会在渲染时反复尝试解析并刷日志。</p>
+     */
+    private static void handleModel(ServerPlayer player, String modelId, int entityId) {
+        EntityMaid maid = findOwnedMaid(player, entityId);
+        if (maid == null || modelId == null || modelId.isEmpty() || modelId.length() > 128) {
+            return;
+        }
+        // 换模型要过全局开关（上游 MaidModelMessage 同一处判断）：
+        // 创造模式的玩家始终可以换，否则看 {@code MaidChangeModel}。
+        // 这个开关的用途是「服主不想让玩家随意换皮」—— 之前它定义了却没被读，
+        // 于是关掉也照样能换。
+        if (!player.isCreative()
+                && !com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig.maidChangeModel()) {
+            return;
+        }
+        if (!net.minecraft.resources.ResourceLocation.isValidResourceLocation(modelId)) {
+            return;
+        }
+        maid.setModelId(modelId);
+        // 「换个模样」进度（上游 MaidModelMessage 在写入成功后打判据）
+        InitTrigger.MAID_EVENT.trigger(player, TriggerType.CHANGE_MAID_MODEL);
+    }
+
+    /**
      * 「能否被骑乘」开关（上游 {@code MaidConfigMessage} 里的 {@code ride} 字段）。
      *
      * <p><b>关掉时要顺手把她放下来。</b>上游的处理是：</p>
@@ -399,26 +427,6 @@ public final class MaidConfigPacket {
      * 都还没移植，所以那份豁免表暂时是空的。不清的话会出现「关掉了却还被抱在怀里」，
      * 只能靠潜行右键（{@code tryDismount}）补救。</p>
      */
-    /**
-     * 服务端写入 {@code ModelId}。
-     *
-     * <p>校验三件事：女仆归请求者所有、模型 id 能解析成合法 {@code ResourceLocation}、
-     * 长度合理。上游只做第一项；这里多挡一层，是因为这个包完全是玩家可控的 ——
-     * 写进一个随意的长字符串会在渲染时反复尝试解析并刷日志。</p>
-     */
-    private static void handleModel(ServerPlayer player, String modelId, int entityId) {
-        EntityMaid maid = findOwnedMaid(player, entityId);
-        if (maid == null || modelId == null || modelId.isEmpty() || modelId.length() > 128) {
-            return;
-        }
-        if (!net.minecraft.resources.ResourceLocation.isValidResourceLocation(modelId)) {
-            return;
-        }
-        maid.setModelId(modelId);
-        // 「换个模样」进度（上游 MaidModelMessage 在写入成功后打判据）
-        InitTrigger.MAID_EVENT.trigger(player, TriggerType.CHANGE_MAID_MODEL);
-    }
-
     private static void handleRideable(ServerPlayer player, boolean value, int entityId) {
         EntityMaid maid = findOwnedMaid(player, entityId);
         if (maid == null) {
@@ -464,4 +472,3 @@ public final class MaidConfigPacket {
         InitTrigger.MAID_EVENT.trigger(player, TriggerType.SWITCH_SCHEDULE);
     }
 }
-

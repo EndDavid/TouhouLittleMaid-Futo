@@ -10,6 +10,10 @@ import java.util.List;
  */
 public final class ServerConfig {
     /**
+     * 构建好的 SERVER spec，供配置界面保存时使用（见 {@link #save()}）。
+     */
+    private static ForgeConfigSpec spec;
+    /**
      * 客户端需要下载的包（URL 列表）。
      */
     public static ForgeConfigSpec.ConfigValue<List<String>> CLIENT_PACK_DOWNLOAD_URLS;
@@ -31,7 +35,15 @@ public final class ServerConfig {
         builder.comment("When turned on, when the maid AI executes more than 50ms, the entity information of the problem will be logged");
         MAID_AI_TIME_DEBUG = builder.define("MaidAITimeDebug", false);
 
-        return builder.build();
+        spec = builder.build();
+        return spec;
+    }
+
+    /** 配置界面点「保存」时调用（SERVER 配置只改当前世界存档里的那份）。 */
+    public static void save() {
+        if (spec != null && spec.isLoaded()) {
+            spec.save();
+        }
     }
 
     /**
@@ -44,4 +56,3 @@ public final class ServerConfig {
         return MAID_AI_TIME_DEBUG != null && MAID_AI_TIME_DEBUG.get();
     }
 }
-

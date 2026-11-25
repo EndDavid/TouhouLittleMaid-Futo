@@ -4604,3 +4604,101 @@ Caused by: java.lang.UnsupportedOperationException
 
 **不再需要**额外放 snakeyaml / concentus / vorbis —— 它们现在在 jar 里。
 
+
+## 配置界面：Cloth Config 全量移植，以及「哪些项真的生效」
+上游在 Forge 上把配置界面交给 `ConfigGuiHandler`，Fabric 上没有这个东西，所以这一章记的是
+**三件事**：界面从哪进、每一项有没有消费者、以及怎么在没有人点鼠标的情况下证明界面能开。
+### 1. 三个入口
+| 入口 | 条件 | 实现 |
+|---|---|---|
+| 模组列表里的「配置」齿轮 | 装了 **ModMenu** | `fabric.mod.json` 的 `modmenu` 入口点 → `compat/modmenu/ModMenuApiImpl` |
+| `打开模组配置界面` 按键 | 永远可用 | `client/input/OpenConfigKey`，**默认未绑定**（避免和已有按键冲突） |
+| 单只女仆的 AI 设置 | 右键女仆 → AI 设置 | `PartAIIntegration`（装了 Cloth 时），否则退回手写 `MaidAISettingScreen` |
+齿轮那一路在**没装 Cloth Config 时返回 `null`**（ModMenu 就不画齿轮），而不是画一颗点了会崩的齿轮 ——
+与上游一致。按键那一路在没装 Cloth 时打开 `client/gui/mod/ClothConfigScreen`，
+明确告诉你「需要安装 Cloth Config」并给下载链接，而不是「点了没反应」。
+### 2. 六个分类，69 个条目
+`MenuIntegration` 按上游 1.18.2 逐项对齐：
+| 分类 | 条目数 | 内容 |
+|---|---|---|
+| 女仆 | 31 | 音量频率、气泡开关、3 个物品下拉框、作息/工作范围、四种武器射程、喂食上限、换模型、五子棋主人限制、主人女仆上限、悦灵替换、背包黑名单、攻击忽略、三种餐食黑名单 ×（正则 + 具体）、吃完返还容器、枪械三段射程 |
+| 坐垫 | 2 | 换肤许可、任何人可破坏 |
+| 杂项 | 12 | 妖精灵力/生成概率/维度黑名单、死亡扣除灵力、魂符、手册、神社庭灯三项、OptiFine 警告、稻草人范围、新妖精模型 |
+| 原版替换 | 4 | 史莱姆、经验球、不死图腾、附魔之瓶 |
+| 渲染 | 12 | 11 种「手持物指向女仆」的提示开关 + YSM 轮盘 |
+| 全局 AI | 8 | 聊天/TTS 开关、温度、历史长度上限、TTS 语言下拉框、自动生成角色设定、token 上限、打开 `available_sites.yml` 的链接 |
+「女仆」那 31 条里有 3 条物品下拉框**直接用物品图标**渲染（`DropdownMenuBuilder.ofItemObject`），
+所以列表里的物品按**注册名**排序 —— 上游按 `Item::toString` 排，那个字符串带对象哈希，
+每次启动顺序都不一样，下拉框里根本找不到东西。
+### 3. 「有界面项但没有子系统」的五项，明说了
+审计方法：把六个配置类里的每个字段名拿去全仓库 grep，排除 `config/` 与 `compat/cloth/` 自身。
+结果：**除下列 5 项外，每一项都有真实消费者**。
+| 配置项 | 缺什么 |
+|---|---|
+| `ReplaceAllayPercent` | 悦灵替换（1.19 才有悦灵；上游 1.18.2 里这一项也是死的） |
+| `MaidGunLongDistance` / `Medium` / `Near` | `compat/tacz` 枪械联动（TACZ 没移植） |
+| `EnableYsmRouletteTip` | Yes Steve Model 联动（YSM 没移植） |
+这 5 项**保留在界面上**（删掉会让 `.toml` 与上游不再可互换），但 tooltip 里多一行
+「本移植版尚未实现对应功能，此项暂不生效」。玩家改完发现没反应时才不会以为是 bug。
+另外 `STTUrl` / `STTProxyAddress` 不进界面（`ai/service/stt` 未移植），但仍在 toml 里。
+### 4. 保存必须显式落盘
+`setSaveConsumer` 只改内存中的值。上游靠 Forge 自己的配置界面顺手 `save()`，
+本移植版是自建界面，所以在 `getConfigBuilder()` 里挂了
+`setSavingRunnable(() -> { GeneralConfig.save(); ServerConfig.save(); })`。
+两个类各加了一个静态 `spec` 引用与 `save()`，`isLoaded()` 为假时静默跳过。
+### 5. 没有人工点击时，怎么证明界面能开
+「配置界面能不能打开」天然要人点一下，但构建这张表的每一步都可能在运行时炸
+（物品下拉框拿到 `null`、语言表为空时 NPE、`Utils.getConfigFolder()` 在客户端拿不到目录）。
+所以加了一个**受 JVM 参数门控**的自检：`compat/cloth/ClothConfigSelfTest`。
+- 只有 `-Dfuto.cloth.selftest=true` 时才激活；`Boolean.getBoolean` 为假时右侧整体短路，
+  这个类**连加载都不会发生**；
+- 触发点：第一次出现标题画面（此时物品注册表与语言表都就绪，和玩家点开时状态一致）；
+- 依次做三件事：构建整张表 → 校验六个分类都在并统计条目 → `setScreen(builder.build())`
+  真跑一遍 Cloth 的 `init()` → 改一个值、`save()`、去 TOML 里读回来，然后还原。
+驱动方式（已写进 `build.gradle` 的 `runs.client`）：
+```bash
+./gradlew.bat runClient -PclothSelftest
+```
+不带 `-PclothSelftest` 时行为与以前完全一致。
+**实测结果**（dev 客户端，带真名 `Dev`）：
+```
+[Futo] cloth selftest: category config.touhou_little_maid.maid      has 31 entries
+[Futo] cloth selftest: category config.touhou_little_maid.chair     has  2 entries
+[Futo] cloth selftest: category config.touhou_little_maid.misc      has 12 entries
+[Futo] cloth selftest: category config.touhou_little_maid.vanilla   has  4 entries
+[Futo] cloth selftest: category config.touhou_little_maid.render    has 12 entries
+[Futo] cloth selftest: category config.touhou_little_maid.global_ai has  8 entries
+[Futo] cloth selftest: 6 categories, 69 entries in total
+[Futo] cloth selftest: screen init OK, current=GlobalizedClothConfigScreen
+[Futo] cloth selftest: save/flush OK (MaidWorkRange = 13)
+[Futo] cloth selftest: DONE
+```
+`MaidWorkRange = 13` 是从 `run/config/touhou_little_maid-common.toml` 里读回来的，
+证明「改值 → 保存 → 落盘」这条链路真的通。自检结束后写回 12，不污染开发环境。
+### 6. 顺带补上的两个「配置定义但没人读」
+| 配置 | 之前 | 现在 |
+|---|---|---|
+| `CloseOptifineWarning` | 定义了，零引用 | `client/event/ShowOptifineScreen` + `client/gui/mod/OptifineScreen`：装了 OptiFine 时在**第一次**标题画面弹警告，倒计时 10 秒才能点「继续」 |
+| `UseNewMaidFairyModel` | 定义了，零引用；渲染器固定旧模型 | `EntityFairyRenderer#render` 按开关委派给 `NewEntityFairyRenderer`（新模型）或走旧模型 |
+`UseNewMaidFairyModel` 默认 **true**，所以女仆妖精的外观变了：从 1.18.2 的旧网格换成
+上游 1.18.2 的新网格（`NewEntityFairyModel`，128×128 贴图、18 种发色 + rick 彩蛋）。
+**为什么不用 1.20.1 的 `models/bedrock/entity/new_maid_fairy.json`**：那份几何**没有任何动画**
+（1.20.1 的渲染器里一个 `setCustomAnimations` 都没有），换成它等于把「走路甩胳膊、
+悬空扇翅膀、每 60 tick 眨一次眼」全部丢掉。1.18.2 的手写网格 `setupAnim` 里带着这些动作，
+而且用的就是仓库里已有的那批贴图。
+两个模型层都要登记（`EntityFairyModel.LAYER` 与 `NewEntityFairyModel.LAYER`）：
+`EntityFairyRenderer` 的构造函数里同时 `new` 了 `NewEntityFairyRenderer`，
+即使配置关着也会去 `bakeLayer` 新模型那一层。
+### 7. 验证边界
+| 项目 | 结果 |
+|---|---|
+| `./gradlew.bat build` | SUCCESSFUL（40,665,359 B） |
+| `check-encoding.ps1` | `SCANNED_FILES=1598 BAD_FILES=0 FFFD_CHARS=0` |
+| `check-renderers.ps1` | `entity 11/11`、`block entity 14/12`、`ALL OK` |
+| `validate-book.ps1` | `entries=54 categories=3 problems=0` |
+| 配置界面自检 | 6 分类 / 69 条目 / init OK / save 落盘 OK |
+| RCON 召唤两只女仆妖精 | 0 `Missing texture`、0 `Unable to load model`、0 渲染异常、0 crash-report |
+**没做**：真人视觉验收（新妖精模型长得对不对、OptiFine 警告页排版）。自动化只能证明
+「模型层烘焙成功 + 贴图路径存在 + 渲染循环不抛异常」。
+没做的功能：图标缓存（`ModelIconCache` 在 1.18.2 上游也不进界面，本移植版的模型 GUI
+没有缓存分支）、悦灵替换、TACZ 枪械、YSM 联动。

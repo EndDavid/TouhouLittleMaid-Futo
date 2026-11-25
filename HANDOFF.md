@@ -648,3 +648,51 @@ REI + Architectury（要「祭坛合成」分类才需要）。
   并用 `git show <上一轮提交>:<path>` 取 base 字节，改完 `git diff --stat <上一轮提交> -- <path>`
   必须只有 `3 +++` 这种量级。
 - **气泡背景必须给光照图坐标（`uv2`）**：`RenderType.text` 的格式是 `POSITION_COLOR_TEX_LIGHTMAP`（元素顺序 position → color → uv0 → uv2，已用 javap 从映射后的 1.18.2 jar 核实），少写一个就在 `endVertex` 抛 `Not filled all elements of the vertex`。`ChatBubbleRenderer#vertex` 末尾的 `uv2(LightTexture.FULL_BRIGHT)` 不是冗余，别删。上游靠 Forge AT 自建 `POSITION_TEX` 渲染类型，本仓库没有 AT，所以只能走 `RenderType.text`。
+
+## 本轮：Cloth Config 全量移植（配置界面）
+**做了什么**
+- `compat/cloth/`：`MenuIntegration`（6 分类 / 69 条目）、`GlobalAIIntegration`（AI 一页）、
+  `PartAIIntegration`（单只女仆 AI）、`ClothConfigCompat`（打开界面 + `isAvailable()`）、
+  `ClothConfigSelfTest`（受 `-Dfuto.cloth.selftest=true` 门控的自检）
+- `compat/modmenu/ModMenuApiImpl`：`modmenu` 入口点，没装 Cloth 时返回 `null`
+- `client/input/OpenConfigKey`：默认未绑定的「打开配置界面」按键（ModMenu 可缺，这是兜底入口）
+- `client/gui/mod/ClothConfigScreen`：没装 Cloth 时的说明页
+- `client/gui/mod/OptifineScreen` + `client/event/ShowOptifineScreen`：
+  让 `CloseOptifineWarning` 真的生效
+- `client/model/NewEntityFairyModel` + `client/renderer/entity/NewEntityFairyRenderer`：
+  让 `UseNewMaidFairyModel` 真的生效（默认 true，女仆妖精外观已变）
+- `GeneralConfig#save()` / `ServerConfig#save()`：配置界面点保存时显式落盘
+- `build.gradle`：`modmenu` 依赖；`runs.client` 支持 `-PclothSelftest`
+**怎么验的（可复现）**
+```
+./gradlew.bat build
+powershell -NoProfile -ExecutionPolicy Bypass -File ./check-encoding.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File ./port/check-renderers.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File ./port/book_pages_held_back/validate-book.ps1
+./gradlew.bat runClient -PclothSelftest      # 轮询 run/logs/latest.log 里的 'cloth selftest: DONE'
+```
+自检结果：6 分类 / 69 条目 / `GlobalizedClothConfigScreen` init OK /
+`MaidWorkRange = 13` 能从 TOML 读回（随后还原为 12）。
+再启 `runServer` + `runClient -PjoinServer`，RCON
+`execute at Dev run summon touhou_little_maid:fairy ~2 ~ ~` 召唤两只，
+日志里 0 `Missing texture`、0 `Unable to load model`、0 渲染异常、`run/crash-reports/` 为空。
+两个 dev-run 进程用 `port/kill-dev-run.ps1` 关掉（它只匹配本仓库的 `loom-cache/launch.cfg`）。
+**新增的坑（重要）**
+- **编辑工具有时会吃掉乘号 `×`（U+00D7）**。README 里 `64×64` 曾变成 `6464`、`128×128` 变成 `128128`，
+  而且已提交进历史。写这种符号时用 `'\u00d7'` 转义，别写字面量；
+  收尾用 `grep -c '6464\|128128'` 自查。
+- **Loom 的 `RunConfigSettings` 没有 `jvmArgs`**，正确方法名是 `vmArgs` / `vmArg`
+  （`javap -classpath ~/.gradle/caches/9.3.0/transforms/*/instrumented-fabric-loom-1.15.5.jar \`
+  `net.fabricmc.loom.configuration.ide.RunConfigSettings` 可确认）。
+- **Cloth 的 `ConfigCategory#getEntries()` 返回 `List<Object>`**，只能数个数，取不到类型化条目；
+  想在自检里断言「某条目存在」得靠 `hasCategory` + 计数。
+- **`ConfigBuilder#build()` 返回 `Screen`（`class_437`）**，自检里直接 `client.setScreen(...)` 就会跑
+  它自己的 `init()`，这就是「界面能开」的证据；只在 `build()` 之后不 setScreen 是测不出问题的。
+**已知缺口（不是 bug，别当任务）**
+- `ReplaceAllayPercent`、`MaidGun*Distance`、`EnableYsmRouletteTip` 这 5 项对应的子系统
+  （悦灵替换 / TACZ 枪械 / YSM）都还没移植。条目保留在界面上但 tooltip 明说「暂不生效」。
+- `STTUrl` / `STTProxyAddress` 不进界面（`ai/service/stt` 未移植）。
+- 图标缓存（`ModelIconCache`）没实现，本移植版的模型 GUI 没有缓存分支；
+  1.18.2 上游的 `MenuIntegration` 也不含这一项，所以界面里不出现。
+- 女仆妖精的新模型没有幼年变体（`baby_maid_fairy.json` 是 1.20.1 才有的，
+  与 1.18.2 的 `EntityFairy#isBaby()` 逻辑不配套）。

@@ -1511,5 +1511,12 @@
   "ai.touhou_little_maid.chat.setting.regenerate.tip": "让模型重写当前模型的角色设定文件（不会覆盖已有的手写文件）",
   "ai.touhou_little_maid.chat.setting.export.tip": "把角色设定正文复制成一份 yml",
   "block.touhou_little_maid.snack_cabinet": "零食柜",
-  "block.touhou_little_maid.snack_cabinet.tip": "可以存储物品。女仆会食用放在顶部的食物方块，还会把其物品栏中的食物方块放置到上方。"
+  "block.touhou_little_maid.snack_cabinet.tip": "可以存储物品。女仆会食用放在顶部的食物方块，还会把其物品栏中的食物方块放置到上方。",
+  "key.touhou_little_maid.category": "车万女仆",
+  "key.touhou_little_maid.open_config.desc": "打开模组配置界面",
+  "config.touhou_little_maid.global_ai.auto_gen_setting": "自动生成角色设定",
+  "config.touhou_little_maid.global_ai.auto_gen_setting.tooltip": "女仆的模型没有对应角色设定时，用 AI 自动写一份并保存到 config/touhou_little_maid/settings",
+  "config.touhou_little_maid.global_ai.max_tokens_per_player": "每位玩家的 token 上限",
+  "config.touhou_little_maid.global_ai.max_tokens_per_player.tooltip": "单个玩家累计可消耗的 token 数量，0 表示不限制",
+  "config.touhou_little_maid.not_ported.tooltip": "（本移植版尚未实现对应功能，此项暂不生效）"
 }
