@@ -13,14 +13,14 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * 女仆界面<b>右侧</b>的侧边栏按钮（现在只有「任务手册」一个），移植自上游
+ * 女仆界面<b>右侧</b>的侧边栏按钮（任务手册 / 全局配置两个槽位），移植自上游
  * {@code client/gui/widget/button/MaidSideTabButton}。
  *
  * <p><b>位置与贴图（{@code maid_gui_side.png}，256x256）：</b></p>
  * <pre>
- * 外框      (235,107) 21x25   由界面统一画在 leftPos+256 / topPos+37
- * 按钮图标  (193,111) 16x16   偏移 (6, 4)，即 leftPos+257 / topPos+41
- * 选中底图  (209,111) 26x24   仅 active=false 时画（本移植版用不到，留作上游行为）
+ * 外框      (235,107) 21x50   两个 21x24 的圆角格，由界面统一画在 leftPos+256 / topPos+37
+ * 按钮图标  (193,107+25*i+4) 16x16   偏移 (6, 4)，即 leftPos+257 / topPos+41+25*i
+ * 选中底图  (209,107+25*i) 26x24     仅 active=false 时画（本移植版用不到，留作上游行为）
  * </pre>
  *
  * <p>1.18.2 的原版 {@link Button} 没有 tooltip 回调，所以提示行直接作为构造参数传进来，
@@ -68,4 +68,3 @@ public class MaidSideTabButton extends Button {
         return this.tooltip.isEmpty() ? null : this.tooltip;
     }
 }
-

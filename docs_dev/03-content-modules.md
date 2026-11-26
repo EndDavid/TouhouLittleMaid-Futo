@@ -801,9 +801,20 @@ Y(sleepDirectionToRotation(bedFacing)) → Z(getFlipDegrees() = 90) → Y(270)
   条目 = 1.18.2 Forge 的 52 条全集 + 本模组特有的 `other/cchess`、`other/wchess`；
   `overview/world_spawn` 比 1.20.1 少一页 `replace_allay.png` —— 1.18.2 没有 allay，那一页讲不通。
 - 侧边页签：`MaidSideTabButton` + `AbstractMaidScreen.addSideTabButtons()`，位置
-  `leftPos+251 / topPos+37`，图标 UV `(193,111)`。框架在 `maid_gui_side.png` 里其实是
-  **两个独立的 21×25 圆角格**（列 107–130 与 132–155，中间第 131 列是空的），所以只画 21×25。
-  点击触发 `OpenPatchouliBookEvent`，未装 Patchouli 时聊天栏给下载提示（与上游一致）。
+  `leftPos+251 / topPos+37`，按钮 26x24、槽位间隔 25（上游 `MaidSideTabs.SPACING`），
+  图标 UV `(193, 107 + 25*槽位 + 4)`。框架在 `maid_gui_side.png` 里是
+  **两个 21x24 的圆角格**（V 107–130 与 132–155，中间第 131 行是空的），
+  整块按 `21x50` 一次画完（上游 `drawSideTabGui` 同样整块画；只画上半截会在下面留一个空槽）。
+  - 槽位 0 = 任务手册：点击触发 `OpenPatchouliBookEvent`，未装 Patchouli 时聊天栏给下载提示
+    （上游这里是弹警告界面，本移植版按需求改成聊天栏）。
+  - 槽位 1 = 全局配置：`ClothConfigCompat.isAvailable()` 为真则开 Cloth 配置界面，
+    否则开 `client/gui/mod/ClothConfigScreen`（一页说明 + 下载按钮 + 返回）。
+    **这条路径不是聊天栏提示**，与手册按钮不同 —— 上游此处就是整页说明。
+    判断必须用 `isModLoaded("cloth-config")`：没装时 `ClothConfigCompat#openConfigScreen`
+    里引用的 `me.shedaniel.*` 会抛 `NoClassDefFoundError`（`Error`，不是 `Exception`）。
+  - 两个按钮都始终显示（缺前置时点了才提示），与上游一致；`cloth-config` 在
+    `fabric.mod.json` 里是 `suggests` 而非 `depends`，所以「没装 Cloth」是正常状态。
+
 - **一个坏的 spotlight 页会让整本书作废。** `BookContentsBuilder#load → #build →
   BookEntry#build → page#build`，spotlight 页会把 `item` / `items` 解析成 `Ingredient`，
   一个不存在的物品 ID 直接抛 `JsonParseException` → `BookContents.empty` → 「Loading error!」。
