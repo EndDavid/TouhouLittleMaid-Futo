@@ -5,6 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.client.OpenPatchouliBo
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.client.event.PlayerLoggedInNotice;
 import com.github.tartaricacid.touhoulittlemaid.client.gui.mod.ClothConfigScreen;
+import com.github.tartaricacid.touhoulittlemaid.client.gui.widget.button.MaidDownloadButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.ScheduleButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.MaidSideTabButton;
 import com.github.tartaricacid.touhoulittlemaid.client.screen.widget.MaidTabButton;
@@ -181,6 +182,15 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
      */
     private int effectTick;
 
+    /**
+     * 左下角的「在线下载模型包」按钮（上游 {@code MaidDownloadButton}）。
+     *
+     * <p>没装任何前置也能用 —— 清单拉不到时界面会自己显示「网络好像出了问题」，
+     * 所以不需要先判断什么。</p>
+     */
+    @Nullable
+    private MaidDownloadButton downloadButton;
+
     protected AbstractMaidScreen(T menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         this.imageWidth = MaidMainContainer.GUI_WIDTH;
@@ -274,6 +284,10 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
                 72, 43, 10, BUTTON,
                 b -> MaidModelGui.open(this.maid));
         this.addRenderableWidget(skinButton);
+
+        // 在线下载模型包（左下角 41x20）。位置与贴图 UV 与上游一致。
+        this.downloadButton = new MaidDownloadButton(this.leftPos + 20, this.topPos + 230, BUTTON, this.maid.getId());
+        this.addRenderableWidget(this.downloadButton);
 
         // 任务列表：开关 + 翻页 + 全部任务按钮
         this.taskButtons.clear();
@@ -546,6 +560,12 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         // 槽位物品提示（4 参重载）与按钮说明文字都必须在这里手动补
         super.renderTooltip(poseStack, mouseX, mouseY);
         this.renderButtonTooltips(poseStack, mouseX, mouseY);
+
+        // 下载按钮上方的「首次 / 有新包」提示。必须在 super.render 之后 ——
+        // 它是文字，画在按钮之前会被按钮底图盖住。
+        if (this.downloadButton != null) {
+            this.downloadButton.renderExtraTips(poseStack);
+        }
     }
 
     /**
@@ -999,6 +1019,10 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
                 "gui.touhou_little_maid.task.next_page");
         this.renderWidgetTooltip(this.pageCloseButton, poseStack, mouseX, mouseY,
                 "gui.touhou_little_maid.task.close");
+        // 在线下载按钮的单行提示（上游 renderTooltip 里同样有一行）
+        this.renderWidgetTooltip(this.downloadButton, poseStack, mouseX, mouseY,
+                "gui.touhou_little_maid.button.model_download");
+
 
         // 右侧侧边栏按钮（任务手册 / 全局配置）：两行提示（标题 + 说明），与上游侧边栏一致
         for (MaidSideTabButton sideTab : this.sideTabButtons) {

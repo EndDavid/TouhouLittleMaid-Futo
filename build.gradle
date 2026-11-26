@@ -178,6 +178,18 @@ loom {
 			if (project.hasProperty('clothSelftest')) {
 				vmArgs "-Dfuto.cloth.selftest=true"
 			}
+			// 在线模型包下载界面的自检。加 -PdownloadSelftest 会带上
+			// -Dfuto.download.selftest=true，于是客户端在标题画面稳定后
+			// 自动 setScreen(new ModelDownloadGui())，让这个纯 Screen 的
+			// init / render 真正跑若干帧并把任何异常打进日志。
+			//
+			// 为什么需要它：这个界面不属于任何 MenuType，没有「进世界再点」
+			// 之外的入口；而它自己画的东西很多（九宫格气泡、进度条、EditBox、
+			// 类型图标），只靠 build 绿是验不到运行时异常的。
+			// 用法：gradlew runClient -PdownloadSelftest
+			if (project.hasProperty('downloadSelftest')) {
+				vmArgs "-Dfuto.download.selftest=true"
+			}
 
 		}
 	}

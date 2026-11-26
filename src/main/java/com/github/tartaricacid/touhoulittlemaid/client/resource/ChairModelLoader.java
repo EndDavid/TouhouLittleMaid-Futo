@@ -45,6 +45,9 @@ public final class ChairModelLoader {
         for (String namespace : CHAIR_PACKS) {
             loaded += loadChairPack(namespace);
         }
+        // 外部包（tlm_custom_pack）排在**内置包之后**，与女仆模型那边同样的理由：
+        // 页签顺序「内置在最前」，重名时内置赢。
+        loaded += CustomPackLoader.loadExternalChairPacks();
         long millis = (System.nanoTime() - startNanos) / 1_000_000L;
         TouhouLittleMaid.LOGGER.info("[Futo] Chair model loading time: {} ms ({} chair models)", millis, loaded);
     }
@@ -96,7 +99,7 @@ public final class ChairModelLoader {
      * author / version / date / icon / icon_delay），所以直接复用 {@link CustomModelPack}；
      * 上游也是同一个泛型类，只是把 {@code ChairModelInfo} 当元素类型。</p>
      */
-    private static CustomModelPack<ChairModelInfo> buildPack(String namespace, JsonObject root,
+    static CustomModelPack<ChairModelInfo> buildPack(String namespace, JsonObject root,
                                                              List<ChairModelInfo> models) {
         CustomModelPack<ChairModelInfo> pack = new CustomModelPack<>();
         pack.setPackName(getStringOr(root, "pack_name", namespace));
@@ -124,7 +127,7 @@ public final class ChairModelLoader {
      * @return 没有任何动画时返回 {@code null}（旧版坐垫绝大多数是纯静态模型）
      */
     @Nullable
-    private static AnimationFile buildAnimations(ChairModelInfo info) {
+    static AnimationFile buildAnimations(ChairModelInfo info) {
         AnimationFile animationFile = new AnimationFile();
         List<ResourceLocation> animationFiles = info.getAnimation();
         if (animationFiles != null) {

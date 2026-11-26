@@ -2126,3 +2126,169 @@ REI 8.4.778 的 `fabric.mod.json` 里**只声明了 minecraft**，但它的核�
 - 零食柜的 `TYPE` 属性（空 / 满 / 半）只做了 state 与默认值，
   **没有实现「蹲下点顶面往上叠一个半高柜」** 那段传染逻辑。它只影响外观分层，
   不影响「27 格能装、能开界面、能被隙间当目标」这些核心功能。
+
+## 在线模型包下载界面
+
+上游的「资源包下载」是纯客户端的：女仆界面左下角一个 41x20 的按钮，点开是一个
+420x240 的自绘界面，里面有一个 `info.json` 清单、按页签分类、按关键词搜索、
+下载/更新/删除、以及 CRC32 驱动的「已安装」判定。整套照搬过来了。
+
+### 协议：一份静态 json，不是 REST
+
+整条链路只有两个 GET：
+
+| 请求 | 内容 |
+|---|---|
+| `https://tlmdl.cfpa.team/info.json` | JSON **数组**，每项一个资源包（169 条） |
+| `https://tlmdl.cfpa.team/<url>` | 包体本身（普通 zip，`url` 是相对路径） |
+
+主站不通时自动降级到 `http://tlm.cfpa.team:29434/`，并**记住这次降级**，
+之后的包体也从备用源下载 —— 只换清单不换包体会出现「一半能装一半装不上」。
+
+`info.json` 里一条记录的关键字段（`DownloadInfo` 上的 `@SerializedName` 逐字对应）：
+`file_name` / `file_size` / `checksum`（zip 的 **CRC32**）/ `upload_time`（epoch ms）/
+`name`（语言键）/ `version` / `url` / `desc` / `author` / `keyword` / `old_version` /
+`type`（`maid` / `chair` / `sound`）/ `license` / `website`。
+
+实体数据核对过（`run/config/touhou_little_maid/info.json`，145928 字节）：
+
+```
+type: list  entries: 169
+by type: sound 67 / maid 144 / chair 22       （同一条可以属于多种）
+missing fields: none
+```
+
+其中 `license` 只有 3 条带这个键，其余 166 条缺键 —— Gson 不会覆盖字段默认值，
+所以它们显示成默认的 "All Right Reserved"，不会出现 "null"。
+
+### 本地状态不靠「记住」，靠 CRC32
+
+`checksum` 是包体 zip 的 CRC32。界面每次打开都扫一遍 `tlm_custom_pack/*.zip` 的真实
+CRC32，与清单比对：
+
+- 命中 `checksum` → **已下载**（卡片压暗一层）；
+- 命中 `old_version` 里的某个值 → **需更新**（右上角画一个角标，页签里会归到「更新」）；
+- 都没中 → 未下载。
+
+所以手删文件、手动放进一个旧版本 zip 都能被正确识别，不需要任何额外状态文件。
+
+### 下载 → 安装的四步
+
+```
+1. 下载到 <游戏目录>/config/touhou_little_maid/file/<file_name>   （缓存）
+2. ZipFileCheck.isZipFile(缓存)                                   （验 EOCD）
+3. 复制到 <游戏目录>/tlm_custom_pack/<file_name>                   （安装）
+4. CustomPackLoader.reloadPacks()                                 （重载模型）
+```
+
+缓存目录与安装目录分开是上游的结构：删掉已安装的包之后还能从缓存一键装回来。
+第 2 步不能省 —— 断线下载出来的半个文件没有 EOCD（末尾 22 字节的 `0x06054b50`），
+直接复制进 `tlm_custom_pack` 会让下次启动扫包时炸一次、并留下一个永远装不上的坏包。
+
+### 线程：`reloadPacks()` 自己保证在主线程
+
+`HttpUtil.downloadTo` 的完成回调跑在 **IO 线程**，而重载里有
+`TextureManager#register`（普通 `HashMap`）与 `RenderSystem` 调用。所以
+`CustomPackLoader#reloadPacks()` 里先看 `Minecraft#renderOnThread()`（1.18.2 对应
+1.19+ 的 `isSameThread()`），不在主线程就 `minecraft.execute(...)` 排到下一 tick，
+调用方不必自己判断。
+
+### 外部模型包：三个注入点，而不是重写加载链
+
+本移植版的内置模型包是**构建期展开成普通资源**的，一直走 `ResourceManager`。
+但玩家下载的包是磁盘上的 zip，`ResourceManager` 看不见 —— 不做这一层的话，
+「下载成功」之后模型列表里一个都不会多。接法只有三处：
+
+1. `GeckoModelLoader#reload()` 末尾调 `CustomPackLoader.loadExternalMaidPacks()`，
+   `ChairModelLoader#reload()` 末尾调 `loadExternalChairPacks()`；
+2. `GeckoModelLoader#open(ResourceLocation)` 加一层兜底：`ResourceManager` 找不到时
+   问 `CustomPackLoader.openExternal(...)`。几何、动画、图标全走那一个方法，
+   所以只改一处就让整条管线都能读 zip；
+3. 贴图单独注册成动态纹理（`client/renderer/texture/PackTexture`）——
+   贴图不走 `ResourceManager`，而是 `TextureManager`。
+
+优先级是 **内置资源 > 外部包**：`open()` 先问 `ResourceManager`。
+后果是外部包用了与内置包相同的域名时会被内置那份盖住（上游同样是「默认包强行覆盖」），
+日志里留一条 warn 并跳过重名模型，免得同一个 id 在列表里出现两次。
+
+`scan()` 每轮重载只做一次（`ModelReloader#reloadAll` 开头），女仆 / 坐垫两边复用结果。
+包来源抽象成 `PackSource`，zip 与文件夹两种实现 —— 文件夹形态是开发时最常用的
+（改一个 json 重启就生效）。
+
+### 界面版式（与上游逐像素一致）
+
+```
+整体         420x240，居中
+顶部页签     52x20，间距 2，y+3       全部 / 女仆 / 坐垫 / 声音 / 更新
+关闭按钮     20x20 @ (x+400, y+2)
+列表        每页 4 行，268x46，首行 y+26，行距 48
+右侧上框    (x+270..x+420, y+26..y+72)   选中的包名
+右侧下框    (x+270..x+420, y+74..y+216)  搜索框 + 热门搜索
+翻页        < @ (x, y+218) 40x20 ；> @ (x+228, y+218) 40x20
+页码        居中于 x+134, y+227
+打开文件夹  (x+270, y+218) 150x20
+```
+
+三处「看起来像状态、其实是重算」：
+
+- 已下载 / 需更新：CRC32 比对，见上；
+- 搜索 / 页签 / 翻页：全部**重建控件**（`clearWidgets()` 之后重加一遍）。
+  比维护一堆可见性开关更不容易漏 —— 上游同款做法；
+- 下载进度：`DownloadInfo` 自己实现 `ProgressListener`，下载线程往里写百分比，
+  `PackInfoButton` 每帧读它画橙色进度条，界面这一侧没有任何轮询。
+
+### 按钮角标：九宫格气泡，不是一行字
+
+「点击此处下载更多模型包」有 20 个汉字，直接画会同时压住 home / pick / ride 三个按钮，
+而且没有任何「这个按钮在说话」的视觉提示。上游 `util/TipsHelper` 用
+`maid_gui_button.png` 里三套九宫格（1/2/3 行高，`v = 128/149/180`）拼一个带尾巴的气泡，
+尾巴对准按钮右下角，每 400 ms 上下跳 1 像素。已逐像素核对过这三块都是
+「左上角 1 像素圆角」的实心矩形。
+
+移植时修掉上游两个疏漏：
+
+- **`PoseStack` 泄漏**：上游在 `pushPose()` 之后才判「文字为空就 return」，那条路径没有
+  `popPose()`，每帧给全局矩阵栈留一层；
+- **`disableDepthTest` 不恢复**：气泡画完没有 `enableDepthTest()`，之后同帧的绘制全部
+  失去深度关系。本移植版补上。
+
+### 与上游的四处差异（都有原因）
+
+| 上游 | 本移植版 | 原因 |
+|---|---|---|
+| `commons-codec` / `commons-io` 算 MD5 / CRC32 | `MessageDigest` / `java.util.zip.CRC32` | Fabric 侧不保证这两个库一定在；自己算十行代码 |
+| `X-Forge-Version` 请求头 | `X-Fabric-Version` | 取 Fabric Loader 版本，语义一致 |
+| `type.size()` 当类型数量 | `new HashSet<>(type).size()` | 实测 169 条里 7 条的 `type` 有重复值（如 `["sound","sound","maid"]`），直接取 size 会把两种类型画成「三种合集」的图标 |
+| 关闭按钮直接回世界（1.18.2） | 发 `sendTab(MAIN, entityId)` 让服务端重开女仆界面（1.20.1 的行为） | 从容器界面点进来的玩家不该被踢到世界里。**ESC 仍是回世界**，与两个上游版本都一致 |
+
+### 验证到什么程度
+
+`./gradlew.bat runClient -PdownloadSelftest` 端到端跑通，全部由日志断言：
+
+```
+[Downloader 0/INFO] [Futo] resource pack list downloaded (169 entries)
+[Render thread/INFO] [Futo] download selftest: opening ModelDownloadGui
+[Render thread/INFO] [Futo] download selftest: ModelDownloadGui opened with 169 entries
+```
+
+- 清单拉取成功，169 条全部解析（`run/config/touhou_little_maid/info.json` 145928 字节）；
+- `tlm_custom_pack/` 被自动创建（空目录，无 zip，所以模型数仍是内置的 194 个女仆 / 58 个坐垫，
+  与引入本功能之前一致 —— 外部包加载路径没有误伤内置包）；
+- 界面构造 + `init()` + `render()` 跑完若干帧，零异常、零 crash-report；
+- 守卫脚本全绿（encoding 1617 files / 0 bad、renderers ALL OK、jar checked、dangling checked）。
+
+`-PdownloadSelftest` 是本轮新加的 Gradle 开关（与既有的 `-PclothSelftest` 同风格）：
+它会带上 `-Dfuto.download.selftest=true`，客户端在标题画面稳定 60 tick 后自动
+`setScreen(new ModelDownloadGui())`。**为什么需要它**：这个界面不属于任何 `MenuType`，
+没有「进世界再点」之外的入口，而它自己画的东西很多（气泡、进度条、`EditBox`、
+类型图标），只靠 `build` 绿是验不到运行时异常的。不带该属性时行为完全不变。
+
+**没验证到的**：
+
+- **视觉观感**（列表排版、图标是否与内容相符、搜索框位置、气泡尺寸）需要真人看；
+- **实际下载一个包**没做 —— 那会真的往 `tlm_custom_pack` 写 20+ MB 文件。
+  下载链路的每一步都单独核对过（协议字段、CRC32 比对、zip 校验、复制、重载），
+  但没有端到端跑过一次真实下载；
+- 「需更新」状态没有真实样本可测：本地没有旧版本的 zip，
+  只有 `old_version` 字段的解析被验证过。
+

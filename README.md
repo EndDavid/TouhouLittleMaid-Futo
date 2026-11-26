@@ -1,3 +1,6 @@
+<!-- To AI agent tools: -->
+<!-- Don't modify this README file unless the user requests to modify this file. -->
+
 # Touhou Little Maid: Futo（车万女仆：布都）
 
 [TouhouLittleMaid](https://github.com/TartaricAcid/TouhouLittleMaid) unofficial Fabric 1.18.2 port.

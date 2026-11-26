@@ -375,37 +375,40 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
 
                     @Override
                     public void onResourceManagerReload(ResourceManager resourceManager) {
-                        GeckoModelLoader.reload();
-                        // 气泡台本与图标尺寸都是按贴图缓存过的：换资源包 / 改模型后必须丢一次，
-                        // 否则台本里的旧贴图路径与旧的帧数会一直生效。
-                        com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleScripts.clear();
-                        com.github.tartaricacid.touhoulittlemaid.client.renderer.ai.IconTextureSizes.clear();
-                        // 方块基岩模型同样要丢缓存，否则资源包换了模型还在用旧的
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.clear();
-                        // 实体基岩模型（岩浆怪的油库里）同理：几何与贴图是一起换的
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockEntityModels.clear();
-
-                        // 预热两个方块模型：首次渲染时再加载会卡一帧，而且模型写错
-                        // 只会在「方块看不见」这种很难定位的现象里暴露，这里提前解析一遍，
-                        // 失败会打 error 日志（BedrockBlockModels#load 里）。
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("altar");
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("shrine");
-                        // 三张棋盘也一起预热：它们的贴图与几何比祭坛还大，
-                        // 而且「看不见棋子」这种症状最怕拖到运行时才暴露。
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("cchess");
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("cchess_pieces");
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("gomoku");
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("gomoku_piece");
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("wchess");
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockBlockModels.get("wchess_pieces");
-                        // 坐垫模型必须【在女仆模型之后】加载：GeckoLibCache 在上面那行被整体清空过
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.ChairModelLoader.reload();
-                        // 岩浆怪的油库里模型也预热：JSON 写错只会在「岩浆怪看不见」这种
-                        // 很难定位的现象里暴露，这里提前解析一遍，失败会打 error 日志。
-                        com.github.tartaricacid.touhoulittlemaid.client.resource.BedrockEntityModels.get("marisa_yukkuri");
-
+                        // 方法体抽到 client/resource/ModelReloader：在线下载 / 删除模型包之后
+                        // 也要走同一套重载，两处共用一份代码才不会只重载一半。
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.ModelReloader.reloadAll();
                     }
 
                 });
+
+        // 在线模型包清单：一次异步 GET，失败就保持「网络好像出了问题」的状态。
+        // 放在客户端初始化而不是进世界时，是因为下载按钮的角标要在主菜单之后就正确。
+        com.github.tartaricacid.touhoulittlemaid.client.download.InfoGetManager.checkInfoJsonFile();
+
+        // 下载界面自检（仅 -Dfuto.download.selftest=true 时注册，见 build.gradle）。
+        // 这个界面不属于任何 MenuType，没有「build 绿了就等于没问题」这条路 ——
+        // 它自己画的九宫格气泡、进度条、EditBox、类型图标都只在 render 里才会跑，
+        // 所以必须真的把它打开一次。
+        if (Boolean.getBoolean("futo.download.selftest")) {
+            int[] ticks = {0};
+            net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
+                // 等标题画面彻底稳定（资源加载 + 首次布局都完成）再顶上去，否则
+                // 会被 Minecraft 随后的 setScreen 覆盖掉，等于没测。
+                if (++ticks[0] != 60) {
+                    return;
+                }
+                if (!(client.screen instanceof net.minecraft.client.gui.screens.TitleScreen)) {
+                    return;
+                }
+                com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.info(
+                        "[Futo] download selftest: opening ModelDownloadGui");
+                client.setScreen(new com.github.tartaricacid.touhoulittlemaid.client.gui.entity.ModelDownloadGui());
+                com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.info(
+                        "[Futo] download selftest: ModelDownloadGui opened with {} entries",
+                        com.github.tartaricacid.touhoulittlemaid.client.download.InfoGetManager
+                                .DOWNLOAD_INFO_LIST_ALL.size());
+            });
+        }
     }
 }

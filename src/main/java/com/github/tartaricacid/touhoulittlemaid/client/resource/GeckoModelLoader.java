@@ -134,6 +134,10 @@ public final class GeckoModelLoader {
         for (String namespace : MAID_PACKS) {
             loadMaidPack(namespace);
         }
+        // 外部包（tlm_custom_pack）必须在**内置包之后**加载：
+        // ①模型列表的页签顺序要「默认包在最前」，与上游一致；
+        // ②重名判定是「先到先得」，内置包应该赢。
+        CustomPackLoader.loadExternalMaidPacks();
         long millis = (System.nanoTime() - startNanos) / 1_000_000L;
 
         TouhouLittleMaid.LOGGER.info("[Futo] Model loading time: {} ms ({} maid models, {} geometries, {} animation files)",
@@ -197,7 +201,7 @@ public final class GeckoModelLoader {
      * <p>上游把这些字段（pack_name / description / author / version / date / icon）
      * 直接反序列化进 {@code CustomModelPack}；这里手工读，字段名与上游保持一致。</p>
      */
-    private static CustomModelPack<MaidModelInfo> buildPack(String namespace, JsonObject root,
+    static CustomModelPack<MaidModelInfo> buildPack(String namespace, JsonObject root,
                                              java.util.List<MaidModelInfo> models) {
         CustomModelPack<MaidModelInfo> pack = new CustomModelPack<>();
         pack.setPackName(getStringOr(root, "pack_name", namespace));
@@ -597,14 +601,15 @@ public final class GeckoModelLoader {
         try {
             resource = Minecraft.getInstance().getResourceManager().getResource(location);
         } catch (Exception e) {
-            TouhouLittleMaid.LOGGER.debug("Missing {}", location);
-            return null;
+            // 内置资源里没有 —— 再问一次外部模型包（tlm_custom_pack 里的 zip / 文件夹）。
+            // 几何、动画、图标全部走这一个方法，所以「支持外部包」只在这里加一行兜底。
+            return CustomPackLoader.openExternal(location);
         }
         try {
             return resource.getInputStream();
         } catch (Exception e) {
             TouhouLittleMaid.LOGGER.error("Failed to open {}", location, e);
-            return null;
+            return CustomPackLoader.openExternal(location);
         }
     }
 
