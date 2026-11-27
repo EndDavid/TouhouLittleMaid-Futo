@@ -153,6 +153,45 @@ dependencies {
         // 启动日志里应出现 "[Jade] Registered maid / shrine lamp tooltip providers"。
         modLocalRuntime files("libs/Jade-1.18.2-fabric-5.100.0.jar")
 
+        // ------------------------------------------------------------------ 可选联动（IPN）
+        //
+        // Inventory Profiles Next：上游 compat/ipn 干两件事 ——
+        //   1) 在三个配置页签的界面类上写 @IPNGuiHint，让 IPN 把排序按钮摆出来；
+        //   2) 在主界面右外侧垫一块 17x48 底板（compat/ipn/SortButtonScreen）。
+        //
+        // 第 1 件只需要 IPN 的<b>注解类型</b>在编译期可见，所以是纯 compileOnly。
+        // 运行期即使没装 IPN 也完全安全：注解是 RUNTIME 保留的数据，没人读它就是死的。
+        //
+        // 【绝不写 modLocalRuntime】IPN 的 fabric.mod.json 硬依赖
+        // fabric-language-kotlin 与 libipn，这两个前置不在 libs/ 里；
+        // 强行带进开发环境只会让 runClient 在加载阶段就报缺依赖。
+        // 因此本联动的验证只能到「注解进得了 class 文件 + 缺 IPN 时不报错」这一层。
+        modCompileOnly files("libs/InventoryProfilesNext-fabric-1.18.2-1.10.20.jar")
+
+        // ------------------------------------------------------------------ 可选联动（Iris）
+        //
+        // Iris 是 Oculus 在 Fabric 侧的等价物（上游 TLMO 1.20.1 的注释就写着
+        // "Fabric: Oculus->Iris"）。我们的代码只用 FabricLoader#isModLoaded("iris")
+        // 做判断，<b>不引用 Iris 的任何类型</b>，所以这里没有编译期依赖。
+        //
+        // 想真的验证一次「装了 Iris 的那条分支」时加 -PirisRuntime：
+        // 它会顺手把 Iris 与它要求的 Sodium 一起放进开发环境。
+        // 默认不加载 —— 光影会改变所有渲染结果，日常验证不该带上它。
+        // 用法：gradlew runClient -PirisRuntime
+        if (project.hasProperty('irisRuntime')) {
+            modLocalRuntime files("libs/iris-mc1.18.2-1.6.5.jar")
+            modLocalRuntime files("libs/sodium-fabric-mc1.18.2-0.4.1+build.15.jar")
+            // JOML：Sodium 1.18.2 把它作为 JiJ 内嵌在 META-INF/jars/joml-1.10.2.jar 里，
+            // 而 Loom **不展开 files() 本地依赖的嵌套 jar**（与 fiber / night-config 同一个坑）。
+            // 第一次试的时候就是这样炸的：
+            //   Mixin transformation of net.minecraft.client.renderer.culling.Frustum failed
+            //   Caused by: ClassNotFoundException: org.joml.Matrix4f
+            //            at sodium.mixins.json:core.MixinFrustum
+            // 所以从这里把 Sodium 自带的那份 JOML 解出来放进 libs/，按普通库载
+            // （它没有 fabric.mod.json，所以是 implementation 而不是 modLocalRuntime）。
+            implementation files("libs/joml-1.10.2.jar")
+        }
+
 }
 
 processResources {

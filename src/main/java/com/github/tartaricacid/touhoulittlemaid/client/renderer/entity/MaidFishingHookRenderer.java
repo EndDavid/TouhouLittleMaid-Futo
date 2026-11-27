@@ -23,8 +23,9 @@ import net.minecraft.world.entity.LivingEntity;
  * 鱼线用 {@code RenderType.lineStrip()} 逐段生成，末端坐标做了抛物线偏移，
  * 看起来是垂下去的而不是一根直线。</p>
  *
- * <p>与上游的差异：去掉了 Oculus（光影）兼容分支 —— 它只是在 Oculus 下补一个退化顶点，
- * 本移植版未接光影兼容层，省略不影响正常渲染。</p>
+ * <p>与上游的差异：<b>只有一处</b> —— 上游的 {@code compat/oculus/OculusCompat} 在本移植版叫
+ * {@code compat/iris/IrisCompat}（Oculus 是光影模组在 Forge 上的名字，Fabric 版叫 Iris），
+ * 判定方式与调用位置逐字相同。</p>
  */
 public class MaidFishingHookRenderer<T extends MaidFishingHook> extends EntityRenderer<T> {
     private static final ResourceLocation TEXTURE_LOCATION =
@@ -110,6 +111,16 @@ public class MaidFishingHookRenderer<T extends MaidFishingHook> extends EntityRe
             stringVertex(x, y, z, lineConsumer, lasted, this.fraction(i), this.fraction(i + 1),
                     colors[0], colors[1], colors[2]);
         }
+
+        // Iris（上游 Forge 侧叫 Oculus）联动：光影管线会把 lineStrip 的最后一节吞掉，
+        // 于是鱼线看起来是从半空中开始的。补一个退化顶点把最后一节冲出去。
+        //
+        // 顶点坐标取 (0,0,0) 是有意的 —— 上游逐字如此。它落在浮标中心，
+        // 与第 17 个顶点（已经收在 v=1 处）几乎重合，所以画面上看不出多一条线。
+        // 没装 Iris 时这一整段不执行，渲染结果与以前完全一致。
+        if (com.github.tartaricacid.touhoulittlemaid.compat.iris.IrisCompat.isLoaded()) {
+            lineConsumer.vertex(0.0, 0.0, 0.0).color(0, 0, 0, 255).normal(0.0F, 0.0F, 0.0F).endVertex();
+        }
     }
 
     protected float fraction(int numerator) {
@@ -153,4 +164,3 @@ public class MaidFishingHookRenderer<T extends MaidFishingHook> extends EntityRe
         return TEXTURE_LOCATION;
     }
 }
-

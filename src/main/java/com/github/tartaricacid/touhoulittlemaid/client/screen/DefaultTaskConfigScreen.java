@@ -11,6 +11,9 @@ import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
+import org.anti_ad.mc.ipn.api.IPNButton;
+import org.anti_ad.mc.ipn.api.IPNGuiHint;
+import org.anti_ad.mc.ipn.api.IPNPlayerSideOnly;
 
 import java.util.List;
 
@@ -19,7 +22,16 @@ import java.util.List;
  *
  * <p>底图 {@code default_task_config.png} 画在 {@code leftPos+80, topPos+28}，
  * 高度只取 137（上半张是提示文字与示意图，下半张是玩家物品栏的位置）。</p>
+ *
+ * <p>IPN 的五个 {@code @IPNGuiHint} 与 {@code @IPNPlayerSideOnly} 与上游
+ * {@code DefaultMaidTaskConfigGui} 逐字相同（说明见 {@code MaidConfigScreen} 的类注释）。</p>
  */
+@IPNPlayerSideOnly
+@IPNGuiHint(button = IPNButton.SORT, horizontalOffset = -36, bottom = -12)
+@IPNGuiHint(button = IPNButton.SORT_COLUMNS, horizontalOffset = -24, bottom = -24)
+@IPNGuiHint(button = IPNButton.SORT_ROWS, horizontalOffset = -12, bottom = -36)
+@IPNGuiHint(button = IPNButton.SHOW_EDITOR, horizontalOffset = -5)
+@IPNGuiHint(button = IPNButton.SETTINGS, horizontalOffset = -5)
 public class DefaultTaskConfigScreen extends MaidTaskConfigScreen<DefaultTaskConfigContainer> {
     private static final ResourceLocation BG =
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/gui/default_task_config.png");
@@ -48,4 +60,3 @@ public class DefaultTaskConfigScreen extends MaidTaskConfigScreen<DefaultTaskCon
         }
     }
 }
-

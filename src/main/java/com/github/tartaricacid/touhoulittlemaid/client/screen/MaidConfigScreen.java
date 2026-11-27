@@ -18,6 +18,9 @@ import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
+import org.anti_ad.mc.ipn.api.IPNButton;
+import org.anti_ad.mc.ipn.api.IPNGuiHint;
+import org.anti_ad.mc.ipn.api.IPNPlayerSideOnly;
 
 /**
  * 女仆配置界面，移植自上游 {@code client/gui/entity/maid/config/MaidConfigContainerGui}。
@@ -31,7 +34,25 @@ import net.minecraft.world.entity.player.Inventory;
  * 「点一下加 0.1，然后弹回原值，再变成新值」的抖动。所以这里在界面里维护
  * 一份 {@code local} 快照作为显示来源，点击时只改本地 + 发包；服务端那边
  * 是幂等写入，最终两边一致。</p>
+ *
+ * <h2>IPN 联动</h2>
+ * <p>类上的五个 {@code @IPNGuiHint} 与上游 {@code MaidConfigContainerGui} 逐字相同：
+ * 让 Inventory Profiles Next 在本界面右下角摆出「排序 / 按列排 / 按行排 / 编辑器 / 设置」五个按钮，
+ * 底板由 {@code compat/ipn/SortButtonScreen} 画。</p>
+ *
+ * <p>{@code @IPNPlayerSideOnly} 是关键：本界面自己没有可排序的容器槽（女仆的 8 项配置是按钮，
+ * 不是物品格），能排的只有底部那份<b>玩家背包</b>。少了这个注解，IPN 会以为整个菜单都该被排序。</p>
+ *
+ * <p>这些注解是 {@code RUNTIME} + {@code @Inherited}，由 IPN 自己用反射读。
+ * 没装 IPN 时<b>没有任何东西会去读它们</b>，所以不构成硬依赖；编译期只需要 IPN 的 jar
+ * （{@code modCompileOnly}）。</p>
  */
+@IPNPlayerSideOnly
+@IPNGuiHint(button = IPNButton.SORT, horizontalOffset = -36, bottom = -12)
+@IPNGuiHint(button = IPNButton.SORT_COLUMNS, horizontalOffset = -24, bottom = -24)
+@IPNGuiHint(button = IPNButton.SORT_ROWS, horizontalOffset = -12, bottom = -36)
+@IPNGuiHint(button = IPNButton.SHOW_EDITOR, horizontalOffset = -5)
+@IPNGuiHint(button = IPNButton.SETTINGS, horizontalOffset = -5)
 public class MaidConfigScreen extends AbstractMaidScreen<MaidConfigContainer> {
     private static final ResourceLocation ICON =
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/gui/maid_gui_config.png");
@@ -196,4 +217,3 @@ public class MaidConfigScreen extends AbstractMaidScreen<MaidConfigContainer> {
         return new TranslatableComponent("gui.touhou_little_maid.maid_config." + name);
     }
 }
-

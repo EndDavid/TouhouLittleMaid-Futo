@@ -36,7 +36,7 @@
 | **聊天气泡（随机台本 + 受伤 + 饰品 + 书与笔 + 表情图标）** | **完成** |
 | **AI 聊天（LLM 对话 + 头顶气泡 + TTS 语音 + 设置界面）** | **完成**（STT 未做） |
 | **进度（成就）：54 条 + 9 件图标物品 + 23 处触发点** | **完成**（`change_maid_sound` 待音效包子系统） |
-| 模组联动（REI / Jade / Patchouli / Cloth Config / ModMenu） | **完成**（JEI / EMI / YSM / Carry On / Iris 等未做；详见 `03` 的「Jade 联动」章节） |
+| 模组联动（REI / Jade / IPN / Iris / Patchouli / Cloth Config / ModMenu） | **完成**（JEI / EMI / YSM / Carry On / KubeJS 等未做；IPN 的 8 个背包界面注解、REI 的背包热区都被「背包界面未移植」挡住；详见 `03` 的「Jade 联动」与「IPN / Iris 联动」） |
 | **睡觉的落点（碰撞箱 + 渲染）** | **完成**（`pinToBed` 两格中点 + 渲染侧补一次半身长） |
 | 服务端未装本模组时的客户端表现 | **完成**（隐藏三个创造页签并清空内容，见 `03` 同名章节） |
 

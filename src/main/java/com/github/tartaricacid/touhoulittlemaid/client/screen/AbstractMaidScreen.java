@@ -679,6 +679,15 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         RenderSystem.setShaderTexture(0, BG);
         this.blit(poseStack, this.leftPos, this.topPos, 0, 0, this.imageWidth, this.imageHeight);
 
+        // IPN（Inventory Profiles Next）排序按钮的底板。位置与上游逐字相同：
+        // leftPos + 249, topPos + 166，17x48。249 已经超出 256 宽的界面本体，
+        // 所以它是挂在界面右外侧给 IPN 的按钮当背景用的，不是画错了。
+        //
+        // 没装 IPN 时这个方法内部第一行就 return，一个像素都不会多画 ——
+        // 三个配置页签上的 @IPNGuiHint 也只有 IPN 自己会去读，缺它时是纯静态数据。
+        com.github.tartaricacid.touhoulittlemaid.compat.ipn.SortButtonScreen
+                .renderBackground(poseStack, this.leftPos + 249, this.topPos + 166);
+
         // 女仆立绘
         this.drawMaidCharacter(mouseX, mouseY);
 

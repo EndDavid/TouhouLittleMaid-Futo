@@ -2543,3 +2543,101 @@ Fabric 的两端各自加载模组，原版 Minecraft 没有「服务端注册�
 - 判定与「内容为空」是日志断言；**按钮真的消失、点不到**这一步只验到注入点正确，
   视觉上需要真人连一次没装本模组的服务器看一眼。
 - 单机 / 服务器侧 `ServerPresence.isAbsent()` 恒为 `false`，行为与改动前完全一致。
+
+## IPN / Iris 联动
+
+上游 compat 里这两门都很小（IPN 23 行 / Oculus 17 行），但**落地方式完全不同**，所以分开写。
+
+### IPN（Inventory Profiles Next）
+
+上游 `compat/ipn` 只有两个动作，本移植版照搬：
+
+| 上游 | 本移植版 | 说明 |
+|---|---|---|
+| 三个配置页签上的 `@IPNGuiHint` ×5 + `@IPNPlayerSideOnly` | 同样写在 `MaidConfigScreen` / `DefaultTaskConfigScreen` / `AttackTaskConfigScreen` 上 | 让 IPN 把「排序 / 按列排 / 按行排 / 编辑器 / 设置」五个按钮摆出来 |
+| `SortButtonScreen#renderBackground` | `compat/ipn/SortButtonScreen`，调用点在 `AbstractMaidScreen#renderBg` | 17×48 底板，位置 `leftPos+249, topPos+166`（与上游逐字相同） |
+| `ModList.get().isLoaded("inventoryprofilesnext")` | `IpnCompat#isLoaded`（`FabricLoader#isModLoaded`） | 缓存成 `Boolean`，允许在 `init()` 之前被渲染线程问到 |
+
+**为什么注解就够了，不用调 IPN 的 API**
+IPN 是用反射读界面类上的 `@IPNGuiHint`（`RUNTIME` + `@Inherited` + `@Repeatable`，
+用 `javap -v` 在 `libs/` 的 jar 上确认过）来定位按钮的。我们只提供数据，
+不参与绘制，所以**一个 IPN 类型都不用在运行期加载** —— 没装 IPN 时那些注解只是一坨没人读的
+class 文件数据，不会 `NoClassDefFoundError`。
+
+`@IPNPlayerSideOnly` 不能省：这三个界面的容器槽全是女仆自己的（配置页干脆没有物品槽），
+能排序的只有底部那份玩家背包。少了它，IPN 会以为整个菜单都该被排序。
+
+底板的位置 `leftPos+249` 已经超出 256 宽的界面本体，是挂在**界面右外侧**的 ——
+上游就是这么放的（IPN 的按钮落点在界面之外）。
+
+**为什么不能端到端跑起来**
+IPN 的 `fabric.mod.json` 硬依赖 `fabric-language-kotlin` 与 `libipn`，这两份前置都不在
+`libs/` 里。所以 `build.gradle` 里只写了 `modCompileOnly`，**没有** `modLocalRuntime` ——
+强行带进开发环境只会在加载阶段报缺依赖。验证只能到「注解进得了 class 文件」这一层。
+
+### Iris（Oculus 在 Fabric 侧的名字）
+
+上游 `compat/oculus/OculusCompat` 是一个 17 行的「装没装」判定，唯一的消费者是
+`MaidFishingHookRenderer`：
+
+```java
+if (OculusCompat.isOculusInstalled()) {
+    lineConsumer.vertex(0.0, 0.0, 0.0).color(0, 0, 0, 255).normal(0.0F, 0.0F, 0.0F).endVertex();
+}
+```
+
+光影管线会把 `lineStrip` 的最后一节吞掉，于是鱼线看起来是从半空中开始的；
+在末尾补一个退化顶点就能把最后一节冲出去。
+
+本移植版：
+
+- 类叫 `compat/iris/IrisCompat`（上游 TLMO 1.20.1 的 Fabric 分支里也是同一个类、
+  注释写着 `// Fabric: Oculus->Iris`，只把 mod id 从 `oculus` 换成 `iris`）；
+- 判定方式与上游 1.20.1 Fabric 版逐字相同：`FabricLoader#isModLoaded("iris")`，
+  **不**去调 `IrisApi#isShaderPackInUse()` —— 多补一个退化顶点在任何情况下都无害，
+  而模组 API 会引入编译期依赖、且光影尚未初始化时未必有值；
+- 调用点在 `MaidFishingHookRenderer#renderFishingLine` 的顶点循环之后，与上游一致。
+
+**dev 环境的坑**：想验「装了 Iris」那条分支得同时装 Sodium，而 Sodium 1.18.2 把 JOML
+作为 JiJ 内嵌在 `META-INF/jars/joml-1.10.2.jar` 里 —— Loom 不展开 `files()` 依赖的嵌套 jar
+（与 fiber / night-config 同一个坑）。第一次跑直接崩在：
+
+```
+Mixin transformation of net.minecraft.client.renderer.culling.Frustum failed
+Caused by: ClassNotFoundException: org.joml.Matrix4f
+         at sodium.mixins.json:core.MixinFrustum
+```
+
+所以 `libs/joml-1.10.2.jar` 是从 Sodium 的 JiJ 里原样解出来的，`-PirisRuntime` 时按
+`implementation`（它没有 `fabric.mod.json`）加载。
+
+### 验证
+
+默认（`libs/` 里没有 IPN / Iris 参与运行）：
+```
+[Futo] Inventory Profiles Next present: false
+[Futo] Iris present: false
+```
+`port/smoketest.ps1` 一路到 `Sound engine started`，无 crash-report，
+日志里没有任何 `NoClassDefFoundError` / `ClassNotFoundException` —— 说明缺这两个模组时
+新增的代码是死的。
+
+`gradlew runClient -PirisRuntime`（Iris 1.6.5 + Sodium 0.4.1 + JOML 1.10.2）：
+```
+[Futo] Iris present: true
+```
+同样到 `Sound engine started`，Sodium / Iris 自己的 mixin 全部应用成功，无 crash-report。
+
+产物审计：`javap -v` 在打包好的 jar 上确认三个界面类都带着
+`@IPNPlayerSideOnly` 与 5 个 `@IPNGuiHint`（以 `@IPNGuiHints` 容器的形式），
+且 `org.anti_ad.mc.ipn.api.*` 没有被 remap 破坏。
+
+### 验证边界
+
+- **IPN 的按钮没在游戏里见过**：缺 `fabric-language-kotlin` / `libipn`，跑不起来。
+  能断言的是「注解在 class 文件里、位置与上游一致、缺 IPN 时不出错」。
+- **Iris 的鱼线没做视觉验收**：那需要一条真实的钓鱼线 + 开着光影包看。
+  验到的是「判定为 true、游戏能正常启动、渲染路径不抛异常」。
+- 上游另外 8 个带 `@IPNGuiHint` 的界面是**背包容器界面**（大/中/小/末影箱/熔炉/储罐/
+  工作台/空背包），本移植版没有那套界面，因此那 8 处注解无处可放 —— 与 REI 的
+  `registerScreens` / `registerTransferHandlers` 是同一个前置阻塞。

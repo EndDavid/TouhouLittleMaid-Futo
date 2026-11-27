@@ -56,6 +56,7 @@
 - 配方补全与 REI 联动
 - Jade 联动（女仆 / 神社灯提示行）
 - 服务端没装本模组时，客户端不该露出创造页签
+- IPN / Iris 联动
 
 ### [`04-rendering-and-models.md`](04-rendering-and-models.md)
 

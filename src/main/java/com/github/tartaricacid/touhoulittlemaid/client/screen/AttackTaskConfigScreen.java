@@ -18,6 +18,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Inventory;
+import org.anti_ad.mc.ipn.api.IPNButton;
+import org.anti_ad.mc.ipn.api.IPNGuiHint;
+import org.anti_ad.mc.ipn.api.IPNPlayerSideOnly;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -39,7 +42,16 @@ import java.util.Optional;
  * 每改一次就发一个包会让服务端反复重建女仆的行为树 —— 编辑十几条就是十几次重建，
  * 每次都要停掉所有正在跑的 Brain 行为。改完关闭时整体提交，
  * 语义与上游 {@code SetAttackListMessage} 一致，成本低得多。</p>
+ *
+ * <p>IPN 的五个 {@code @IPNGuiHint} 与 {@code @IPNPlayerSideOnly} 与上游
+ * {@code AttackTaskConfigGui} 逐字相同（说明见 {@code MaidConfigScreen} 的类注释）。</p>
  */
+@IPNPlayerSideOnly
+@IPNGuiHint(button = IPNButton.SORT, horizontalOffset = -36, bottom = -12)
+@IPNGuiHint(button = IPNButton.SORT_COLUMNS, horizontalOffset = -24, bottom = -24)
+@IPNGuiHint(button = IPNButton.SORT_ROWS, horizontalOffset = -12, bottom = -36)
+@IPNGuiHint(button = IPNButton.SHOW_EDITOR, horizontalOffset = -5)
+@IPNGuiHint(button = IPNButton.SETTINGS, horizontalOffset = -5)
 public class AttackTaskConfigScreen extends MaidTaskConfigScreen<AttackTaskConfigContainer> {
     private static final ResourceLocation BG =
             new ResourceLocation(TouhouLittleMaid.MOD_ID, "textures/gui/attack_task_config.png");
@@ -209,4 +221,3 @@ public class AttackTaskConfigScreen extends MaidTaskConfigScreen<AttackTaskConfi
         super.onClose();
     }
 }
-

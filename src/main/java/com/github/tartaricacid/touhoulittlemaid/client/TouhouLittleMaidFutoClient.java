@@ -212,6 +212,12 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 否则玩家能拖出物品，而服务端注册表里没有它们，拿在手里等于空气。
         // 判定方式与 3 秒容差见 ServerPresenceClient 的类注释。
         com.github.tartaricacid.touhoulittlemaid.client.event.ServerPresenceClient.init();
+        // 两个纯客户端的模组联动：都只打一条「装没装」的日志（可断言的锚点）。
+        // Inventory Profiles Next：排序按钮的位置由界面类上的 @IPNGuiHint 决定，
+        // 底板由 AbstractMaidScreen#renderBg 画，这里只负责报一声。
+        com.github.tartaricacid.touhoulittlemaid.compat.ipn.IpnCompat.init();
+        // Iris（上游 Forge 侧叫 Oculus）：只影响钓鱼钩鱼线末尾那个退化顶点。
+        com.github.tartaricacid.touhoulittlemaid.compat.iris.IrisCompat.init();
 
 
         // 实体 ID 复制器：手持它右键任意实体，把注册名复制到剪贴板（上游 CopyEntityIdEvent）。
