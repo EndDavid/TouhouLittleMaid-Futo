@@ -10,6 +10,8 @@ import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidFindHom
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidHomeMealTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidHealSelfTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidWorkMealTask;
+import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidStealEdibleMoveBlockTask;
+import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidStealEdibleUseTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidClearSleepTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidInteractWithDoor;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidJoyTask;
@@ -171,6 +173,11 @@ public final class MaidBrain {
         pairMaidList.add(updateActivity);
         pairMaidList.add(Pair.of(6, new MaidBegTask()));
         pairMaidList.add(Pair.of(7, new MaidWorkMealTask()));
+        // 女仆偷吃方块食物（蛋糕 / 农夫乐事的派与盛宴）。
+        // 上游同样是两条成对的行为：一条负责走过去（Move），
+        // 一条负责到了之后真吃（Use）。权重都是 8，与上游一致。
+        pairMaidList.add(Pair.of(8, new MaidStealEdibleMoveBlockTask(0.6f)));
+        pairMaidList.add(Pair.of(8, new MaidStealEdibleUseTask(2)));
         pairMaidList.add(Pair.of(20, getLookAndRandomWalk(e -> e.getTask().enableLookAndRandomWalk(e))));
         brain.addActivity(Activity.WORK, ImmutableList.copyOf(pairMaidList));
     }

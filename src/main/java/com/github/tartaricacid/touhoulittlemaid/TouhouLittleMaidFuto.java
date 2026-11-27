@@ -76,6 +76,11 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // maid meals (work meal / heal meal), see MaidMealManager
         com.github.tartaricacid.touhoulittlemaid.entity.task.meal.MaidMealManager.init();
 
+
+        // 「什么算方块类食物」登记表（蛋糕 + 各 compat）。
+        // 必须早于任何女仆创建 —— 女仆的 WORK 行为里有两条行为会遍历它，
+        // 列表空的话它们只是空转（不会崩），但「女仆不吃东西」很难自诊。
+        com.github.tartaricacid.touhoulittlemaid.entity.ai.edible.MaidEdibleBlockManager.init();
         // 背包注册表（empty 等），同样必须早于任何女仆创建
         BackpackManager.init();
 

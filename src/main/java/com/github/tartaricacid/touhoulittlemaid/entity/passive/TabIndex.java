@@ -13,6 +13,14 @@ public final class TabIndex {
     public static final int TASK_CONFIG = 1;
     public static final int MAID_CONFIG = 2;
 
+    /**
+     * 饰品页（Trinkets 联动单独开的一页）。
+     *
+     * <p>上游把它做成「背包界面里的一个子页」；本移植版没有那套背包界面，
+     * 所以它是第四个顶层页签 —— 从主界面的按钮进入，从饰品页的按钮退回。</p>
+     */
+    public static final int TRINKETS = 3;
+
     private TabIndex() {
     }
 }

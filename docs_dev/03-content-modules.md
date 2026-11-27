@@ -2641,3 +2641,114 @@ Caused by: ClassNotFoundException: org.joml.Matrix4f
 - 上游另外 8 个带 `@IPNGuiHint` 的界面是**背包容器界面**（大/中/小/末影箱/熔炉/储罐/
   工作台/空背包），本移植版没有那套界面，因此那 8 处注解无处可放 —— 与 REI 的
   `registerScreens` / `registerTransferHandlers` 是同一个前置阻塞。
+
+## 农夫乐事 / 饰品（Trinkets）联动
+
+这两门在上游都属于 **1.20.1 才有的东西**：`compat/farmersdelight` 依赖 1.20.1 新增的
+「方块类食物」体系，`compat/curios` 依赖 Curios（Fabric 上的等价物是 Trinkets）。
+所以本轮不只是搬两个 compat 类，而是把那两套**前置基础设施**一起补上。
+
+### 农夫乐事：先把「方块类食物」体系补出来
+
+上游 1.18.2 **完全没有**这套东西（`grep -r edible` 零命中），它是 1.4.7 才加的。
+本移植版按 TLMO Fabric 1.20.1 的形状补齐了四块：
+
+| 新增 | 作用 |
+|---|---|
+| `api/block/IMaidEdibleBlock` | 「什么算能吃一口的方块」的接口 + 零食架标签 `MAID_SNACK_STAND_BLOCK` |
+| `entity/ai/edible/MaidEdibleBlockManager` | 登记表（内置蛋糕 + 各 compat） |
+| `entity/ai/edible/MaidEdibleBlockAction` | 记忆值：偷吃 / 摆放 |
+| `entity/ai/edible/CakeEdible` | 原版蛋糕实现（这套机制的样板，也是没装任何食物模组时唯一的可观察行为） |
+| `entity/ai/brain/task/MaidStealEdibleMoveBlockTask` | 找到目标并走过去（搜索半径 5、冷却 45 秒、可达性放宽到 3×3×3） |
+| `entity/ai/brain/task/MaidStealEdibleUseTask` | 到了之后真正动手（吃完加 `Type.STEAL_EDIBLE_BLOCK` 好感度） |
+| `data/touhou_little_maid/tags/blocks/maid_snack_stand_block.json` | 零食架标签，内容是 `touhou_little_maid:snack_cabinet` |
+
+顺带补了三个上游有、本移植版缺的东西：
+
+- `EntityMaid#spawnItemParticles(ItemStack, int)`（嘴里掉食物渣的粒子，1.20.1 的写法）；
+- `Type.STEAL_EDIBLE_BLOCK`（`+1` 好感度 / 3 分钟冷却，数值与上游逐字相同）；
+- `InitEntities.MAID_EDIBLE_BLOCK_ACTION` 记忆模块；
+- `MaidMoveToBlockTask#getHorizontalSearchRange`（上游有这个钩子，本移植版当初写死了
+  `getRestrictRadius()`；偷吃只搜 5 格，所以必须加回来）。
+
+**为什么要求「必须放在零食架上」**：否则女仆会把玩家精心摆在地上的蛋糕啃掉。
+判断走 `belowIsSnackStand`，标签只含零食柜 —— 与原版一致。
+
+**农夫乐事自己的那份**（`compat/farmersdelight`）覆盖两类方块：
+`PieBlock`（派，`BITES` 递增）与 `FeastBlock`（盛宴，`servings` 递减）。
+Fabric 版的包名是 `com.nhoryzon.mc.farmersdelight.block.*`（**不是** Forge 的
+`vectorwing.farmersdelight.common.block.*`），而且 `PieBlock` 没有 `getMaxBites()`，
+最大口数是常量 `PieBlock.MAX_BITES` —— 这两处都是从 `libs/` 的 jar 里 `javap` 出来的。
+
+### 饰品：Curios → Trinkets
+
+Curios 只有 Forge 版；Fabric 上的等价物是 **Trinkets**。上游 TLMO 的 Fabric 分支用 Accessories，
+这里按需求对接 Trinkets。
+
+| 新增 | 对应上游 |
+|---|---|
+| `compat/trinkets/TrinketsCompat` | `CuriosCompat` —— 只做「装没装」+ 转发，**一个 Trinkets 类型都不引用** |
+| `compat/trinkets/TrinketsHandler` | 真正干活的（`TrinketsApi.getTrinketComponent` / 遍历槽 / 倒进墓碑） |
+| `compat/trinkets/menu/MaidTrinketSlot` | `MaidCurioSlot` |
+| `compat/trinkets/menu/TrinketContainer` | `CuriosContainer` |
+| `compat/trinkets/client/TrinketContainerScreen` | `CuriosContainerScreen` |
+| `compat/trinkets/client/TrinketBackButton` | `CuriosButton` |
+
+**为什么 ID 类要拆成两个**：`TrinketsCompat` 的方法签名里如果出现
+`Optional<TrinketComponent>`，没装 Trinkets 时加载它就有链接风险。所以判定与转发放在
+不引用任何 Trinkets 类型的 `TrinketsCompat` 里，实现放在只有 `isLoaded()` 为真才会被链接的
+`TrinketsHandler` 里。这与 `FarmersDelightCompat` / `FarmersDelightEdible` 是同一个套路。
+
+**槽位从哪来**：Trinkets 3.3.1 的实体槽位是数据驱动的 —— `EntitySlotLoader` 扫描
+`data/trinkets/entities/*.json`（注意**命名空间必须是 `trinkets`**，这是从字节码里读出来的），
+读 `entities` + `slots` 两个字段。所以本移植版随包给了一份
+`src/main/resources/data/trinkets/entities/maid.json`，给女仆挂四个槽：
+项链 / 戒指 / 帽子 / 腰带。
+
+**版式**：与上游一致 —— 玩家物品栏 + 女仆护甲/主副手 + 6 列饰品格网格（`143,37` 起，步距 18）。
+底图 `maid_gui_curios.png` 与按钮贴图 `bauble_button.png` 都取自 TLMO Fabric 1.20.1 的 jar。
+
+### 与上游的三处差异（都有原因）
+
+1. **不做分页**：上游每页 36 格并翻页，是因为 Curios 的槽数不限。本移植版的槽位来自我们自己的
+   数据文件（4 个），一页绰绰有余。而且 1.18.2 的 `AbstractContainerMenu#lastSlots` /
+   `remoteSlots` 是 **private**（1.20 才放开），翻页时清不掉，会导致「翻页后物品错位」。
+2. **入口在主界面右侧外面**（`leftPos+256, topPos+92`）：主界面已经排满了（护甲 / 主副手 /
+   饰品栏 / 背包 6 行 / 玩家物品栏 / 左下角下载按钮），往里放任何东西都会盖住槽位。
+   上游把它放在「背包子界面」里，本移植版没有那层子界面。
+3. **不画槽位图标**：上游走 Curios 的图集 sprite。1.18.2 的 Fabric 没有把 Trinkets 的槽位贴图
+   并进图集，画出来只会是紫黑格。空格子的用途靠**悬停提示**说明（戒指 / 项链 …）。
+
+### 验证
+
+默认（`libs/` 里 Trinkets 已进 dev runtime，农夫乐事没有）：
+```
+[Futo] Farmer's Delight present: false
+[Futo] edible block registered: CakeEdible
+[Futo] Trinkets present: true
+```
+`gradlew runClient -PfarmersDelightRuntime`：
+```
+[Futo] Farmer's Delight present: true
+[Futo] edible block registered: CakeEdible
+[Futo] edible block registered: FarmersDelightEdible
+[Futo] Trinkets present: true
+```
+两边都到 `Sound engine started`，无 crash-report，日志里没有
+`NoClassDefFoundError` / `NoSuchMethodError` —— 说明缺哪个模组时，对应那份代码都不会被链接。
+
+产物审计：jar 内 `compat/trinkets/**` 六个类 + `compat/farmersdelight/**` 两个类 +
+`entity/ai/edible/**` 三个类 + `data/trinkets/entities/maid.json` +
+`data/touhou_little_maid/tags/blocks/maid_snack_stand_block.json` 全部就位。
+`build` 绿；四道守卫绿（`check-encoding` 1655 files / 0 bad、`check-jar` / `check-dangling`
+checked、`check-renderers` ALL OK）。
+
+### 验证边界
+
+- **没做过「女仆真的去偷吃」的实机验证**：那需要把蛋糕摆在零食柜上、等到上班时段、
+  观察她走过去吃。能自动断言的是「登记表里有两份实现」「缺模组时不报错」。
+- **饰品页没做过视觉验收**：需要真人打开女仆界面点右侧按钮看一眼。
+  能自动断言的是「Trinkets 认到了、菜单能注册、槽位数据文件在 jar 里」。
+- **Trinkets 的槽位是否真的挂到女仆身上**没有直接断言（要靠 `EntitySlotLoader` 解析后
+  再开界面看）。数据文件路径与字段名是从 `libs/trinkets-3.3.1.jar` 的字节码里读出来的，
+  不是猜的，但仍建议第一次实机时确认四个槽是否都出现。

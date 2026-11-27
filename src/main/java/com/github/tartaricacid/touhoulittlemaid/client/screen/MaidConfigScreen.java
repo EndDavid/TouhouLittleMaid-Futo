@@ -217,3 +217,4 @@ public class MaidConfigScreen extends AbstractMaidScreen<MaidConfigContainer> {
         return new TranslatableComponent("gui.touhou_little_maid.maid_config." + name);
     }
 }
+

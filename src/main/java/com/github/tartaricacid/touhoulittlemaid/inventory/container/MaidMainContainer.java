@@ -87,7 +87,19 @@ public class MaidMainContainer extends AbstractMaidContainer {
 
     private final int backpackRows;
 
-    public MaidMainContainer(MenuType<MaidMainContainer> type, int id, Inventory inventory, int entityId) {
+    public MaidMainContainer(MenuType<?> type, int id, Inventory inventory, int entityId) {
+        this(type, id, inventory, entityId, true);
+    }
+    /**
+     * 带「要不要背包格」开关的构造器。
+     *
+     * <p>Trinkets 联动的那一页要「玩家物品栏 + 护甲 + 主副手 + 饰品格」，但<b>不要</b>女仆自己的
+     * 背包格（那些格子在主界面已经有了，重复摆一份只会让人困惑）。上游 Curios 专门写了
+     * 一个 {@code CuriosContainer} 子类、并在里面把 {@code addBackpackInv} 覆写成空实现；
+     * 本移植版这几个 add* 方法是 private，加一个开关参数是更小的改动。</p>
+     */
+    protected MaidMainContainer(MenuType<?> type, int id, Inventory inventory,
+                                int entityId, boolean withBackpack) {
         super(type, id, inventory, entityId);
 
         EntityMaid foundMaid = this.maid;
@@ -101,11 +113,13 @@ public class MaidMainContainer extends AbstractMaidContainer {
             this.addMaidArmorInv(foundMaid);
             this.addMaidHandInv(foundMaid);
             this.addMaidBauble(foundMaid);
-            this.addBackpackInv(foundMaid, capacity);
+            if (withBackpack) {
+                this.addBackpackInv(foundMaid, capacity);
+            }
         }
     }
 
-    private void addMaidArmorInv(EntityMaid maid) {
+    protected void addMaidArmorInv(EntityMaid maid) {
         IItemHandler armor = maid.getArmorInvWrapper();
         for (int i = 0; i < 4; i++) {
             EquipmentSlot equipmentSlot = ARMOR_SLOTS[i];
@@ -163,7 +177,7 @@ public class MaidMainContainer extends AbstractMaidContainer {
         }
     }
 
-    private void addMaidHandInv(EntityMaid maid) {
+    protected void addMaidHandInv(EntityMaid maid) {
         IItemHandler hands = maid.getHandsInvWrapper();
         // 主手：模组自带贴图，由屏幕补画
         this.addSlot(new HintSlot(hands, 0, 87, 77, EMPTY_MAINHAND_SLOT));

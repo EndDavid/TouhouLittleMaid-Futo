@@ -221,3 +221,4 @@ public class AttackTaskConfigScreen extends MaidTaskConfigScreen<AttackTaskConfi
         super.onClose();
     }
 }
+

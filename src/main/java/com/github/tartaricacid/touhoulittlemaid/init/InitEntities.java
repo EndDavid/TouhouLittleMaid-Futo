@@ -236,6 +236,17 @@ public final class InitEntities {
     public static final MemoryModuleType<List<Entity>> VISIBLE_PICKUP_ENTITIES = Registry.register(
             Registry.MEMORY_MODULE_TYPE, TouhouLittleMaid.rl("visible_pickup_entities"),
             MaidReflection.newMemoryModuleType(Optional.empty()));
+    /**
+     * 女仆面对方块类食物时打算干什么（偷吃 / 摆放）。
+     *
+     * <p>上游同名记忆模块。它必须是独立的一个存储项 —— 两个行为
+     * 一个写、一个读，不能挖到 {@code TARGET_POS} 里。</p>
+     */
+    public static final MemoryModuleType<com.github.tartaricacid.touhoulittlemaid.entity.ai.edible.MaidEdibleBlockAction>
+            MAID_EDIBLE_BLOCK_ACTION = Registry.register(
+            Registry.MEMORY_MODULE_TYPE, TouhouLittleMaid.rl("maid_edible_block_action"),
+            MaidReflection.newMemoryModuleType(Optional.empty()));
+
     public static final MemoryModuleType<PositionTracker> TARGET_POS = Registry.register(
             Registry.MEMORY_MODULE_TYPE, TouhouLittleMaid.rl("target_pos"),
             MaidReflection.newMemoryModuleType(Optional.empty()));

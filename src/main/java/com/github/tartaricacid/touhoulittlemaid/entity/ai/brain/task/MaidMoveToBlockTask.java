@@ -48,7 +48,7 @@ public abstract class MaidMoveToBlockTask extends MaidCheckRateTask {
     protected final void searchForDestination(ServerLevel worldIn, EntityMaid maid) {
         MaidPathFindingBFS pathFinding = getOrCreateArrivalMap(worldIn, maid);
         BlockPos centrePos = this.getWorkSearchPos(maid);
-        int searchRange = (int) maid.getRestrictRadius();
+        int searchRange = this.getHorizontalSearchRange(maid);
         BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
         for (int y = this.verticalSearchStart; y <= this.verticalSearchRange; y = y > 0 ? -y : 1 - y) {
             for (int i = 0; i < searchRange; ++i) {
@@ -74,6 +74,16 @@ public abstract class MaidMoveToBlockTask extends MaidCheckRateTask {
         }
         this.currentWorkPos = null;
         this.clearCurrentArrivalMap(pathFinding);
+    }
+
+    /**
+     * 水平搜索半径。子类可以收窄它（例如偷吃方块食物只找 5 格）。
+     *
+     * <p>上游 1.20.1 同样有这个钩子；本移植版最初直接写死了
+     * {@code (int) maid.getRestrictRadius()}，加回来是为了让子类能改搜索半径。</p>
+     */
+    protected int getHorizontalSearchRange(EntityMaid maid) {
+        return (int) maid.getRestrictRadius();
     }
 
     protected void clearCurrentArrivalMap(MaidPathFindingBFS pathFinding) {

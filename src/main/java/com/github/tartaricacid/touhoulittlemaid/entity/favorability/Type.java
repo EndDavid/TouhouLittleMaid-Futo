@@ -26,6 +26,12 @@ public class Type {
      * 改掉的话，未来接上棋类时行为会和上游不一致。
      */
     public static final Type WCHESS_WIN = new Type("CChessWin", 4, 18000);
+    /**
+     * 偷吃方块食物（蛋糕 / 派 / 盛宴）。数值与上游逐字相同：
+     * 每次 +1 好感度，3 分钟冷却。
+     */
+    public static final Type STEAL_EDIBLE_BLOCK = new Type("StealEdibleBlock", 1, 3 * 60 * 20);
+
     public static final Type WORK_MEAL = new Type("WorkMeal", 1, 2 * 60 * 20);
     public static final Type ON_HOME_MEAL = new Type("OnHomeMeal", 1, 24000);
     public static final Type HOME_MEAL = new Type("HomeMeal", 1, 60 * 20);

@@ -46,6 +46,28 @@ public class MaidMainScreen extends AbstractMaidScreen<MaidMainContainer> {
         return this.topPos;
     }
 
+    /**
+     * 饰品页的入口按钮。
+     *
+     * <p><b>为什么放在界面右外侧：</b>主界面已经排满了（护甲 / 主副手 /
+     * 饰品栏 / 背包 6 行 / 玩家物品栏 / 左下角的下载按钮），往里放任何东西
+     * 都会盖住某个槽位。1.20.1 的上游把这个按钮放在「背包子界面」里，
+     * 而本移植版没有那层子界面 —— 所以贴在 GUI 右侧外面（x >= 256），
+     * 与右侧两个侧边页签排成一列。</p>
+     */
+    @Override
+    protected void initAdditionWidgets() {
+        if (this.maid == null
+                || !com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat.isLoaded()) {
+            return;
+        }
+        this.addRenderableWidget(
+                new com.github.tartaricacid.touhoulittlemaid.compat.trinkets.client.TrinketBackButton(
+                        this.leftPos + 256, this.topPos + 92, false,
+                        b -> com.github.tartaricacid.touhoulittlemaid.client.screen.MaidClientPacketSender
+                                .sendTab(TabIndex.TRINKETS, this.maid.getId())));
+    }
+
     @Override
     protected int getCurrentTab() {
         return TabIndex.MAIN;

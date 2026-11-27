@@ -47,6 +47,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.Util;
 import net.minecraft.nbt.CompoundTag;
@@ -1512,6 +1513,35 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                 this.level.addParticle(ParticleTypes.HEART,
                         this.getRandomX(1.0), this.getRandomY() + 0.5, this.getRandomZ(1.0),
                         offsetX, offsetY, offsetZ);
+            }
+        }
+    }
+
+    /**
+     * 从嘴里掉食物渣的粒子。
+     *
+     * <p>移植自上游 1.20.1 的 {@code EntityMaid#spawnItemParticles}。
+     * 用它的地方是「偷吃方块食物」与各类方块饭。
+     * 画面上就是女仆眼前往下掉一小堆物品帖图。</p>
+     *
+     * <p>只在服务端发（{@code ServerLevel#sendParticles}）—— 粒子本来就是服务端广播的，
+     * 客户端自己再 addParticle 一次只会双倍。</p>
+     */
+    public void spawnItemParticles(ItemStack stack, int amount) {
+        for (int i = 0; i < amount; ++i) {
+            Vec3 speed = new Vec3((this.random.nextFloat() - 0.5) * 0.1, Math.random() * 0.1 + 0.1, 0.0);
+            speed = speed.xRot(-this.getXRot() * Mth.DEG_TO_RAD);
+            speed = speed.yRot(-this.getYRot() * Mth.DEG_TO_RAD);
+
+            double yOffset = -this.random.nextFloat() * 0.6 - 0.3;
+            Vec3 pos = new Vec3((this.random.nextFloat() - 0.5) * 0.3, yOffset, 0.6);
+            pos = pos.xRot(-this.getXRot() * Mth.DEG_TO_RAD);
+            pos = pos.yRot(-this.getYRot() * Mth.DEG_TO_RAD);
+            pos = pos.add(this.getX(), this.getEyeY(), this.getZ());
+
+            ItemParticleOption option = new ItemParticleOption(ParticleTypes.ITEM, stack);
+            if (this.level instanceof ServerLevel serverLevel) {
+                serverLevel.sendParticles(option, pos.x, pos.y, pos.z, 1, speed.x, speed.y + 0.05, speed.z, 0.0);
             }
         }
     }
@@ -3477,6 +3507,17 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                             com.github.tartaricacid.touhoulittlemaid.init.InitMenu.TASK_CONFIG_DEFAULT,
                             syncId, inventory, entityId);
                 }
+                if (tabIndex == TabIndex.TRINKETS) {
+                    // 饰品页（Trinkets）。没装 Trinkets 时回退到主界面 ——
+                    // 宁可让玩家看到主界面，也不能让他去加载一个不存在的菜单类。
+                    if (com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat.isLoaded()) {
+                        return com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat
+                                .createMenu(syncId, inventory, entityId);
+                    }
+                    return new com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidMainContainer(
+                            com.github.tartaricacid.touhoulittlemaid.init.InitMenu.MAID_MAIN,
+                            syncId, inventory, entityId);
+                }
                 if (tabIndex == TabIndex.MAID_CONFIG) {
                     return new com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidConfigContainer(
                             com.github.tartaricacid.touhoulittlemaid.init.InitMenu.MAID_CONFIG,
@@ -3655,6 +3696,9 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             IMaidBackpack maidBackpack = this.getMaidBackpackType();
             tombstone.insertItem(maidBackpack.getTakeOffItemStack(ItemStack.EMPTY, null, this));
             maidBackpack.onSpawnTombstone(this, tombstone);
+            // Trinkets 饰品（上游 CuriosEvent#onMaidTombstone 的对应物）。
+            // 没装 Trinkets 时这个方法第一行就 return。
+            com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat.drainToTombstone(this, tombstone);
             // 胶片
             tombstone.insertItem(com.github.tartaricacid.touhoulittlemaid.item.ItemFilm.maidToFilm(this));
             // 全局记录（狐狸卷轴按玩家查墓碑用）

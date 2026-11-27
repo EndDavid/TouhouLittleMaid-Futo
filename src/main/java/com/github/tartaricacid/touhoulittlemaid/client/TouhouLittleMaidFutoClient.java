@@ -206,6 +206,14 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.SyncSiteListPacket.initClient();
         com.github.tartaricacid.touhoulittlemaid.network.TTSAudioToClientPacket.initClient();
         com.github.tartaricacid.touhoulittlemaid.network.TTSSystemAudioToClientPacket.initClient();
+        // 饰品页（Trinkets 联动）。没装 Trinkets 时不注册界面 ——
+        // 那个界面类本身就 import 了 Trinkets 的类，加载它就是一次无谓的风险。
+        if (com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat.isLoaded()) {
+            net.fabricmc.fabric.api.client.screenhandler.v1.ScreenRegistry.register(
+                    com.github.tartaricacid.touhoulittlemaid.init.InitMenu.TRINKET_MAIN,
+                    com.github.tartaricacid.touhoulittlemaid.compat.trinkets.client.TrinketContainerScreen::new);
+        }
+        com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat.init();
         // 对着可聊天的女仆按聊天键（默认 T）开界面
         com.github.tartaricacid.touhoulittlemaid.client.event.PressAIChatKeyEvent.init();
         // 「对面的服务端装没装本模组」。没装时隐藏三个创造模式页签并清空其内容 ——
