@@ -134,6 +134,25 @@ dependencies {
         modCompileOnly files("libs/modmenu-3.2.5.jar")
         modLocalRuntime files("libs/modmenu-3.2.5.jar")
 
+        // ------------------------------------------------------------------ 可选联动（Jade）
+        //
+        // Jade 是 Fabric 1.18.2 上的 TOP 等价物（同一份 API，包名是 snownee.jade.api.*）。
+        // 上游 TLM Forge 1.18.2 的 compat/jade 就是给女仆实体与神社灯加提示行。
+        //
+        // 注册机制：Fabric 侧**不扫描 @WailaPlugin 注解**，而是
+        //   FabricLoader.getInstance().getEntrypointContainers("jade", IWailaPlugin.class)
+        // （见 Jade 5.100.0 的 snownee.jade.Jade#loadComplete）。因此我们的 JadePlugin
+        // 登记在 fabric.mod.json 的 `jade` 入口点里；没装 Jade 时入口点不会被取，
+        // 所以这是可选依赖，不进 depends。
+        //
+        // 注意 libs/ 里的 Jade jar 是 intermediary 命名的（类引用是 net.minecraft.class_1297 这种），
+        // 必须用 mod* 配置（Loom 会把它 remap 到当前 official mappings），
+        // 写成普通 compileOnly 会因为类名对不上而编译失败。
+        modCompileOnly files("libs/Jade-1.18.2-fabric-5.100.0.jar")
+        // 开发环境（gradlew runClient）里真的带上 Jade，用来做端到端验证：
+        // 启动日志里应出现 "[Jade] Registered maid / shrine lamp tooltip providers"。
+        modLocalRuntime files("libs/Jade-1.18.2-fabric-5.100.0.jar")
+
 }
 
 processResources {

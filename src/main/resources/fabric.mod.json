@@ -27,6 +27,9 @@
 		"rei_client": [
 			"com.github.tartaricacid.touhoulittlemaid.compat.rei.MaidREIClientPlugin"
 		],
+		"jade": [
+			"com.github.tartaricacid.touhoulittlemaid.compat.jade.JadePlugin"
+		],
 		"modmenu": [
 			"com.github.tartaricacid.touhoulittlemaid.compat.modmenu.ModMenuApiImpl"
 		]
@@ -44,6 +47,7 @@
 	"suggests": {
 		"cloth-config": ">=6.0.0 <7.0.0",
 		"patchouli": "*",
-		"modmenu": ">=3.0.0"
+		"modmenu": ">=3.0.0",
+		"jade": ">=5.100.0"
 	}
 }

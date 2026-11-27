@@ -54,6 +54,7 @@
 - 模型切换器：红石切模型，以及它为什么不需要 `canConnectRedstone`
 - 进度（成就）系统：54 条全量移植
 - 配方补全与 REI 联动
+- Jade 联动（女仆 / 神社灯提示行）
 
 ### [`04-rendering-and-models.md`](04-rendering-and-models.md)
 
@@ -84,4 +85,3 @@
 - 每条「与上游不同」都写明原因 —— 那些大多是 1.18.2 缺少 Forge 补丁导致的，不是偏好。
 - 这些文件按 CRLF + UTF-8 存储，编辑时不要整体重排行尾（见 `../.github/copilot-instructions.md`）。
 - 文件名一律 ASCII，标题与正文用中文 —— `port/*.ps1` 是纯 ASCII 脚本，中文路径在 PS 5.1 里会坏。
-

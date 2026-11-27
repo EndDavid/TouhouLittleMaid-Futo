@@ -70,10 +70,6 @@ port_check_status.txt
 
 /check.txt
 
-# 仅本地做联动测试用、build.gradle 里并没有引用的 jar（libs/ 下的其它 jar 是构建依赖，要入库）
-/libs/Jade-*.jar
-/libs/JadeAddons-*.jar
-
 # Essentially, the following files are required for building the project. They should not be ignored or deleted, as doing so will prevent successful compilation after cloning the repository:
 #   libs/*.jar
 #   gradle/wrapper/

@@ -2392,3 +2392,92 @@ ModelReloader#reloadAll
 - **真实的第三方包**：合成包只覆盖「读得到、值对、能覆盖」，没覆盖
   「20 MB 的包 + 几百个模型 + 多语言文件」这种规模；
 - 多注的那条 `has` 在真实场景下没有回归样本，只是两条路语义一致，风险低。
+
+## Jade 联动（女仆 / 神社灯提示行）
+
+Jade 是 Fabric 1.18.2 上的 TOP 等价物：同一套 API，只是包名从
+`mcp.mobius.waila.api.*` 换成了 `snownee.jade.api.*`。上游的 `compat/jade` 很小，
+三个文件加起来 95 行：
+
+| 类 | 作用 |
+|---|---|
+| `compat/jade/JadePlugin` | 入口：把两个 provider 注册到 `EntityMaid` / `BlockMaidBeacon` |
+| `compat/jade/provider/MaidProvider` | 女仆：任务 / 日程 / 好感度等级 / 距下一级还差多少点 / 永久无敌 |
+| `compat/jade/provider/ShrineLampProvider` | 神社灯：已存电力 + 当前效果每秒消耗 |
+
+文案键沿用上游的 `top.touhou_little_maid.entity_maid.*` 与
+`tooltips.touhou_little_maid.maid_beacon.desc` / `gui.touhou_little_maid.maid_beacon.cost_power`
+（各 lang json 里本来就有，是当年 TOP 联动留下的），**不需要新增译文**。
+
+### 注册机制：Fabric 走入口点，不是注解扫描
+
+Forge 版靠 `@WailaPlugin` 扫类路径。Fabric 版**完全不读这个注解** ——
+Jade 5.100.0 的 `snownee.jade.Jade#loadComplete()` 里是：
+
+```java
+FabricLoader.getInstance().getEntrypointContainers("jade", IWailaPlugin.class)
+```
+
+所以 `JadePlugin` 登记在 `fabric.mod.json` 的 **`"jade"` 入口点**里。没装 Jade 时
+没有东西会来取它，于是 **Jade 是可选依赖**：只写 `suggests`，不写 `depends`。
+
+顺带两个坑（都是从 jar 字节码里核出来的，不是猜的）：
+
+- `snownee.jade.api.WailaPlugin` 在这个版本的签名是 `String value()` 且**没有默认值** ——
+  照抄上游的 `@WailaPlugin`（无参）会直接编译失败；而且 Fabric 侧根本不用它，所以不写。
+- 上游写的是 `registerComponentProvider(provider, TooltipPosition.TAIL, Class)`，
+  这个 API 在 5.x 已经不存在了。现在只有
+  `registerBlockComponent(IBlockComponentProvider, Class)` /
+  `registerEntityComponent(IEntityComponentProvider, Class)`；`TooltipPosition` 退化成一个
+  纯常量类，行的顺序由 provider 的 `getDefaultPriority()` 与 `ITooltip#add` 的调用顺序决定。
+  写法与 TLMO 1.20.1 Fabric 版（`_ref/orihime-1201`）逐行一致。
+
+### 依赖怎么写
+
+`libs/Jade-1.18.2-fabric-5.100.0.jar` 是 **intermediary 命名**的（类引用是
+`net.minecraft.class_1297` 这种），所以必须用 `modCompileOnly` / `modLocalRuntime`：
+Loom 会先把它重映射到本仓库的 official mappings 再上 classpath。
+写成普通 `compileOnly files(...)` 会因为类名对不上，在 javac 解析 API 签名时就崩。
+
+### 与上游的三处差异（都有原因）
+
+1. **`AddJadeInfoEvent` 没有移植**：上游在「任务」行之后 post 这个 Forge 事件，
+   让附属模组往提示里插自己的行。本移植版没有附属模组扩展体系，`MaidProvider`
+   里留了注释与空位，将来要加就是一行回调。
+2. **「永久无敌」那一行不会显示**：上游读的是自己同步的 `DATA_INVULNERABLE`
+   （`Entity#setInvulnerable` 只改服务端字段，不下发客户端；替身地藏就是靠这个同步字段
+   让客户端看得见的）。本移植版没有这个同步字段，这里直接读 `Entity#isInvulnerable()`，
+   客户端恒为 `false`。要补的话是单独一件事（给 `EntityMaid` 加一个 entity data 字段 +
+   覆写 `setInvulnerable`），不在本轮范围。
+3. **`@WailaPlugin` 注解不写**（见上）。
+
+### 验证
+
+- `./gradlew.bat build` = BUILD SUCCESSFUL；产物 jar 内含 `compat/jade/*` 三个类，
+  `fabric.mod.json` 的 `entrypoints.jade` 指向 `JadePlugin`。
+- **Jade 真的认到了我们**（`gradlew runClient`，`run/logs/latest.log`）：
+
+```
+[Jade] Start loading plugin from Touhou Little Maid: Futo
+[Jade] Registered maid / shrine lamp tooltip providers      <- 我们写的锚点
+```
+
+  第二行是写在 `JadePlugin#registerClient` 里的日志：只有「装了 Jade + `jade` 入口点被读到 +
+  本类成功加载 + 两次 `register*Component` 都执行完没抛异常」四件事同时成立才会出现。
+- 客户端一直加载到 `Sound engine started`（窗口已创建），无 crash-report，
+  日志里没有 Jade 相关异常（剩下的 `No data fixer registered for …` 是老噪音）。
+- 四道守卫脚本全绿：`check-encoding`（BAD_FILES=0 / FFFD=0）、`check-jar` checked、
+  `check-renderers`（entity 11/11、block entity 14/12 ALL OK）、`check-dangling` checked。
+- `port/deploy-jar.ps1` 部署到 `1.18.2-Fabric-test`，sha256 两侧一致（该实例里本来就有 Jade）。
+
+### 验证边界
+
+- **没有做视觉验收**：提示行在 HUD 里长什么样、行序对不对、中文会不会挤，需要真人
+  对着已驯服的女仆与神社灯各看一会儿。
+- 只验到「注册成功」，没有在真实世界里逐条断言数值。任务名 / 日程 / 好感度都是
+  entity data 同步字段（`DATA_TASK` / `SCHEDULE_MODE` / `DATA_FAVORABILITY`），
+  客户端读得到正确值 —— 这一点与上游相同；但「无敌」那一行例外（见上）。
+- `libs/JadeAddons-1.18.2-fabric-2.2.1.jar` 仍在 `libs/` 里但**没有被 `build.gradle` 引用**：
+  上游 `compat/jade` 只有上面两个 provider，没有用 JadeAddons 的任何内容
+  （1.20.1 版那三个「物品栏」provider 是 Jade 本体的 `registerItemStorage*`）。
+  留着是为了将来补「祭坛 / 墓碑 / 野餐垫的容器预览」时能直接接上。
