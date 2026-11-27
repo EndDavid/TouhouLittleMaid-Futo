@@ -3,6 +3,7 @@ package com.github.tartaricacid.touhoulittlemaid.init;
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemExtinguisher;
 import com.github.tartaricacid.touhoulittlemaid.item.ItemMaidBackpack;
+import com.github.tartaricacid.touhoulittlemaid.network.ServerPresence;
 import net.fabricmc.fabric.api.client.itemgroup.FabricItemGroupBuilder;
 import net.fabricmc.fabric.api.item.v1.FabricItemSettings;
 import net.minecraft.core.NonNullList;
@@ -30,6 +31,12 @@ public final class InitItems {
             // 下面这一遍 fillItemCategory 已经把手册收进 defaults 了。
             // 再手动 add 一次，物品栏里就会出现【两份】《记忆中的幻想乡》。
             .appendItems((items, tab) -> {
+                // 服务端没装本模组时，这一整栏都不该有内容：物品在服务端注册表里不存在，
+                // 拖进背包后会在服务端变成空气（或直接回弹），表现为「拿得到、完全用不了」。
+                // 判定与隐藏逻辑见 network/ServerPresence 与 mixin/client/CreativeModeInventoryScreenMixin。
+                if (ServerPresence.isAbsent()) {
+                    return;
+                }
                 NonNullList<ItemStack> defaults = NonNullList.create();
                 for (Item item : Registry.ITEM) {
                     item.fillItemCategory(tab, defaults);
@@ -62,6 +69,12 @@ public final class InitItems {
                     new com.github.tartaricacid.touhoulittlemaid.item.ItemChair.Data(
                             "touhou_little_maid:cushion", 0.0F, true, false)))
             .appendItems((items, tab) -> {
+                // 服务端没装本模组时，这一整栏都不该有内容：物品在服务端注册表里不存在，
+                // 拖进背包后会在服务端变成空气（或直接回弹），表现为「拿得到、完全用不了」。
+                // 判定与隐藏逻辑见 network/ServerPresence 与 mixin/client/CreativeModeInventoryScreenMixin。
+                if (ServerPresence.isAbsent()) {
+                    return;
+                }
                 NonNullList<ItemStack> defaults = NonNullList.create();
                 for (Item item : Registry.ITEM) {
                     item.fillItemCategory(tab, defaults);
@@ -86,6 +99,12 @@ public final class InitItems {
             .create(TouhouLittleMaid.rl("garage_kit"))
             .icon(() -> new ItemStack(InitItems.GARAGE_KIT))
             .appendItems((items, tab) -> {
+                // 服务端没装本模组时，这一整栏都不该有内容：物品在服务端注册表里不存在，
+                // 拖进背包后会在服务端变成空气（或直接回弹），表现为「拿得到、完全用不了」。
+                // 判定与隐藏逻辑见 network/ServerPresence 与 mixin/client/CreativeModeInventoryScreenMixin。
+                if (ServerPresence.isAbsent()) {
+                    return;
+                }
                 NonNullList<ItemStack> defaults = NonNullList.create();
                 for (Item item : Registry.ITEM) {
                     item.fillItemCategory(tab, defaults);

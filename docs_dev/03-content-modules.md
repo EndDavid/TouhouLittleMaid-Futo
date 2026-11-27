@@ -2481,3 +2481,65 @@ Loom 会先把它重映射到本仓库的 official mappings 再上 classpath。
   上游 `compat/jade` 只有上面两个 provider，没有用 JadeAddons 的任何内容
   （1.20.1 版那三个「物品栏」provider 是 Jade 本体的 `registerItemStorage*`）。
   留着是为了将来补「祭坛 / 墓碑 / 野餐垫的容器预览」时能直接接上。
+
+## 服务端没装本模组时，客户端不该露出创造页签
+
+**现象**
+只在客户端装本模组、连一个没有它的服务器，创造模式里仍然看得到
+「Touhou Little Maid: Main / Chair / Garage Kit」三个页签，还能把物品拖进背包。
+拖出来的物品在服务端反序列化时注册表里没有对应 id，于是拿到手就等于空气
+（或直接回弹）—— 玩家看到的是「拿到了但完全用不了」。
+
+**为什么会这样**
+Fabric 的两端各自加载模组，原版 Minecraft 没有「服务端注册表里没有就藏起来」这层逻辑
+（那是 Forge 的 registry sync 在做，Fabric 没有等价物）。所以客户端的物品、方块、
+创造页签全都照常注册，只是服务端不认。
+
+**怎么判断对面装没装**
+不读服务端 mod 列表（Fabric Loader 不提供），而是复用 Fabric Networking 的握手：
+服务端只要 `registerGlobalReceiver` 过一个 channel，Fabric 就会在玩家登录完成时
+（`ServerPlayNetworkAddon#onClientReady`）把这个 channel 用 `minecraft:register` 发给客户端，
+客户端的 `ClientPlayNetworking#canSend(channel)` 随之为 `true`。
+
+于是新增一个**空载荷 channel** `touhou_little_maid:presence`（`network/ServerPresence`），
+它唯一的使命就是「声明本模组在场」；接收器里什么都不做。
+
+**为什么不是一进服就判定**
+服务端的通告与客户端的 `ClientPlayConnectionEvents.JOIN` 在同一时刻触发，先后没有保证。
+`client/event/ServerPresenceClient` 因此从 JOIN 起观察最多 60 tick（3 秒）：
+期间任一刻看到 `canSend == true` 就认定「装了」，超时仍是 `false` 才认定「没装」。
+判定一旦落地就停止，连接断开时复位。
+
+误判只会朝一个方向：服务端其实装了、但通告迟到超过 3 秒 —— 此时页签被藏起来，
+重进一次世界即可恢复。反方向（没装却显示）才是要修的 bug，所以选择宁可晚确认、不提前放行。
+
+**藏起来的三层**
+1. `init/InitItems` 三个页签的 `appendItems` 在判定为「没装」时直接返回 —— 内容为空；
+2. `mixin/client/CreativeModeInventoryScreenMixin` 在 `renderTabButton` 的 `HEAD` 处
+   `cancel`，按钮不画；
+3. 同一个 mixin 在 `checkTabClicked` / `checkTabHovering` 的 `HEAD` 处返回 `false`，
+   否则「看不见的按钮」仍然点得到、也仍然弹提示。
+另外 `init` 的 `HEAD` 处检查「当前选中的是不是这三个之一」，是的话退回「建筑方块」，
+免得高亮框停在一个没有按钮的位置。
+
+**验证**
+真起了一个**没有本模组**的 1.18.2 服务端（`server1182`，临时把 mods 里只留 fabric-api、
+`online-mode=false`、换新世界名），然后在客户端执行 `gradlew runClient -PjoinServer`：
+```
+[Futo] remote server does not run Touhou Little Maid (no touhou_little_maid:presence channel):
+       hiding its creative tabs, otherwise the items would be unusable
+[Futo] creative tab 'main' now exposes 0 item(s)
+[Futo] creative tab 'chair' now exposes 0 item(s)
+[Futo] creative tab 'garage_kit' now exposes 0 item(s)
+```
+反例（同一个服务端换回带本模组的 mods、以及 `gradlew runServer` 起的开发服务端）：
+```
+[Futo] remote server runs Touhou Little Maid, creative tabs kept
+```
+两个方向都验过，且都没有 crash-report。测完把服务端的 `mods/`、`server.properties`、
+两个临时世界全部还原/删除（`server1182` 不属于本仓库）。
+
+**验证边界**
+- 判定与「内容为空」是日志断言；**按钮真的消失、点不到**这一步只验到注入点正确，
+  视觉上需要真人连一次没装本模组的服务器看一眼。
+- 单机 / 服务器侧 `ServerPresence.isAbsent()` 恒为 `false`，行为与改动前完全一致。

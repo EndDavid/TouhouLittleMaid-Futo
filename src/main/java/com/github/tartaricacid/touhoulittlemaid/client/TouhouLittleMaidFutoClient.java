@@ -208,6 +208,12 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.TTSSystemAudioToClientPacket.initClient();
         // 对着可聊天的女仆按聊天键（默认 T）开界面
         com.github.tartaricacid.touhoulittlemaid.client.event.PressAIChatKeyEvent.init();
+        // 「对面的服务端装没装本模组」。没装时隐藏三个创造模式页签并清空其内容 ——
+        // 否则玩家能拖出物品，而服务端注册表里没有它们，拿在手里等于空气。
+        // 判定方式与 3 秒容差见 ServerPresenceClient 的类注释。
+        com.github.tartaricacid.touhoulittlemaid.client.event.ServerPresenceClient.init();
+
+
         // 实体 ID 复制器：手持它右键任意实体，把注册名复制到剪贴板（上游 CopyEntityIdEvent）。
         // 必须是客户端：剪贴板与聊天提示都是本地的东西。
         com.github.tartaricacid.touhoulittlemaid.client.event.CopyEntityIdEvent.init();

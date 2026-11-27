@@ -89,6 +89,9 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         com.github.tartaricacid.touhoulittlemaid.network.MaidBeaconPacket.initServer();
         // 网络包：女仆界面左侧的状态效果列表（客户端每 20 tick 拉一次，服务端现查现回）
         com.github.tartaricacid.touhoulittlemaid.network.MaidEffectPacket.initServer();
+        // 「我在场」：空载荷 channel，唯一作用是让 Fabric 把本模组的存在通告给客户端。
+        // 客户端据此判断服务端装没装本模组 —— 没装时隐藏创造模式页签（见 ServerPresence）。
+        com.github.tartaricacid.touhoulittlemaid.network.ServerPresence.initServer();
         // 网络包：仆从铃绑定女仆（C2S，把女仆 UUID + 提示名写进主手那枚铃的 NBT）
         com.github.tartaricacid.touhoulittlemaid.network.ServantBellSetPacket.initServer();
         // 网络包：隙间（C2S：切换 I/O 方向 / 黑白名单、提交槽位配置后重开界面）

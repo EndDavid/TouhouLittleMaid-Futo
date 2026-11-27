@@ -2,6 +2,7 @@ package com.github.tartaricacid.touhoulittlemaid.mixin.client;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
+import com.github.tartaricacid.touhoulittlemaid.network.ServerPresence;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.GuiComponent;
@@ -12,11 +13,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * 把「Touhou Little Maid: Main」创造模式页签的图标换成布都的 pack 立绘。
@@ -55,6 +58,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <p>深度用 100：原版在画图标之前把 {@code itemRenderer.blitOffset} 设成 100
  * 让物品盖在页签底图上，我们顶替的正是那一层，所以取同一个值，
  * 既盖住底图也不会突出到别的东西前面。</p>
+ *
+ * <h2>另一半职责：服务端没装本模组时把页签藏起来</h2>
+ *
+ * <p>Fabric 两端各自加载模组，服务端没装本模组时客户端照样注册了三个页签，
+ * 于是玩家能把物品拖出来 —— 但那些物品在服务端注册表里不存在，拿到手就等于空气。
+ * 判定见 {@code network/ServerPresence}（走 Fabric 的 channel 通告），
+ * 这里负责界面侧的三件事：<b>不画按钮</b>、<b>点不到</b>、<b>悬停不出提示</b>。
+ * 页签内容本身的清空在 {@code init/InitItems} 的三个 {@code appendItems} 里。</p>
  */
 @Mixin(CreativeModeInventoryScreen.class)
 public class CreativeModeInventoryScreenMixin {
@@ -86,11 +97,60 @@ public class CreativeModeInventoryScreenMixin {
     @Unique
     private CreativeModeTab futo$tab;
 
+    /**
+     * 当前选中的页签下标。原版字段是 {@code private static}，这里只用来在
+     * 「选中的正是被藏起来的页签」时退回到「建筑方块」，免得高亮框停在空白位置。
+     */
+    @Shadow
+    private static int selectedTab;
+
+    /**
+     * 这个页签是不是本模组的三个之一。
+     */
+    @Unique
+    private static boolean futo$isOurs(CreativeModeTab tab) {
+        return tab == InitItems.MAIN_TAB || tab == InitItems.CHAIR_TAB || tab == InitItems.GARAGE_KIT_TAB;
+    }
+
+    /**
+     * 本模组的页签在<i>当前这个服务端</i>上是否该消失。
+     */
+    @Unique
+    private static boolean futo$hiddenHere(CreativeModeTab tab) {
+        return ServerPresence.isAbsent() && futo$isOurs(tab);
+    }
+
+    /**
+     * 选中的页签被藏起来时退回「建筑方块」。
+     *
+     * <p>只在极端情况下用得上：玩家在连接后的头 3 秒（判定还没完成）就打开创造界面、
+     * 恰好选中本模组的页签，之后判定落地。不做这一步的话内容虽为空，但高亮框会停在
+     * 一个没有按钮的位置。</p>
+     */
+    @Inject(method = "init", at = @At("HEAD"))
+    private void futo$dropSelectionOnHiddenTab(CallbackInfo ci) {
+        if (!ServerPresence.isAbsent()) {
+            return;
+        }
+        CreativeModeTab[] tabs = CreativeModeTab.TABS;
+        if (selectedTab < 0 || selectedTab >= tabs.length) {
+            return;
+        }
+        if (futo$isOurs(tabs[selectedTab])) {
+            selectedTab = CreativeModeTab.TAB_BUILDING_BLOCKS.getId();
+        }
+    }
+
     @Inject(
             method = "renderTabButton(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/CreativeModeTab;)V",
-            at = @At("HEAD")
+            at = @At("HEAD"),
+            cancellable = true
     )
     private void futo$captureTabRenderContext(PoseStack poseStack, CreativeModeTab tab, CallbackInfo ci) {
+        if (futo$hiddenHere(tab)) {
+            ci.cancel();
+            return;
+        }
         this.futo$tabPoseStack = poseStack;
         this.futo$tab = tab;
     }
@@ -126,5 +186,35 @@ public class CreativeModeInventoryScreenMixin {
         GuiComponent.blit(this.futo$tabPoseStack, x - inset, y - inset,
                 futo$tabIconSize, futo$tabIconSize, 0.0F, 0.0F, 32, 32, 32, 32);
         this.futo$tabPoseStack.popPose();
+    }
+
+    /**
+     * 按钮不画了，点击判定也要一起失效 —— 否则玩家能在空白处点开一个看不见的页签。
+     */
+    @Inject(
+            method = "checkTabClicked(Lnet/minecraft/world/item/CreativeModeTab;DD)Z",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void futo$noClickOnHiddenTab(CreativeModeTab tab, double mouseX, double mouseY,
+                                         CallbackInfoReturnable<Boolean> cir) {
+        if (futo$hiddenHere(tab)) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    /**
+     * 悬停同理：不画按钮，也不能在空白处弹出页签名提示。
+     */
+    @Inject(
+            method = "checkTabHovering(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/CreativeModeTab;II)Z",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void futo$noHoverOnHiddenTab(PoseStack poseStack, CreativeModeTab tab, int mouseX, int mouseY,
+                                          CallbackInfoReturnable<Boolean> cir) {
+        if (futo$hiddenHere(tab)) {
+            cir.setReturnValue(false);
+        }
     }
 }
