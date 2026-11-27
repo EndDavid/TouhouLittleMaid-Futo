@@ -24,6 +24,7 @@
     "client.CreativeModeInventoryScreenMixin",
     "client.LivingEntityBreakItemAccessor",
     "client.HumanoidModelMixin",
+    "client.LanguageMixin",
     "client.ItemInHandRendererMixin",
     "client.ItemInHandLayerMixin",
     "client.ItemRendererMixin",

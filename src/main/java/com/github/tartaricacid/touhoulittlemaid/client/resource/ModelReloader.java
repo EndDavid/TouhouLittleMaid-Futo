@@ -40,6 +40,10 @@ public final class ModelReloader {
         // 先把 tlm_custom_pack 扫一遍：下面 GeckoModelLoader / ChairModelLoader
         // 各自要用「外部包列表」，扫一次比两边各扫一次省一半磁盘遍历。
         CustomPackLoader.scan();
+        // 外部译文与模型缓存同寿命：内置包的名字在 assets/touhou_little_maid/lang/*.json 里
+        // （原版自己会读），这里清的是「外部包 .lang + 在线清单 language 字段」那部分。
+        // 不清的话，删掉的模型包的名字会一直留在缓存里。
+        LanguageLoader.clear();
         GeckoModelLoader.reload();
         // 气泡台本与图标尺寸都是按贴图缓存过的：换资源包 / 改模型后必须丢一次，
         // 否则台本里的旧贴图路径与旧的帧数会一直生效。
@@ -68,5 +72,9 @@ public final class ModelReloader {
         // 岩浆怪的油库里模型也预热：JSON 写错只会在「岩浆怪看不见」这种
         // 很难定位的现象里暴露，这里提前解析一遍，失败会打 error 日志。
         BedrockEntityModels.get("marisa_yukkuri");
+        // 语言必须最后登记：上面刚 clear 过，不重建的话模型包名又变回 tlm.xxx.name 原始键。
+        // 顺序上先清单（在线下载界面用）再包内 .lang（模型列表用），后者可以覆盖前者。
+        LanguageLoader.loadDownloadInfoLanguages();
+        CustomPackLoader.loadExternalLanguages();
     }
 }

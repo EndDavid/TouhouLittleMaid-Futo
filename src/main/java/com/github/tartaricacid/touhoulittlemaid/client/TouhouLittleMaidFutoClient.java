@@ -392,7 +392,41 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
         // 所以必须真的把它打开一次。
         if (Boolean.getBoolean("futo.download.selftest")) {
             int[] ticks = {0};
+            // 清单是异步拉的：等它落地再验一次译名解析，否则「还没下载完」会被误判成
+            // 「译名没生效」。解析走的是 TranslatableComponent#getString()，
+            // 与界面里 drawCenteredString 用的是同一条路径。
+            //
+            // 要打印两次：第一次在清单落地时（这时模型重载还没跑，表里只有 info.json
+            // 的 language 字段），第二次在打开界面前（重载已跑完，包内 .lang 也并进去了）。
+            // 两次的 cache 之差就是「外部包 .lang 真被读了几条」—— 界面本身没有可断言的
+            // 输出，这是唯一能自动核对 .lang 那条路的地方。
+            boolean[] logged = {false};
+            java.util.function.Consumer<String> probe = stage -> {
+                com.github.tartaricacid.touhoulittlemaid.client.download.pojo.DownloadInfo first =
+                        com.github.tartaricacid.touhoulittlemaid.client.download.InfoGetManager
+                                .DOWNLOAD_INFO_LIST_ALL.get(0);
+                String code = net.minecraft.client.Minecraft.getInstance()
+                        .getLanguageManager().getSelected().getCode();
+                java.util.Map<String, String> table =
+                        com.github.tartaricacid.touhoulittlemaid.client.resource.LanguageLoader
+                                .getLanguages(code);
+                com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.info(
+                        "[Futo] download selftest[{}]: {} -> {} (lang={}, cache={})", stage, first.getName(),
+                        new net.minecraft.network.chat.TranslatableComponent(first.getName()).getString(),
+                        code, table == null ? "null" : table.size());
+            };
+
             net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
+                if (!logged[0] && !com.github.tartaricacid.touhoulittlemaid.client.download.InfoGetManager
+                        .DOWNLOAD_INFO_LIST_ALL.isEmpty()
+                        // 资源重载期间 Language 实例还是默认那个（匿名类），ClientLanguage 要等
+                        // LanguageManager 重载完才注入。等它换过来再验，否则会把「还没轮到」误判成「没生效」。
+                        && net.minecraft.locale.Language.getInstance()
+                        instanceof net.minecraft.client.resources.language.ClientLanguage) {
+
+                    logged[0] = true;
+                    probe.accept("after download");
+                }
                 // 等标题画面彻底稳定（资源加载 + 首次布局都完成）再顶上去，否则
                 // 会被 Minecraft 随后的 setScreen 覆盖掉，等于没测。
                 if (++ticks[0] != 60) {
@@ -401,6 +435,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 if (!(client.screen instanceof net.minecraft.client.gui.screens.TitleScreen)) {
                     return;
                 }
+                // 到这一步资源重载早跑完了（ModelReloader 会先 clear 再重建），
+                // 所以这次打印的 cache 同时含「在线清单」与「包内 .lang」两条来源。
+                probe.accept("after model reload");
                 com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.info(
                         "[Futo] download selftest: opening ModelDownloadGui");
                 client.setScreen(new com.github.tartaricacid.touhoulittlemaid.client.gui.entity.ModelDownloadGui());

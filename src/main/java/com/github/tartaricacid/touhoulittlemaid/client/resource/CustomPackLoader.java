@@ -225,6 +225,33 @@ public final class CustomPackLoader {
     }
 
     /**
+     * 加载外部包里的语言文件（{@code assets/<域>/lang/*.lang}）。
+     *
+     * <p>模型包的名字 / 简介在 {@code maid_model.json} 里是<b>键</b>（{@code model.<域>.<名字>.name}），
+     * 译文就写在这些 {@code .lang} 里。原版只读资源包中的 {@code .json} 语言文件，
+     * 而 {@code tlm_custom_pack/} 里的 zip 连资源包都不是，所以必须自己读进
+     * {@link LanguageLoader}，由 {@code mixin/client/LanguageMixin} 兜住查询 ——
+     * 否则下载完的模型包在列表里只有原始键。</p>
+     *
+     * <p>本方法跑在重载线程上；{@link LanguageLoader} 内部是并发容器，
+     * 渲染线程随时读都安全。</p>
+     */
+    static void loadExternalLanguages() {
+        for (PackSource source : sources) {
+            for (String domain : source.domains()) {
+                for (String path : source.languageFiles(domain)) {
+                    try (InputStream stream = source.open(path)) {
+                        LanguageLoader.readLanguageFile(path, stream);
+                    } catch (IOException e) {
+                        TouhouLittleMaid.LOGGER.warn("[Futo] failed to read language file {} from {}",
+                                path, source.name(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * 一个外部女仆包。
      *
      * <p>与 {@link GeckoModelLoader} 内置包那条路的差别只有两处：
@@ -464,6 +491,9 @@ public final class CustomPackLoader {
                 return null;
             }
         }
+
+        /** 这个包里某个域的语言文件完整路径（{@code assets/<domain>/lang/*.lang}）。 */
+        abstract List<String> languageFiles(String domain);
     }
 
     /**
@@ -533,6 +563,20 @@ public final class CustomPackLoader {
                 return null;
             }
         }
+
+        @Override
+        List<String> languageFiles(String domain) {
+            String prefix = "assets/" + domain + "/lang/";
+            List<String> files = new ArrayList<>();
+            try (ZipFile zipFile = new ZipFile(this.file.toFile())) {
+                zipFile.stream().map(ZipEntry::getName)
+                        .filter(name -> name.startsWith(prefix) && name.endsWith(".lang"))
+                        .forEach(files::add);
+            } catch (IOException e) {
+                TouhouLittleMaid.LOGGER.error("[Futo] failed to list language files in {}", this.file, e);
+            }
+            return files;
+        }
     }
 
     /**
@@ -601,6 +645,25 @@ public final class CustomPackLoader {
                 TouhouLittleMaid.LOGGER.error("[Futo] failed to read {}", file, e);
                 return null;
             }
+        }
+
+        @Override
+        List<String> languageFiles(String domain) {
+            Path langDir = this.root.resolve("assets").resolve(domain).resolve("lang");
+            if (!Files.isDirectory(langDir)) {
+                return List.of();
+            }
+            List<String> files = new ArrayList<>();
+            try (Stream<Path> stream = Files.list(langDir)) {
+                stream.filter(Files::isRegularFile)
+                        .map(path -> path.getFileName().toString())
+                        .filter(name -> name.endsWith(".lang"))
+                        .sorted()
+                        .forEach(name -> files.add("assets/" + domain + "/lang/" + name));
+            } catch (IOException e) {
+                TouhouLittleMaid.LOGGER.error("[Futo] failed to list {}", langDir, e);
+            }
+            return files;
         }
     }
 

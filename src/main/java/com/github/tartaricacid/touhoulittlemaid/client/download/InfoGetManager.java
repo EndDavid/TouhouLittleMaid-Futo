@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.download.pojo.DownloadInfo;
 import com.github.tartaricacid.touhoulittlemaid.client.download.pojo.DownloadStatus;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.CustomPackLoader;
+import com.github.tartaricacid.touhoulittlemaid.client.resource.LanguageLoader;
 import com.github.tartaricacid.touhoulittlemaid.util.ZipFileCheck;
 import com.google.gson.reflect.TypeToken;
 import net.fabricmc.loader.api.FabricLoader;
@@ -286,6 +287,10 @@ public final class InfoGetManager {
             DOWNLOAD_INFO_LIST_MAID = List.copyOf(maid);
             DOWNLOAD_INFO_LIST_CHAIR = List.copyOf(chair);
             DOWNLOAD_INFO_LIST_SOUND = List.copyOf(sound);
+            // 清单里每条记录自带 language 字段（en_us / zh_cn 的 name 与 desc 译文），
+            // 界面上的名字就是靠它翻译的。这里立刻登记一次，免得「下载界面要等下一次
+            // 模型重载才有译名」—— 清单是异步拉下来的，那次重载早就跑完了。
+            LanguageLoader.loadDownloadInfoLanguages();
         } catch (Exception e) {
             TouhouLittleMaid.LOGGER.error("[Futo] failed to parse {}", infoJsonFile, e);
         }

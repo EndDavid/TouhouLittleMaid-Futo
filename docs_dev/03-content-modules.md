@@ -2292,3 +2292,103 @@ CRC32，与清单比对：
 - 「需更新」状态没有真实样本可测：本地没有旧版本的 zip，
   只有 `old_version` 字段的解析被验证过。
 
+## 外部模型包的译文：两张表 + 一层 mixin
+界面上那一行「名字」不是文案，是**键**：`maid_model.json` 里写
+`"name": "model.<域>.<名字>.name"`，在线清单 `info.json` 里写
+`"name": "tlm.yingbai_arknights_pack.name"`。真正的译文在另外两个地方，
+而**原版一个都读不到**：
+| 来源 | 位置 | 原版为什么读不到 |
+|---|---|---|
+| 在线清单 | `info.json` 每条记录的 `language` 字段（`zh_cn` / `en_us` → 键值表） | 它不是资源包，只是一份下载目录 |
+| 模型包内 | `assets/<域>/lang/<语言>.lang`（旧式 `键=值` 文本） | `ResourceManager` 只认资源包里的 `.json`；`tlm_custom_pack/*.zip` 连资源包都不是 |
+不补这一层，界面上就是截图里那种 `tlm.yingbai_arknights_pack.name`。
+### 接法：补一张表，不动语言系统
+- `client/resource/LanguageLoader`：`语言代码 → (键 → 译文)` 的缓存，三个写入口
+  （清单的 `language` 字段、zip 内的 `.lang`、文件夹包内的 `.lang`）；
+- `mixin/client/LanguageMixin`：在 `ClientLanguage#getOrDefault(String)` 与 `#has(String)`
+  的 `HEAD` 处各注入一次，**只在命中缓存时** `setReturnValue`。
+选 `ClientLanguage` 是因为 `LanguageManager` 加载语言时会把 `ClientLanguage`
+`Language.inject(...)` 进 `Language.getInstance()`，于是 `Component.translatable(...)`
+的解析全部经过它 —— 界面代码（`PackInfoButton` / `ModelDownloadGui`）一行都不用改。
+1.18.2 的 `Language` 只有 `getOrDefault(String)` 与 `has(String)` 两个抽象方法，
+`ClientLanguage` 两个都实现了（`javap` 核对过），所以注入点只需要这两个。
+「查不到就不拦」是关键：没命中就让原方法继续跑，模组自己的
+`assets/touhou_little_maid/lang/*.json`、其它模组、资源包的行为完全不变。
+当前语言没有该键时回退查一次 `en_us`，与上游一致 —— 清单只提供中英两版时，
+德语 / 日语客户端上至少是完整的英文名，而不是原始键。
+上游只注了 `getOrDefault`，这里把 `has` 也注上：有些路径会先问「这个键存在吗」，
+两条路不一致的话会出现「文字对了但 `has` 说没有」。
+### 生命周期与顺序
+```
+ModelReloader#reloadAll
+  CustomPackLoader.scan()                      ← 先扫一遍 tlm_custom_pack
+  LanguageLoader.clear()                       ← 与模型缓存同寿命，删包后名字才不会残留
+  GeckoModelLoader.reload() / ChairModelLoader.reload()
+  LanguageLoader.loadDownloadInfoLanguages()   ← ① 在线清单
+  CustomPackLoader.loadExternalLanguages()     ← ② 包内 .lang，可覆盖 ①
+```
+顺序是有意的：**包内 `.lang` 后登记**，同一个键由「包自带的翻译」胜出。
+清单是异步拉的，`InfoGetManager` 解析完 `info.json` 会**立刻**再登记一次 ①——
+否则「下载界面要等下一次模型重载才有译名」，而那次重载早就跑完了。
+清单下载与模型重载是两个互不相干的时间点，这正是截图那个 bug 的成因：
+开发环境里那次重载恰好还排在后面，看着像「能用」，实际部署到实例里就是原始键。
+### 线程
+三个写方：资源重载线程（`ModelReloader`）、`HttpUtil` 的 IO 线程（清单落地）、
+渲染线程（下载完成后的重载）。读方是渲染线程与文字排版，频率极高。
+所以缓存是 `ConcurrentHashMap`，且**只**在 `reloadAll` 入口 `clear()` 一次 ——
+遍历中清空会读到半个表。上游用普通 `HashMap`，这里是刻意改的。
+### 与上游的差异
+| 上游 | 本移植版 | 原因 |
+|---|---|---|
+| `commons-io` 的 `IOUtils.readLines` / `FilenameUtils` | `BufferedReader` + 正则 | Fabric 侧不保证有 commons-io |
+| `LANG_CACHE` 是 `HashMap` | `ConcurrentHashMap` | 写读跨线程（见上） |
+| `getLanguageMap` 只收 `HashMap<String, HashMap<String, String>>` | 放宽成 `Map<String, ? extends Map<String, String>>` | 清单、包内 `.lang`、未来的内置表三条路共用一个入口 |
+| 只注 `getOrDefault` | `getOrDefault` + `has` | 见上 |
+| — | `.lang` 首行 BOM 会剥掉 | 带 BOM 的文件会让第一条键多一个不可见字符，那条译文永远查不到 |
+| — | 空行直接跳过 | 上游只跳 `#` 注释，空行靠 `split` 长度兜住 —— 行尾带空格时会多出一条空键 |
+### 三个容易踩的点
+1. **zip 里必须有目录条目**。`ZipSource#domains()` 用的是上游同款正则
+   `^assets/[\w.]+/$`，匹配的是文件夹条目；打包工具若没写 `assets/x/` 这种条目，
+   域名列表是空的，`.lang` 与 `maid_model.json` 都扫不到。
+   （这是既有行为：内置包与在线下载的包都带目录条目。）
+2. **只认两段式语言代码**：`^assets/<域>/lang/(\w{2}_\w{2})\.lang$`。
+   `zh_CN.lang` 能匹配（最后统一转小写），`zh_cn.json` 不会 —— 上游同款正则，
+   模型包里放的是 `.lang` 而不是 `.json`。
+3. **外部 `.lang` 可以盖住模组自己的键**（例如某个包写了 `gui.touhou_little_maid.xxx`）。
+   上游就是这个行为，因为 mixin 的优先级高于 JSON。清单与 `.lang` 都是第三方内容，
+   装了什么包就得承担什么。
+### 验证到什么程度
+`./gradlew.bat runClient -PdownloadSelftest` 现在打两次探测：清单落地时一次、
+打开界面前一次（那时重载已跑完）。第二次的 `cache` 减去第一次，就是「外部包 `.lang`
+读进来几条」：
+
+```
+[Futo] download selftest[after download]:     tlm.yingbai_arknights_pack.name -> 映白模型包        (lang=zh_cn, cache=338)
+[Futo] found 2 custom model pack(s) in ...\run\tlm_custom_pack
+[Futo] download selftest[after model reload]: tlm.yingbai_arknights_pack.name -> 来自外部包语言文件 (lang=zh_cn, cache=340)
+[Futo] download selftest: ModelDownloadGui opened with 169 entries
+```
+
+那两个包是临时合成的（放在 `run/tlm_custom_pack/`，跑完即删，`run/` 不入库）：
+
+| 包 | 形态 | `zh_cn.lang` 里写的东西 |
+|---|---|---|
+| `futo_langtest.zip` | zip，含 `assets/futo_langtest_zip/` 目录条目 | `model.futo.langtest.zip.name=压缩包里的译文` |
+| `futo_langtest_folder/` | 展开目录 | `tlm.yingbai_arknights_pack.name=来自外部包语言文件`、`model.futo.langtest.folder.name=文件夹中的译文`、`subtitle.touhou_little_maid.other.credit=…` |
+
+`338 → 340` 说明两条路各读进 1 条；`subtitle.touhou_little_maid.other.credit`
+没有计入 340，`REMOVE_KEY` 的过滤生效。第三条日志里的译文从「映白模型包」变成
+「来自外部包语言文件」：文件夹包的文件名排在 zip 之后（`futo_langtest.zip` 的 `.`
+小于 `futo_langtest_folder` 的 `_`），登记得更晚，于是盖住了清单里的同名键 ——
+证明的是**值真的走到了界面用的那条解析路径**，而不是「表里有这个键」。
+- 构建绿；`check-encoding` 1620 files / 0 bad；`check-jar` checked；
+- 产物里 `mixins.json` 含 `client.LanguageMixin`；`LanguageMixin.class` 的 `@Mixin` 目标
+  已静态重映射成 `net/minecraft/class_1078`、方法名成 `method_4679` / `method_4678`
+  （`getOrDefault` / `has`），所以生产环境不靠 refmap 也能命中 —— 这一点必须查，
+  否则「开发环境好用、装进实例就失效」；
+- 部署到 `1.18.2-Fabric-test`，sha256 两侧一致。
+**没验证到的**：
+- **视觉观感**：界面里那一行名字会不会被截断、与版本号是否重叠，需要真人看；
+- **真实的第三方包**：合成包只覆盖「读得到、值对、能覆盖」，没覆盖
+  「20 MB 的包 + 几百个模型 + 多语言文件」这种规模；
+- 多注的那条 `has` 在真实场景下没有回归样本，只是两条路语义一致，风险低。
