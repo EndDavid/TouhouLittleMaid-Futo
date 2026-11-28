@@ -63,6 +63,36 @@ loom_version=1.15.5
   `port/fix-eol.ps1` 统一行尾。注意 `lang/en_us.json`、`lang/zh_cn.json` 的**原始行尾是 mixed**，
   整体转换同样会造出近两千行 diff —— 只有字节级插入才能保住「1 行」的 diff。
 
+### 版本号：只改一处 `mod_version`
+
+`gradle.properties` 的 `mod_version` 是唯一来源，它同时决定三处：
+
+| 位置 | 怎么来的 |
+|---|---|
+| 产物名 `build/libs/touhoulittlemaid-fabric-1.18.2-futo-<mod_version>.jar` | Gradle 的 `version = project.mod_version` |
+| jar 内 `fabric.mod.json` 的 `version` | `processResources` 里 `expand "version": project.version` |
+| **女仆界面左上角显示的那一行** | `TouhouLittleMaid#versionString()` 读 Fabric 元数据拼出来 |
+
+界面那一行以前是硬编码的字符串（`"1.18.2-futo.1"`），每次发版都得记着改一处，
+漏掉就出现「jar 叫 1.1-futo、界面上还是旧号」。现在改成派生：
+
+```java
+public static String versionString() {
+    String minecraft = SharedConstants.getCurrentVersion().getName();   // 1.18.2
+    String mod = FabricLoader.getInstance().getModContainer(MOD_ID)
+            .map(c -> c.getMetadata().getVersion().getFriendlyString())  // 1.1-futo
+            .orElse("dev");
+    return minecraft + "-" + mod;                                       // 1.18.2-1.1-futo
+}
+```
+
+所以升版只动 `mod_version` 一处，界面与 jar 名自动同步。实测（客户端启动日志）：
+`[VERSIONTEST] gui label = 1.18.2-1.1-futo`。
+
+> 注意 `clean` 必须跟着做：产物名带版本号，`build/libs/` 里同时留着新旧两个 jar 时，
+> Fabric Loader 会拒绝启动（或悄悄加载旧的那个）。`port/deploy-jar.ps1` 已经会清掉
+> 目标 `mods/` 里的旧版本，但本地的 `build/libs/` 要自己 `gradlew clean`。
+
 ### 图标与美术资源：`pack.png` 是唯一来源
 
 模组自带的图标美术都来自同一张 32×32 的立绘，源文件就是 `src/main/resources/pack.png`：

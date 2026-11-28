@@ -847,8 +847,9 @@ public abstract class AbstractMaidScreen<T extends AbstractMaidContainer> extend
         if (this.maid == null) {
             return;
         }
-        // 版本号（上游 drawModInfo 的等价物）
-        String debugInfo = "1.18.2-futo.1";
+        // 版本号（上游 drawModInfo 的等价物）。内容由 TouhouLittleMaid#versionString
+        // 从元数据派生（MC 版本 + fabric.mod.json 里的 mod_version），不要写死。
+        String debugInfo = TouhouLittleMaid.versionString();
         this.font.draw(poseStack, debugInfo, 3.0F, -10.0F, 0xFFFFFF);
 
         // 四条状态数字（0.5 缩放），顺序与 drawStatusBars 一致
