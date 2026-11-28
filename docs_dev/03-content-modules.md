@@ -3070,3 +3070,89 @@ javap -p -c  <1.20.1 jar>  'TileEntitySnackCabinet$1'
 自检里那四次 `openMenu` 都会走 `startOpen → onOpen → playSound`，
 所以「换音效没把打开流程弄坏」是有证据的。
 **没验的**：听感。像不像木桶、0.5 音量在这种小方柜上合不合适，要真人上机听。
+
+## 三个版本的物品 / 模型清单对照（2026-11-28）
+
+用户报「本构建 / 上游 1.18.2 / 上游 1.20.1 的创造模式物品栏条目数都不一样」。把三个 jar 摊开
+逐条数过之后，结论是：**物品层面只差三件，其余数量差异全部来自内置模型包的版本不同。**
+
+### 怎么数的（可复现）
+
+```bash
+javap -p -c -cp <jar> com.github.tartaricacid.touhoulittlemaid.init.InitItems       > i.txt
+javap -p -c -cp <jar> com.github.tartaricacid.touhoulittlemaid.init.InitCreativeTabs > t.txt
+```
+
+- **1.18.2**：页签挂在 `Item.Properties#tab(...)` 上，而且大部分物品是在**自己类的构造器**里
+  写 `tab(MaidGroup.MAIN_TAB)`，只有少数几个写在 `InitItems` 里 ——
+  所以「哪个物品进哪一栏」看的是物品类，不是 `InitItems`。
+- **1.20.1**：改成 `CreativeModeTab.Builder#displayItems`，物品一条条 `accept`；
+  直接数字节码里的 `getstatic InitItems.XXX` 即可（主栏 **59** 条）。
+- 两版都还有一条 `fillItemCategory` 通路（1.18.2 由 `appendItems` 里的遍历触发），
+  它负责生成**变体**：坐垫（`ItemChair`）、手办（`BlockGarageKit`）、
+  「生成？？？」占位物品（`ItemEntityPlaceholder`，一条实体产物配方一件）。
+
+### 注册物品数
+
+| | 我们的 jar | 上游 1.18.2 | 上游 1.20.1 |
+|---|---|---|---|
+| 注册的物品 | **70** | 68 | 73 |
+
+70 = 上游 1.18.2 的 68 − 2（`monster_list`、`tacz_gun_icon`）+ 4（`snack_cabinet` 与三件
+`*_board_state`）。**没有「我们有而两版上游都没有」的东西**。
+（1.18.2 上游完全没有残局道具，那是 1.20.1 才加的内容。）
+
+### 物品层面的三处差异
+
+| 物品 | 1.18.2 | 1.20.1 | 是什么 | 处理 |
+|---|---|---|---|---|
+| `monster_list` | 有 | 有 | 只有 tooltip 的空 `Item`（`stacksTo(1)`），语言键是「妖怪名单（移除）」，tooltip 用 `DARK_RED`。**不在任何创造栏里** | 略过。上游自己废弃后留下的存档兼容占位 |
+| `tacz_gun_icon` | 有 | 有 | `ItemAdvancementIcon` 家族第 9 个，给 TACZ（现代枪械）那条进度当图标。**不在任何创造栏里** | 略过。TACZ 无 Fabric 1.18.2 版本 |
+| `owner_conversion_tool` | 无 | 有 | 真正的「NTR 物品」：右击别人的女仆把她转成自己的。1.20.1 里它是 `EntityMaid#getNtrItem()` 的默认值，也在主栏里 | **唯一可考虑补的一件**。本移植版目前与 1.18.2 一致：读配置 `MaidNtrItem`，默认 `minecraft:structure_void` |
+
+所以用户看到的主栏条目数差异，主要由这几件事叠起来：三本附魔书（1.18.2 上游整个 jar 里
+`EnchantedBookItem` 零引用，我们按 1.20.1 补了）、占位物品的变体数量、帕秋莉手册，
+以及下面这节的模型数。
+
+### 坐垫栏 / 手办栏：差的是模型包，不是代码
+
+这两栏都是 `fillItemCategory` 遍历模型注册表铺出来的，所以**条目数等于内置包里
+`model_id` 的条数**：
+
+| 内置模型包 | 女仆模型 | 坐垫模型 |
+|---|---|---|
+| 1.18.2（= 本构建随包的） | 194 | 58 |
+| 1.20.1 | 234 | 63 |
+
+1.20.1 多出的 **41 个女仆模型**：`geckolib:` 那批 `winefox_*`（`blue` / `elf` / `jk` / `momo` /
+`wedding` / `saint` / `nine_tailed` / `new_year` / `astronaut` / `survivor` / `tactics` /
+`magical` / `mini` / `matured` / `salesperson` / `kongfu` / `little` …）＋ `hailuo_new_year` /
+`kluonoa` / `rice_cake_fox` / `sta` / `zhiban` / `zhiban_new_year`；`touhou_little_maid:`
+的 `ariya_iwanaga` / `chimi_houjuu` / `cirno_slim` / `goliath_doll` / `hourai_doll` /
+`komeiji_koishi_2` / `nareko_michigami` / `ubame_chirizuka` / `watari_nina` / `yuiman_asama`；
+`touhou_little_maid_seihou:` 五个（`mai` / `mei` / `milia` / `vivit` / `vivit_2`）；
+`authors_and_credits:` 三个（`cyra_pow_wow` / `flower_candy` / `wine_fox_taisho`）。
+另外 1.18.2 的 `authors_and_credits:zhiban` 在 1.20.1 里改名成了 `geckolib:zhiban`。
+
+多出的 **5 个坐垫模型**：`native_drum` / `fogg05` / `legendary_pig_man` /
+`crystalizedsuns_moms_tombstone` / `head_of_academycraft`。
+
+两侧清单条目的结构完全一致（`model_id` / `model` / `animation` / `render_entity_scale` /
+`description`），所以补法是纯搬运：把 1.20.1 包里对应的 `models/entity/*.json`、
+`animation/*.json`、`textures/entity/**` 一起搬进来，再往 `assets/<ns>/maid_model.json`
+补条目。**这正是仓库约定「材质 / 纹理 / 模型使用 TLMO Fabric 1.20.1」还没落地的部分。**
+
+### 方块：只多不少
+
+`assets/touhou_little_maid/blockstates/` 下：我们 **16** 个、1.18.2 上游 15 个、1.20.1 上游 16 个。
+唯一的差集就是 `snack_cabinet`（1.20.1 新方块，已移植），没有缺的。
+
+### 顺带发现：jar 里躺着一个 14 MB 的死包
+
+`src/main/resources/assets/touhou_little_maid/tlm_custom_pack/touhou_little_maid-1.0.0.zip`
+（14 MB）是从上游资源树原样拷进来的，会整包进 jar。但本移植版的内置模型是**展开成普通资源**
+的，`CustomPackLoader#scan()` 只扫 `FabricLoader.getGameDir()/tlm_custom_pack/`，
+`GetJarResources` 也只被 `AvailableSites` 用来读那一份 yml —— **没有任何代码去读 jar 里这份 zip**。
+它里面的 `model_id` 与展开后的 `assets/<ns>/maid_model.json` 完全相同，将来若有人误加一条
+「读 jar 内包」的分支，会立刻变成重复注册。删掉它 jar 能少掉三分之一（39 MB → 约 25 MB）。
+
