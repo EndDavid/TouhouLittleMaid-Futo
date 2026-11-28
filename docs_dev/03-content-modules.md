@@ -2726,3 +2726,120 @@ Accessories 的可用性与 API 尚未核实），要么自己发明一套。上
 
 - **没做过「女仆真的去偷吃」的实机验证**：那需要把蛋糕摆在零食柜上、等到上班时段、
   观察她走过去吃。能自动断言的是「登记表里有两份实现」「缺模组时不报错」。
+
+## 零食柜的三处毛病（2026-11-28）
+
+用户在零食柜上放蛋糕后游戏崩溃，并且报了两处渲染问题。查下来是三件互不相干的事，
+外加一个顺带撞见的致命 bug。
+
+### 1. 「放蛋糕崩溃」其实是部署在游戏运行时覆盖了 jar
+
+崩溃报告里的异常与蛋糕毫无关系：
+
+```
+java.lang.RuntimeException: Failed to load class file for
+        'com.github.tartaricacid.touhoulittlemaid.client.renderer.ai.ChatBubbleRenderer$Side'!
+Caused by: java.util.zip.ZipException: ZipFile invalid LOC header (bad signature)
+```
+
+JVM 打开 jar 时持有 ZipFile 句柄，而 Windows 允许别人<b>覆盖</b>一个被打开的 jar 文件。
+于是下一次要加载某个类时，读到的字节已经是新 jar 的内容、偏移量却是旧的值 —— 报的
+永远是「恰好接下来要加载的那个类」。上一次部署（11:14）盖在了一个 11:04 就启动的游戏上，
+11:16 才崩，中间两次操作（放蛋糕 / 看向女仆）只是碰巧轮到那个类。
+
+`port/deploy-jar.ps1` 现在会先查 `Win32_Process` 里有没有命令行含 `1.18.2-Fabric-test` 的
+java 进程，有就直接 `throw`，不覆盖。查不到命令行信息的环境下降级为「只警告不阻断」
+（否则开发时的 `runClient` 会挡住所有部署）。
+
+### 2. 空柜子也竖着两格高的玻璃罩
+
+`models/bedrock/block/snack_cabinet.json` 里有三个互斥的骨骼：`root`（柜体，1 格高）、
+`full`（高玻璃罩，顶到 2.11 格）、`half`（矮玻璃罩，顶到 1.94 格）。反编译上游 1.20.1 的
+`TileEntitySnackCabinetRenderer#render` 可见它会按 `TYPE` 改 `BedrockPart.visible`：
+`1` 只显示 `full`、`2` 只显示 `half`、其余两个都不显示。
+
+本移植版的渲染器起初漏了这一步，三个骨骼全画 —— 于是空柜子顶上平白多出一格玻璃罩，
+看上去就像「用了旧模型、两格高」。
+
+补上的东西：
+
+| 新增 | 说明 |
+|---|---|
+| `BlockSnackCabinet.SNACK_CABINET_FULL` / `SNACK_CABINET_HALF` | 两个方块标签，判定「柜顶摆的是什么」 |
+| `data/touhou_little_maid/tags/blocks/snack_cabinet_{full,half}.json` | 与上游逐字相同的两份标签（full 9 项 / half 44 项，后者大半是 kaleidoscope_cookery，全部 `required: false`） |
+| `BlockSnackCabinet#updateShape` | 上方邻居变化时重算 `TYPE` |
+| `BlockSnackCabinet#getStateForPlacement` | 放下时就算一次，不等方块更新 |
+| `TileEntitySnackCabinetRenderer#setBoneVisible` | 每帧按 `TYPE` 设置 `full` / `half` 的 `hidden` |
+
+**与上游的一处差异**：上游的 `updateShape` 只在「邻居命中标签」时赋值，邻居变成空气时
+直接走 `super`，于是把食物拿走后玻璃罩不会消失（要等下一次方块更新）。这里改成三分支都赋值，
+上方既不在 full 也不在 half 里就写回 `0`。
+
+### 3. 占位物品图标显示成条纹
+
+`reborn_maid.png` 是 16×240（15 帧）、`spawn_box.png` 是 16×656（41 帧），
+两者的 `.png.mcmeta` 都只写了 `frametime: 2`。旧实现在两处同时出错：
+
+1. 图标是 `LayerDefinition` + `addBox(..., 16, 16, 0)` 做的<b>零厚度板</b>。原版拆 UV 是按
+   盒子六面平铺，厚度为 0 时背面的 u 从 `u + 2d + w` 起算 —— 16 → 32，直接跑出这张 16 宽的
+   贴图，采样被夹在最右一列；四块侧面又退化成 0 面积、与正反面共面，同一个 z 上堆了五六层。
+2. 就算只有一块面，UV 取满格（0..1）也会把 15 / 41 帧压成一条 —— 仍然是条纹。
+
+现在的做法：
+
+| 变更 | 原因 |
+|---|---|
+| 删掉 `client/model/EntityPlaceholderIconModel` | 零厚度 `ModelPart` 这条路本身就走不通 |
+| `EntityPlaceholderItemRenderer` 手写一块 +Z 单位 quad | 等价于上游的 `singleSouthFace()` |
+| 自己读 PNG 尺寸与 `mcmeta` 的 `frametime`，每帧只挪 UV 的 v 区间 | 见下 |
+
+**为什么不能走方块图集**：图集只收「被某个模型引用」的贴图，而
+`models/item/reborn_maid.json` / `spawn_box.json` 对应的<b>不是物品</b>（两者都是祭坛配方的
+产物），`ModelBakery` 只按物品注册名加载 `models/item/*`，这两张 sprite 永远不会被 stitch，
+查出来永远是 `missingno`。所以改成直接绑原贴图 + 自己算帧（帧数 = 高 / 宽，节拍 1 tick = 50 ms）。
+代价是与原版动画的相位不保证同步，观感一致。
+
+### 4. 顺带查出：女仆一 tick 就崩服（NPE）
+
+用 RCON 起开发服务端做上面的验证时，服务端启动一秒后直接崩了：
+
+```
+java.lang.NullPointerException: Cannot invoke "java.util.Optional.map(...)"
+        because the return value of "java.util.Map.get(Object)" is null
+    at net.minecraft.world.entity.ai.Brain.getMemory(Brain.java:244)
+    at ...MaidStealEdibleMoveBlockTask.start(MaidStealEdibleMoveBlockTask.java:84)
+```
+
+`Brain` 的 `memories` 是一个<b>预先按 `getMemoryTypes()` 建好的 map</b>，读一个没登记的键
+不会返回 `empty`，而是 NPE。上一轮加了 `InitEntities.MAID_EDIBLE_BLOCK_ACTION` 这个记忆类型，
+却忘了把它加进 `MaidBrain#getMemoryTypes()` —— 而 `MaidStealEdibleMoveBlockTask` 在 WORK 时段
+每 tick 都会读它。
+
+修复：在 `getMemoryTypes()` 里登记 `InitEntities.MAID_EDIBLE_BLOCK_ACTION`。
+
+### 验证
+
+RCON 端到端（`gradlew runServer` + `port/rcon.py`）：
+
+```
+setblock 2 -55 0 touhou_little_maid:snack_cabinet
+execute if block 2 -55 0 touhou_little_maid:snack_cabinet[type=0]   -> Test passed
+setblock 2 -54 0 minecraft:cake
+execute if block 2 -55 0 touhou_little_maid:snack_cabinet[type=1]   -> Test passed
+setblock 2 -54 0 minecraft:air
+execute if block 2 -55 0 touhou_little_maid:snack_cabinet[type=0]   -> Test passed
+```
+
+也就是「空柜 → 0、顶上放蛋糕 → 1、拿掉 → 0」三步都对。服务端连续跑了两分钟、世界里
+有女仆在 tick，`Stopping server` 一次都没出现，`crash-reports/` 为空 —— NPE 那条已闭。
+
+客户端 `port/smoketest.ps1` 到 `Sound engine started`，日志里只有离线鉴权的 401，
+无 `NoClassDefFoundError` / `NoSuchMethodError`。`build` 绿；四道守卫绿
+（`check-encoding` 1649 files / 0 bad、`check-jar` / `check-renderers` 11/11 + 14/12 / `check-dangling`）；
+已部署到测试实例且 sha256 一致。
+
+### 验证边界
+
+- **视觉没验收**：玻璃罩是否只在该出现时出现、图标动画的观感，都要真人在游戏里看一眼。
+  能自动断言的是「`TYPE` 状态机正确」「服务端不崩」「产物里没有旧模型类」。
+- **「女仆真的走过去偷吃」仍未验证**：需要主人在线 + 上班时段，且这一条本身也不属于本轮修的三个问题。

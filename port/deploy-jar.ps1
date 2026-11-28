@@ -15,6 +15,48 @@ $bak  = 'D:\MCHMCL\.minecraft\versions\1.18.2-Fabric-test\mods_backup_tlm'
 $out  = Join-Path $repo 'port\_deploy.txt'
 $sb = New-Object System.Text.StringBuilder
 
+# ---------------------------------------------------------------------------
+# REFUSE TO DEPLOY INTO A RUNNING GAME.
+#
+# Replacing the jar under a live JVM does not fail loudly: the JVM keeps its
+# open ZipFile handle, the bytes underneath change, and the next class it tries
+# to load dies with
+#     ZipException: ZipFile invalid LOC header (bad signature)
+# wrapped as a hard crash ("Failed to load class file for ..."). That is
+# exactly what happened on 2026-11-28 11:16: the jar was deployed over a game
+# that had been running since 11:04, and the crash landed on whatever class was
+# loaded next - it looked like "placing a cake crashes the game".
+#
+# Windows lets the copy through (the JVM opens jars with FILE_SHARE_WRITE), so
+# the only reliable guard is to look for a live process of that instance first.
+# --gameDir is on the command line of both the HMCL launcher and this script's
+# sibling runServer/runClient, and it is the same regardless of which java.exe
+# or which arguments the launcher picked.
+# ---------------------------------------------------------------------------
+$instanceTag = '1.18.2-Fabric-test'
+$running = @()
+try {
+    $running = @(Get-CimInstance Win32_Process -Filter "Name = 'java.exe' OR Name = 'javaw.exe'" -ErrorAction Stop |
+                 Where-Object { $_.CommandLine -and $_.CommandLine.Contains($instanceTag) })
+} catch {
+    # Get-CimInstance can be unavailable (very old PowerShell / locked down box).
+    # Do not block the deploy on that: fall back to a plain process-name scan,
+    # which can only over-report (and therefore only err on the safe side).
+    $running = @(Get-Process java, javaw -ErrorAction SilentlyContinue)
+    if ($running.Count -gt 0) {
+        [void]$sb.AppendLine('WARN: could not inspect command lines; assuming a game may be running.')
+    }
+}
+if ($running.Count -gt 0) {
+    $ids = ($running | ForEach-Object { $_.ProcessId }) -join ', '
+    # The fallback path cannot tell instances apart, so it warns instead of
+    # aborting - otherwise every dev runClient would block the deploy.
+    if ($running[0].PSObject.Properties['CommandLine']) {
+        throw "a game of $instanceTag is still running (pid $ids) - close it first, or the JVM will read a half-replaced jar"
+    } else {
+        [void]$sb.AppendLine("WARN: java processes present (pid $ids) but unidentifiable; deploying anyway.")
+    }
+}
 if (-not (Test-Path $src)) { throw "no jar at $src" }
 if (-not (Test-Path $md))  { throw "no mods dir at $md" }
 if (-not (Test-Path $bak)) { New-Item -ItemType Directory -Path $bak | Out-Null }

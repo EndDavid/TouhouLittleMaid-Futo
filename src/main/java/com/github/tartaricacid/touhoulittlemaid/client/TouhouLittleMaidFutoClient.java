@@ -162,11 +162,9 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.client.renderer.tileentity.TileEntitySnackCabinetRenderer::new);
 
         // 「生成？？？」占位物品：进度图标用它画「祭坛这条配方做出来的东西」。
-        // 与野餐篮同一套 —— 烘焙一块扁平图层 + BuiltinItemRenderer 换贴图。
-        // 物品本身不进创造物品栏（除了主栏里那些非物品类配方的副本）。
-        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
-                com.github.tartaricacid.touhoulittlemaid.client.model.EntityPlaceholderIconModel.LAYER,
-                com.github.tartaricacid.touhoulittlemaid.client.model.EntityPlaceholderIconModel::createBodyLayer);
+        // 它不需要模型层：图标是渲染器里手写的一块 quad，UV 每帧只覆盖动态贴图的当前那一帧。
+        // 那些贴图是 16×240 / 16×656（若干帧竖着叠起来，mcmeta 里只有 frametime），所以不能直接取满格 0..1。
+        // 旧版用的是 LayerDefinition + 零厚度 addBox，背面的 UV 会跑到贴图外面 —— 表现就是条纹。
         net.fabricmc.fabric.api.client.rendering.v1.BuiltinItemRendererRegistry.INSTANCE.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitItems.ENTITY_PLACEHOLDER,
                 new com.github.tartaricacid.touhoulittlemaid.client.renderer.item.EntityPlaceholderItemRenderer());

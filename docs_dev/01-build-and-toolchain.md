@@ -333,3 +333,29 @@ Caused by: java.lang.UnsupportedOperationException
 | REI + Architectury | 都装了才会点亮「祭坛合成」分类 |
 
 **不再需要**额外放 snakeyaml / concentus / vorbis —— 它们现在在 jar 里。
+
+## 部署时游戏必须已退出（否则下次加载类必定崩）
+
+`port/deploy-jar.ps1` 会用新 jar 覆盖测试实例 `mods/` 里的那一份。这件事在 Windows 上
+<b>不会</b>被系统拒绝：JVM 打开 jar 时是带 `FILE_SHARE_WRITE` 的，别人照样能改写文件内容。
+
+后果是延迟发作的：JVM 手里的 ZipFile 仍按旧偏移量读新字节，下一次要加载某个类时抛
+
+```
+java.lang.RuntimeException: Failed to load class file for '<某个类>'!
+Caused by: java.util.zip.ZipException: ZipFile invalid LOC header (bad signature)
+```
+
+报的是「恰好接下来要加载的那个类」，与真正的原因（部署动作）毫无关系 —— 2026-11-28 就
+因此把「在零食柜上放蛋糕会崩」当成了方块逻辑的 bug，实际只是那次部署盖在了一个正在运行的游戏上。
+
+所以脚本现在先查 `Get-CimInstance Win32_Process` 里有没有命令行含 `1.18.2-Fabric-test` 的
+`java.exe` / `javaw.exe`，有就 `throw`。`--gameDir` 在 HMCL 与 loom 的 `runClient` / `runServer`
+命令行里都有，与用哪个 java、带哪些参数无关。
+
+`Get-CimInstance` 不可用的环境（老 PowerShell / 被策略限制）会降级成 `Get-Process java` 的
+粗查：那种情况下无法区分实例，所以只写警告、不阻断 —— 否则开发时开着的 `runClient`
+会让每一次部署都失败。
+
+配套习惯：改完 jar 先关游戏，再部署，再启动。这条和 `port/kill-dev-run.ps1`（只杀
+`loom-cache/launch.cfg` 匹配到的进程）一起用，不要手动 `taskkill /IM java.exe`。

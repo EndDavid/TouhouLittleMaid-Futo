@@ -88,7 +88,12 @@ public final class MaidBrain {
                 MemoryModuleType.WALK_TARGET,
                 MemoryModuleType.ATTACK_TARGET,
                 MemoryModuleType.ATTACK_COOLING_DOWN,
-                InitEntities.TARGET_POS
+                InitEntities.TARGET_POS,
+                // 「方块类食物」的行为记忆。
+                // 必须在这里登记：Brain 的 memories 是一个预先建好的 map，
+                // getMemory(未注册的键) 会 NPE 而不是返回 empty，
+                // 而这一段代码是女仆每 tick 都要跑的。
+                InitEntities.MAID_EDIBLE_BLOCK_ACTION
         );
         return ImmutableList.copyOf(defaultTypes);
     }
