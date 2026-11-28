@@ -2843,3 +2843,98 @@ execute if block 2 -55 0 touhou_little_maid:snack_cabinet[type=0]   -> Test pass
 - **视觉没验收**：玻璃罩是否只在该出现时出现、图标动画的观感，都要真人在游戏里看一眼。
   能自动断言的是「`TYPE` 状态机正确」「服务端不崩」「产物里没有旧模型类」。
 - **「女仆真的走过去偷吃」仍未验证**：需要主人在线 + 上班时段，且这一条本身也不属于本轮修的三个问题。
+
+## 零食柜（续）：偏移的真正原因、玻璃观感、以及存储的验证
+
+上一轮修完之后，实机仍然是「整体偏半格」，而且玻璃罩看起来发暗。这一轮定位到真正的原因，
+并顺手把「能不能右键打开 27 格」用命令验证了一遍。
+
+### 偏移：`T(0.5) R T(-0.5)` 不是「转回去」
+
+出问题的三行（初版）：
+
+```java
+poseStack.translate(0.5, 0.0, 0.5);
+poseStack.mulPose(Vector3f.YP.rotationDegrees(-facing.toYRot()));
+poseStack.translate(-0.5, 0.0, -0.5);   // ← 这一句
+```
+
+`T(p) R T(-p)` 的语义是「绕点 p 旋转」。而基岩模型自身已经<b>水平居中在原点</b>
+（`root` 的 cube 是 `origin[-8,0,-8] size[16,16,16]`，即 -0.5..0.5 格），
+所以模型该绕的是<b>自己</b>，只需要 `T(0.5) R`；多出来的 `T(-0.5)` 等于把模型先推到 -1..0：
+
+| 朝向 | 旋转角 | 模型落地范围（x / z） |
+|---|---|---|
+| SOUTH | 0° | -0.5..0.5 → 0..1 ✔ |
+| NORTH | 180° | `(1 - x)` → 0.5..1.5 ✘ 偏半格 |
+| EAST / WEST | ±90° | 同样偏半格 |
+
+这就解释了为什么「只有某些朝向看起来对」：转 0° 时那句恰好抵消，其余三个朝向全部外推半格。
+现在改成与神社 / 野餐垫一致的写法：
+
+```java
+poseStack.translate(0.5, BedrockBlockModels.floorOffset(MODEL_NAME), 0.5);
+poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot() + 180.0F));
+```
+
+`YP(toYRot + 180)` 与上游的 `YN(180 - 2D*90)` 等价（模 360）。启动日志实测包围盒：
+
+```
+[Futo] Block model snack_cabinet loaded: 3 bones,
+       bbox x[-0.500..0.500] y[0.000..2.000] z[-0.530..0.502] floorOffset=-0.000
+```
+
+水平居中、底面在 0、整体高 2.0 格（柜体 1 格 + 玻璃罩 1 格），与参考图一致。
+`z` 下限 -0.53 是模型自带的「前面那层小托板」，属于设计。
+
+### 玻璃发暗：那是转错之后看到的「内壁」
+
+先排除了两个「像原因但其实不是」的猜测：
+
+- **贴图不同**：`textures/bedrock/block/snack_cabinet.png` 与本仓库那份 sha256 完全相同（128×128）；
+- **渲染类型不同**：上游字节码里是 `class_1921.method_23578`，本移植版 `RenderType.entityCutoutNoCull`
+  编译出来也是 `method_23578`（拿产物 jar 反查过）—— 两者本来就是同一个。
+
+所以玻璃看起来偏暗是**姿态错误带来的次级现象**：转错之后我们看到的是罩子的背面 / 内壁，
+法线朝里，实体着色器算出来的亮度自然偏低。姿态修好后这一项应当一起消失。
+
+### 存储：27 格，与上游一致（命令级验证）
+
+`BlockSnackCabinet#use` 与上游逐字对应：
+
+```java
+if (hit.getDirection() == Direction.UP && held.getItem() instanceof BlockItem) return PASS; // 留给「往上叠一层」
+if (level.isClientSide) return SUCCESS;
+if (blockEntity instanceof TileEntitySnackCabinet cabinet) player.openMenu(cabinet);
+return CONSUME;
+```
+
+方块实体是 `RandomizableContainerBlockEntity` 的 27 格（`ChestMenu.sixRows`），
+所以界面就是原版六行箱子。用 RCON 直接对容器下命令，可以证明它确实是个可读写的 `Container`：
+
+```
+item replace block 2 -55 0 container.0  with minecraft:cake   -> Replaced a slot ... with [Cake]
+item replace block 2 -55 0 container.26 with minecraft:apple  -> Replaced a slot ... with [Apple]
+data get block 2 -55 0
+  {Items: [{Slot: 0b,  id: "minecraft:cake",  Count: 1b},
+           {Slot: 26b, id: "minecraft:apple", Count: 1b}], id: "touhou_little_maid:snack_cabinet"}
+```
+
+`container.26` 能被接受，说明槽位确实是 0..26（27 格）；`data get` 里 `Items` 有值，
+说明它走的是 `ContainerHelper` 那条正常的存读链路。**上一轮「点不开」的实际原因是模型偏了半格**：
+玩家看到的是那个偏出去的柜体，点下去命中的是空气。
+
+### 验证
+
+- 客户端 `runClient -PjoinServer` 连本地服务端，`tp` 到柜子旁：模型加载日志出现上面那行 bbox，
+  `Render thread/ERROR` 里没有任何与本模组相关的条目，`run/crash-reports/` 为空。
+- 同一客户端里 `/give` 两个带 `RecipeId` 的占位物品（`altar/reborn_maid`、`altar/spawn_box`），
+  让物品栏渲染动态图标；日志里没有 `[Futo] Entity placeholder item renderer failed` —— 
+  说明「读 PNG 尺寸 + 读 mcmeta + 按帧挪 UV」这条新路径在真实渲染里跑通了。
+- `type` 状态机回归：空柜 `type=0` → 顶上加蛋糕 `type=1` → 拿掉 `type=0`，三步 `Test passed`。
+- `build` 绿；四道守卫绿；产物已部署（sha256 一致）。
+
+### 仍然没验的
+
+- **观感**：玻璃罩的高度、托板朝向、图标动画的节奏，仍然要真人看一眼。
+  能自动断言的只有「包围盒正确」「状态机正确」「渲染时不抛异常」。

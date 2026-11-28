@@ -185,6 +185,19 @@ public class BlockSnackCabinet extends BaseEntityBlock {
         return new TileEntitySnackCabinet(pos, state);
     }
 
+    /**
+     * 右键打开 27 格存储（与上游逐字对应）。
+     *
+     * <p>界面就是原版六行箱子：方块实体是
+     * {@link net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity}，
+     * {@code createMenu} 返回 {@link net.minecraft.world.inventory.ChestMenu#sixRows}，
+     * 客户端因此直接用 {@code ChestScreen} —— 与木桶 / 箱子同一套。</p>
+     *
+     * <p>唯一的例外是「手持方块物品点顶面」：那一下返回 {@code PASS}，
+     * 留给上游的「往柜顶叠一层」行为（与上游完全相同，不是漏写）。
+     * 上一轮有人报「点不开」，实际原因是模型整体偏了半格，玩家点的是空气；
+     * 见 {@code docs_dev/03}「零食柜（续）」。</p>
+     */
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
                                  InteractionHand hand, BlockHitResult hit) {

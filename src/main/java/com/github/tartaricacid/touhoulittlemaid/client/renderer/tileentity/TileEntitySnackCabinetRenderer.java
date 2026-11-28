@@ -25,9 +25,18 @@ import net.minecraft.world.level.block.state.BlockState;
  * 那条管线已经把 texel→格、X 轴翻转、负 inflate、零厚度面、骨骼层级都处理过了，
  * 所以这里既不需要再手抄几百行 {@code addBox}，也不需要 {@code ZN(180)} 之类的手工姿态修正。</p>
  *
- * <p><b>朝向</b>：只按 {@code FACING} 绕 Y 轴转 —— 基岩几何的原点就在方块底面中心
- * （与 {@code models/block/snack_cabinet.json} 里那个只有 particle 的空模型对应），
- * 所以不需要额外的平移。</p>
+ * <h2>姿态：与神社 / 野餐垫同一套</h2>
+ *
+ * <p>基岩几何是 <b>Y 向上、底面在 y = 0、水平居中在原点</b>
+ * （{@code root} 骨骼的 cube 是 {@code origin[-8,0,-8] size[16,16,16]}，正好 -0.5..0.5），
+ * 所以只需要「挑到方块中心 + 按朝向转」，不需要上游那句
+ * {@code translate(0.5, 1.5, 0.5)} 与 {@code ZN(180)} —— 那是旧的「原版 ModelPart」空间（Y 向下）的代偿，
+ * 与野餐垫那里踩过的是同一个坑。</p>
+ *
+ * <p><b>一个必须记住的算式</b>：{@code T(0.5) R T(-0.5)} 等于「绕点 (0.5, 0, 0.5) 旋转」。
+ * 而这个模型的自身已经居中在原点，所以再补一句 {@code T(-0.5)} 就不是「还回去」：
+ * 转 0° 时它恰好抵消，转 180° 时得到 {@code (1 - x, y, 1 - z)}，模型整体偏移半格。
+ * 本渲染器初版就是这么写的，于是只有朝南（角度 0）时看起来对，其余三个朝向全部偏出去半格。</p>
  *
  * <h2>为什么要按 TYPE 隐藏骨骼</h2>
  *
@@ -72,9 +81,12 @@ public class TileEntitySnackCabinetRenderer implements BlockEntityRenderer<TileE
         setBoneVisible(model, BONE_FULL, type == BlockSnackCabinet.TYPE_FULL);
         setBoneVisible(model, BONE_HALF, type == BlockSnackCabinet.TYPE_HALF);
         poseStack.pushPose();
-        poseStack.translate(0.5D, 0.0D, 0.5D);
-        poseStack.mulPose(Vector3f.YP.rotationDegrees(-facing.toYRot()));
-        poseStack.translate(-0.5D, 0.0D, -0.5D);
+        // 姿态与神社 / 野餐垫完全一致。
+        // 【不要在转完之后再 translate(-0.5, 0, -0.5)】
+        // T(0.5) R T(-0.5) 是「绕点 (0.5, 0, 0.5) 旋转」，而模型自己已经居中在原点
+        // —— 于是转 180° 时整个模型会被推出半格（见下面的算式）。
+        poseStack.translate(0.5D, BedrockBlockModels.floorOffset(MODEL_NAME), 0.5D);
+        poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot() + 180.0F));
         GeoBlockRenderer.render(model, TEXTURE, poseStack, buffer, packedLight, packedOverlay, RENDER_TYPE);
         poseStack.popPose();
     }
