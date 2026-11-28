@@ -1988,9 +1988,11 @@ public class EntityMaid extends TamableAnimal implements IMaid,
      * 环境音。
      *
      * <p><b>与上游一致：不覆写 {@code getAmbientSoundInterval()}，也不做任何节流。</b>
-     * 节奏完全交给原版 {@code Mob#baseTick}（{@code random.nextInt(1000) < ambientSoundTime++}，
-     * 间隔取 {@code getAmbientSoundInterval()} 的默认值 80，平均约 6 秒一次），
-     * 这里只多一道玩家配置的频率判定。</p>
+     * 节奏完全交给原版 {@code Mob#baseTick}：{@code random.nextInt(1000) < ambientSoundTime}，
+     * 而 {@code resetAmbientSoundTime()} 把计数置为 {@code -getAmbientSoundInterval()}。
+     * 女仆的真实间隔是 <b>120</b>（{@code Animal#getAmbientSoundInterval()} 覆写了 {@code Mob} 的 80，
+     * 女仆正走 {@code TamableAnimal → Animal} 这条链），加上概率回爬约 45 tick，
+     * 平均 ≈165 tick ≈ 8 秒一次。这里只多一道玩家配置的频率判定。</p>
      *
      * <p>此前本移植版把间隔改成 240、并额外加了「任意两只女仆的语音之间至少 60 tick」——
      * 这两条都是上游没有的发明：单只就从约 6 秒拉长到约 14 秒，多只还会互相压制，

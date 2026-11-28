@@ -331,9 +331,17 @@ lvl=50  gohei=[enders_ender=1]                            sword=[]
 
 ### 密度与并发：与上游完全一致（不做节流）
 
-原版 `Mob#baseTick` 的触发是 `random.nextInt(1000) < ambientSoundTime++`，
-`resetAmbientSoundTime()` 把计数重置为 `-getAmbientSoundInterval()`。
-默认 `interval = 80` 时期望间隔约 125 tick（≈6 秒）。
+原版 `Mob#baseTick` 的触发是 `random.nextInt(1000) < ambientSoundTime`，
+`resetAmbientSoundTime()` 把计数重置为 `-getAmbientSoundInterval()`（javap 确认过：
+`if_icmpge` 跳过，也就是 `nextInt < ambientSoundTime` 才发声）。
+
+女仆的真实间隔是 **120**，不是 `Mob` 的 80 —— `Animal#getAmbientSoundInterval()`
+覆写成了 120（javap：`bipush 120`），而女仆走的是 `TamableAnimal → Animal` 这条链。
+加上概率回爬的约 45 tick，期望间隔 ≈165 tick ≈ **8 秒**。
+
+> 这个数字是实测出来的：临时在 `playAmbientSound()` 里打一行
+> `getAmbientSoundInterval()` 跑 `runServer`，输出 `interval=120`。
+> 此前文档写的 80 / 6 秒是错的 —— 只看了 `Mob` 没看 `Animal`。
 
 **上游没有改这个节奏，本移植版现在也没有。** 逐个核对过：
 
@@ -396,6 +404,39 @@ private boolean shouldPlayVoice() {
 `action, entityId, payload`）：`MaidConfigScreen` 左右箭头各 ±10% →
 `MaidClientPacketSender#sendSoundFreq` → `MaidConfigPacket.SOUND_FREQ` →
 `handleSoundFreq` → `MaidSubConfig#setSoundFreq`（夹到 0~1）→ 同步数据 → `shouldPlayVoice()`。
+
+### 实测：节奏与频率门都真的生效
+
+临时在 `playAmbientSound()` 里插一行
+`[SNDTEST] uuid=... interval=... freq=... play=...`（测完即撤），
+`runServer` + RCON 召唤三只女仆，世界内有：
+
+```
+[SNDTEST] uuid=29ce... interval=120 freq=0.25 play=false   <- 上一轮存档里的那只，跨重启保留
+[SNDTEST] uuid=db05... interval=120 freq=0.0  play=false   <- SoundFreq 0.0：恒定静音
+[SNDTEST] uuid=abcd... interval=120 freq=1.0  play=true    <- 默认 1.0：恒定放行
+```
+
+三件事同时被这一组日志证实：
+
+1. **节奏是 120**（不是 80），与上游同链一致；
+2. **频率门生效**：`0.0` 恒 false、`1.0` 恒 true，`0.25` 按概率出现；
+3. **配置值跨存档保留**：`freq=0.25` 那只是上一轮用 `data merge` 写入、再
+   `save-all flush` + 区块卸载重载后读回来仍是 0.25 的同一只，服务端重启后仍为 0.25。
+
+用 `data` 命令做的往返验证（同一只女仆）：
+
+```
+summon ... {Invulnerable:1b,NoAI:1b}
+data get    ... MaidSubConfig.SoundFreq   -> 1.0f        (默认)
+data merge  ... {MaidSubConfig:{SoundFreq:0.25f}}
+data get    ... MaidSubConfig.SoundFreq   -> 0.25f
+save-all flush / forceload remove+add     (区块重载)
+data get    ... MaidSubConfig.SoundFreq   -> 0.25f
+```
+
+**没验的**：听感。间隔变成约 8 秒、音调从 1.3 回到 1.0 是否「听起来和上游一样」，
+仍然需要真人在客户端里待几分钟。
 
 ## 配置：Forge Config API Port 到底给了什么，我们用了多少
 
