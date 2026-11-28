@@ -3507,17 +3507,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
                             com.github.tartaricacid.touhoulittlemaid.init.InitMenu.TASK_CONFIG_DEFAULT,
                             syncId, inventory, entityId);
                 }
-                if (tabIndex == TabIndex.TRINKETS) {
-                    // 饰品页（Trinkets）。没装 Trinkets 时回退到主界面 ——
-                    // 宁可让玩家看到主界面，也不能让他去加载一个不存在的菜单类。
-                    if (com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat.isLoaded()) {
-                        return com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat
-                                .createMenu(syncId, inventory, entityId);
-                    }
-                    return new com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidMainContainer(
-                            com.github.tartaricacid.touhoulittlemaid.init.InitMenu.MAID_MAIN,
-                            syncId, inventory, entityId);
-                }
                 if (tabIndex == TabIndex.MAID_CONFIG) {
                     return new com.github.tartaricacid.touhoulittlemaid.inventory.container.MaidConfigContainer(
                             com.github.tartaricacid.touhoulittlemaid.init.InitMenu.MAID_CONFIG,
@@ -3696,9 +3685,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
             IMaidBackpack maidBackpack = this.getMaidBackpackType();
             tombstone.insertItem(maidBackpack.getTakeOffItemStack(ItemStack.EMPTY, null, this));
             maidBackpack.onSpawnTombstone(this, tombstone);
-            // Trinkets 饰品（上游 CuriosEvent#onMaidTombstone 的对应物）。
-            // 没装 Trinkets 时这个方法第一行就 return。
-            com.github.tartaricacid.touhoulittlemaid.compat.trinkets.TrinketsCompat.drainToTombstone(this, tombstone);
             // 胶片
             tombstone.insertItem(com.github.tartaricacid.touhoulittlemaid.item.ItemFilm.maidToFilm(this));
             // 全局记录（狐狸卷轴按玩家查墓碑用）

@@ -31,22 +31,6 @@ public final class InitMenu {
             new ExtendedScreenHandlerType<>((syncId, inventory, buf) ->
                     new MaidMainContainer(InitMenu.MAID_MAIN, syncId, inventory, buf.readInt())));
 
-    /**
-     * 女仆的饰品页（Trinkets 联动）。
-     *
-     * <p>与其它四个菜单一样是 {@link ExtendedScreenHandlerType}，只传女仆实体 id。</p>
-     *
-     * <p><b>为什么无条件注册：</b>菜单类型本身只是一个注册表条目，
-     * 它的构造 lambda 只有在真正打开界面时才会执行，
-     * 而那条路径又由 {@code TrinketsCompat#isLoaded()} 守着。</p>
-     */
-    public static final MenuType<com.github.tartaricacid.touhoulittlemaid.compat.trinkets.menu.TrinketContainer>
-            TRINKET_MAIN = Registry.register(
-            Registry.MENU, TouhouLittleMaid.rl("maid_trinket"),
-            new ExtendedScreenHandlerType<>((syncId, inventory, buf) ->
-                    new com.github.tartaricacid.touhoulittlemaid.compat.trinkets.menu.TrinketContainer(
-                            InitMenu.TRINKET_MAIN, syncId, inventory, buf.readInt())));
-
     public static final MenuType<MaidConfigContainer> MAID_CONFIG = Registry.register(
             Registry.MENU,
             TouhouLittleMaid.rl("maid_config"),

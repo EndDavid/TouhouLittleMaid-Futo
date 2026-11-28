@@ -1518,8 +1518,5 @@
   "config.touhou_little_maid.global_ai.auto_gen_setting.tooltip": "女仆的模型没有对应角色设定时，用 AI 自动写一份并保存到 config/touhou_little_maid/settings",
   "config.touhou_little_maid.global_ai.max_tokens_per_player": "每位玩家的 token 上限",
   "config.touhou_little_maid.global_ai.max_tokens_per_player.tooltip": "单个玩家累计可消耗的 token 数量，0 表示不限制",
-  "config.touhou_little_maid.not_ported.tooltip": "（本移植版尚未实现对应功能，此项暂不生效）",
-  "gui.touhou_little_maid.trinkets": "饰品",
-  "gui.touhou_little_maid.curios_button.open.desc": "打开饰品栏",
-  "gui.touhou_little_maid.curios_button.close.desc": "返回主界面"
+  "config.touhou_little_maid.not_ported.tooltip": "（本移植版尚未实现对应功能，此项暂不生效）"
 }

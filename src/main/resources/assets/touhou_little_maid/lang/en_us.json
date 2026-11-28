@@ -1537,8 +1537,5 @@
   "config.touhou_little_maid.global_ai.auto_gen_setting.tooltip": "When a maid model has no character setting, let the AI write one into config/touhou_little_maid/settings",
   "config.touhou_little_maid.global_ai.max_tokens_per_player": "Max tokens per player",
   "config.touhou_little_maid.global_ai.max_tokens_per_player.tooltip": "Total tokens a single player may spend, 0 means unlimited",
-  "config.touhou_little_maid.not_ported.tooltip": "(Not implemented in this port yet - this option has no effect for now)",
-  "gui.touhou_little_maid.trinkets": "Trinkets",
-  "gui.touhou_little_maid.curios_button.open.desc": "Open trinkets",
-  "gui.touhou_little_maid.curios_button.close.desc": "Back to the main tab"
+  "config.touhou_little_maid.not_ported.tooltip": "(Not implemented in this port yet - this option has no effect for now)"
 }
