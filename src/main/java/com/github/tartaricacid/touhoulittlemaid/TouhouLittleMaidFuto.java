@@ -155,6 +155,11 @@ public final class TouhouLittleMaidFuto implements ModInitializer {
         // /tlm 管理命令（GUI 之外的批量修改 / 调试入口）
         MaidCommand.init();
 
+        // 零食柜右键自检（仅 -Dfuto.snack.selftest=true 时装配，见 build.gradle 的 -PsnackSelftest）
+        if (Boolean.getBoolean("futo.snack.selftest")) {
+            com.github.tartaricacid.touhoulittlemaid.debug.SnackCabinetSelfTest.init();
+        }
+
         TouhouLittleMaid.LOGGER.info("[Futo] Touhou Little Maid initialized.");
     }
 }

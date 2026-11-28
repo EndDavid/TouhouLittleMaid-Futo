@@ -229,6 +229,9 @@ gradlew runClient -PjoinServer   # 另一个终端，自动连 127.0.0.1:25565
 ```
 `--server` / `--port` 是原版启动参数，1.18.2 的 `Main` 认它，进服后会自动连接
 （不是 1.20 才有的 `--quickPlayMultiplayer`）。不带 `-PjoinServer` 时行为与以前完全一致。
+只验证「右键打开界面」这类**服务端交互**时不需要客户端：
+`gradlew runServer -PsnackSelftest` 会放一个零食柜、用假玩家调一遍
+`BlockState#use`、断言开出 27 格箱子界面，然后自己停服（见 `docs_dev/03`）。
 然后用 RCON 在玩家脚边生成实体，看客户端会不会崩：
 ```
 summon touhou_little_maid:broom -1 64 -8

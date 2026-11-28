@@ -246,7 +246,7 @@ public final class InitBlocks {
      * <p><b>1.18.2 没有这个东西</b> —— 它是 1.20.1 新增的方块。本仓库 baseline 早就拷了
      * 它的基岩模型 / 贴图 / 物品模型，但方块、方块实体与配方一直没接上，于是
      * {@code recipes/altar/snack_cabinet.json}（桶 + 木板 + 玻璃板）也无从落地。
-     * 本轮补上：27 格容器，界面复用原版六行箱子（{@code ChestMenu.sixRows} + {@code ChestScreen}）。</p>
+     * 本轮补上：27 格容器，界面复用原版单箱（{@code ChestMenu.threeRows} + {@code ChestScreen}）。</p>
      *
      * <p>和野餐垫一样是 {@code ENTITYBLOCK_ANIMATED}：{@code models/block/snack_cabinet.json}
      * 里只有 {@code particle} 贴图，几何全由 {@code TileEntitySnackCabinetRenderer} 画。</p>

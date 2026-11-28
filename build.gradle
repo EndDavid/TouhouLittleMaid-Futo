@@ -216,6 +216,14 @@ loom {
 			}
 
 		}
+
+		// 零食柜「右键开界面」的服务端自检（不需要客户端）
+		// gradlew runServer -PsnackSelftest
+		server {
+			if (project.hasProperty('snackSelftest')) {
+				vmArgs "-Dfuto.snack.selftest=true"
+			}
+		}
 	}
 }
 

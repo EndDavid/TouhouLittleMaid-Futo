@@ -2057,8 +2057,8 @@ baseline 里已经有 `models/item/entity_id_copy.json`、`textures/item/entity_
 | `recipes/altar/snack_cabinet.json` | 从上游逐字节拷 |
 | `data/c/tags/items/glass_panes.json` | 配方要 `c:glass_panes`，仓库原来没有这个标签 |
 
-**界面不需要自己写**：27 格正好是原版六行箱子的容量，所以 `createMenu` 直接返回
-`ChestMenu.sixRows(...)`，客户端也不用注册 Screen —— 原版 `MenuScreens` 早就把
+**界面不需要自己写**：27 格正好是原版单箱子的容量，所以 `createMenu` 直接返回
+`ChestMenu.threeRows(...)`（`sixRows` 要 54 格，写错会让每次右键都抛异常），客户端也不用注册 Screen —— 原版 `MenuScreens` 早就把
 `MenuType.GENERIC_9x3` 绑到了 `ChestScreen`（重复注册只会多一条无用表项）。
 
 **踩到的一个 1.18.2 差异**：`ContainerOpenersCounter#incrementOpeners` 在 1.18.2 只有 4 个参数，
@@ -2900,17 +2900,17 @@ poseStack.mulPose(Vector3f.YP.rotationDegrees(facing.toYRot() + 180.0F));
 
 ### 存储：27 格，与上游一致（命令级验证）
 
-`BlockSnackCabinet#use` 与上游逐字对应：
+`BlockSnackCabinet#use`：
 
 ```java
-if (hit.getDirection() == Direction.UP && held.getItem() instanceof BlockItem) return PASS; // 留给「往上叠一层」
 if (level.isClientSide) return SUCCESS;
 if (blockEntity instanceof TileEntitySnackCabinet cabinet) player.openMenu(cabinet);
 return CONSUME;
 ```
 
-方块实体是 `RandomizableContainerBlockEntity` 的 27 格（`ChestMenu.sixRows`），
-所以界面就是原版六行箱子。用 RCON 直接对容器下命令，可以证明它确实是个可读写的 `Container`：
+方块实体是 `RandomizableContainerBlockEntity` 的 27 格（`ChestMenu.threeRows` ——
+不是 `sixRows`：后者要 54 格，写错会让每次右键都抛异常，见本节末尾「右键点不开的真正原因」）。
+用 RCON 直接对容器下命令，可以证明它确实是个可读写的 `Container`：
 
 ```
 item replace block 2 -55 0 container.0  with minecraft:cake   -> Replaced a slot ... with [Cake]
@@ -2921,8 +2921,11 @@ data get block 2 -55 0
 ```
 
 `container.26` 能被接受，说明槽位确实是 0..26（27 格）；`data get` 里 `Items` 有值，
-说明它走的是 `ContainerHelper` 那条正常的存读链路。**上一轮「点不开」的实际原因是模型偏了半格**：
-玩家看到的是那个偏出去的柜体，点下去命中的是空气。
+说明它走的是 `ContainerHelper` 那条正常的存读链路。
+
+> 注意这条 RCON 证据<strong>不能</strong>证明「右键能开」：它只说明方块实体是个可读写的容器。
+> 最初把「点不开」归因成模型偏了半格，那确实也是原因之一（玩家点的是空气），
+> 但真正的原因在 `createMenu`，见本节末尾「右键点不开的真正原因」。
 
 ### 验证
 
@@ -2985,3 +2988,64 @@ box-UV 的模型（祭坛 / 棋盘 / 电脑 / 键盘 …）一个字节都没动
 `runClient` 到 `Sound engine started`，11 个基岩方块模型的 bbox 日志全部照常打印，
 `crash-reports/` 为空。**观感仍需真人确认**：玻璃框线是否回到罩子边上、
 上一轮圈出来的那块斜板是否回到玻璃里。
+
+### 「右键点不开」的真正原因：`sixRows` 要 54 格，柜子只有 27
+前两轮把「点不开」归因成模型偏移（那是真的，但只是原因之一）。模型修好之后仍然打不开，
+于是这一轮不再靠推理，直接写了一个**服务端自检**把「点」这一步跑起来
+（`gradlew runServer -PsnackSelftest`，见下）。第一次跑就抓到：
+```
+java.lang.IllegalArgumentException: Container size 27 is smaller than expected 54
+    at net.minecraft.world.inventory.AbstractContainerMenu.checkContainerSize(AbstractContainerMenu.java:98)
+    at net.minecraft.world.inventory.ChestMenu.<init>(ChestMenu.java:52)
+    at net.minecraft.world.inventory.ChestMenu.sixRows(ChestMenu.java:47)
+    at ...TileEntitySnackCabinet.createMenu(TileEntitySnackCabinet.java:114)
+    at ...RandomizableContainerBlockEntity.createMenu(RandomizableContainerBlockEntity.java:161)
+    at net.minecraft.server.level.ServerPlayer.openMenu(ServerPlayer.java:1031)
+    at ...BlockSnackCabinet.use(BlockSnackCabinet.java:217)
+```
+`ChestMenu` 的构造器里有 `checkContainerSize(container, rows * 9)`：
+| 工厂方法 | 行数 | 需要的格数 |
+|---|---|---|
+| `oneRow` | 1 | 9 |
+| `threeRows` | 3 | **27** ← 27 格柜子该用这个 |
+| `sixRows` | 6 | 54（双箱） |
+我们写的是 `sixRows`，于是**每一次右键都在 `openMenu` 里抛异常**。
+异常发生在服务端处理右键包的过程中，客户端只看到「什么都没发生」——
+这就是玩家视角的全部现象；而 RCON 的 `item replace block ... container.26`
+只能证明方块实体是个可读写的容器，永远证明不了「点」这一步。
+上游用的就是三行：反编译 1.20.1 的 `TileEntitySnackCabinet` 可见
+`getContainerSize()` 返回 `bipush 27`，`createMenu` 调用 `ChestMenu.method_19245`，
+而 `method_19245` 给构造器传的行数是 `iconst_3`、菜单类型 `GENERIC_9x3`
+（`method_19247` 才是 6 行 / `GENERIC_9x6` / 54 格）。
+同一个 `use` 里还有第二处会挡住右键：上游那句「手持方块物品点顶面 → `PASS`」。
+它存在的唯一理由是上游那个「蹲下 + 方块点顶面 = 往柜顶叠一层」的动作，本移植版没做，
+于是它只剩下副作用 —— **手里拿着方块点顶面时界面不开**。
+删掉它即可，因为原版客户端在「蹲下 + 手上有物品」时根本不会调用方块的 `use`
+（`MultiPlayerGameMode#useItemOn` 里的 `isSecondaryUseActive() && !flag` 分支），
+箱子 / 木桶都靠这一条，所以「站着右键开界面 / 蹲着右键放方块」两个动作都成立。
+### 自检：`gradlew runServer -PsnackSelftest`
+`debug/SnackCabinetSelfTest`（由 `-Dfuto.snack.selftest=true` 装配，`build.gradle` 里
+对应 `-PsnackSelftest`）在出生点放一个柜子，然后**真的调用**
+`BlockState#use(Level, Player, InteractionHand, BlockHitResult)`——
+服务端收到右键包之后走的就是这条路——并断言 `player.containerMenu` 是 27 格 / 三行的
+`ChestMenu`。四种拿法各测一次，跑完自己 `halt`。
+1.18.2 的 fabric-api（0.77）里没有 `net.fabricmc.fabric.api.entity.FakePlayer`
+（那个类要到 1.19 的 0.6.x 模块才有，已核对缓存里 0.4.19 / 0.4.20 两个 jar），
+所以自检按 Fabric 内部 `FakePlayerNetworkHandler` 的做法自己造了一个
+`ServerPlayer` + 吞掉所有 `send` 的 `ServerGamePacketListenerImpl`，
+这样 `openMenu → initMenu → slotChanged` 里那些发包调用不会因为 `connection == null` 而 NPE。
+实测输出：
+```
+[Futo] snack selftest: cabinet placed at BlockPos{x=-192, y=69, z=-192}
+[Futo] snack cabinet opened by [Futo Snack Selftest] at BlockPos{x=-192, y=69, z=-192}
+[Futo] snack selftest [empty hand / side face]: use=CONSUME menu=ChestMenu rows=3 -> ok
+[Futo] snack cabinet opened by [Futo Snack Selftest] at ...
+[Futo] snack selftest [cake in hand / top face]: use=CONSUME menu=ChestMenu rows=3 -> ok
+[Futo] snack selftest [empty hand / top face]: use=CONSUME menu=ChestMenu rows=3 -> ok
+[Futo] snack selftest [planks in hand / side face]: use=CONSUME menu=ChestMenu rows=3 -> ok
+[Futo] snack selftest: PASS
+```
+另外 `use` 现在每次成功打开都会打一行
+`[Futo] snack cabinet opened by <玩家> at <坐标>`，方块实体缺失时打 `warn`。
+以后再有「点不开」的报告，先看服务端日志有没有这一行，就能立刻分辨
+「没点到 / 没走到 openMenu」还是「打开了但客户端没画」。

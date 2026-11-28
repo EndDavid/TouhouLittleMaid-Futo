@@ -48,7 +48,7 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 com.github.tartaricacid.touhoulittlemaid.init.InitMenu.PICNIC_BASKET,
                 com.github.tartaricacid.touhoulittlemaid.client.gui.item.PicnicBasketContainerScreen::new);
         // 零食柜（1.20.1 新增）不需要在这里注册界面：
-        // 它的菜单是原版 ChestMenu.sixRows，用的是 MenuType.GENERIC_9x3，
+        // 它的菜单是原版 ChestMenu.threeRows（27 格），用的是 MenuType.GENERIC_9x3，
         // 而原版的 MenuScreens 早就把这个类型绑到了 ChestScreen —— 重复注册只会多一条无用表项。
 
         EntityRendererRegistry.register(InitEntities.EXTINGUISHING_AGENT, EntityExtinguishingAgentRenderer::new);
@@ -155,7 +155,7 @@ public final class TouhouLittleMaidFutoClient implements ClientModInitializer {
                 new com.github.tartaricacid.touhoulittlemaid.client.renderer.item.PicnicBasketItemRenderer());
 
         // 零食柜（1.20.1 新增）。与野餐垫同一条基岩模型管线；
-        // 界面复用原版六行箱子 —— 27 格正好是 ChestMenu.sixRows 的容量，
+        // 界面复用原版单箱 —— 27 格正好是 ChestMenu.threeRows 的容量，
         // 所以 Screen 直接注册原版 ChestScreen，不需要自己写界面。
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 com.github.tartaricacid.touhoulittlemaid.init.InitBlocks.SNACK_CABINET_TE,

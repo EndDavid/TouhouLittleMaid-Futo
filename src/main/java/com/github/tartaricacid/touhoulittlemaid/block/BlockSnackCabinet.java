@@ -14,7 +14,6 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -188,29 +187,40 @@ public class BlockSnackCabinet extends BaseEntityBlock {
     /**
      * 右键打开 27 格存储（与上游逐字对应）。
      *
-     * <p>界面就是原版六行箱子：方块实体是
+     * <p>界面就是原版单箱（27 格、三行）：方块实体是
      * {@link net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity}，
-     * {@code createMenu} 返回 {@link net.minecraft.world.inventory.ChestMenu#sixRows}，
+     * {@code createMenu} 返回 {@link net.minecraft.world.inventory.ChestMenu#threeRows}，
      * 客户端因此直接用 {@code ChestScreen} —— 与木桶 / 箱子同一套。</p>
      *
-     * <p>唯一的例外是「手持方块物品点顶面」：那一下返回 {@code PASS}，
-     * 留给上游的「往柜顶叠一层」行为（与上游完全相同，不是漏写）。
-     * 上一轮有人报「点不开」，实际原因是模型整体偏了半格，玩家点的是空气；
-     * 见 {@code docs_dev/03}「零食柜（续）」。</p>
+     * <h2>为什么这里<b>不再</b>有「手持方块点顶面 → PASS」那一条</h2>
+     *
+     * <p>上游 1.20.1 的 {@code BlockSnackCabinet#use} 开头确实有这一段（反编译字节码逐字确认），
+     * 它服务于上游那个「蹲下 + 方块物品点顶面 = 往柜顶叠一层食物」的动作。
+     * 本移植版没有做那个动作，于是这一段只剩下副作用：
+     * <b>手里随便拿着一个方块（木板、玻璃、甚至蛋糕）去点柜子顶面，界面不会开</b>，
+     * 玩家看到的就是「点不开」。</p>
+     *
+     * <p>而「想往柜顶放方块」并不需要这个特判：原版客户端在<b>蹲下 + 手上有物品</b>时
+     * 根本不会调用方块的 {@code use}（{@code MultiPlayerGameMode#useItemOn} 里的
+     * {@code isSecondaryUseActive() && !flag} 分支），这一条对箱子 / 木桶同样适用。
+     * 所以删掉之后，「站着右键 = 开界面」「蹲着右键 = 往柜顶放方块」两种操作都成立，
+     * 与木桶完全一致。</p>
      */
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
                                  InteractionHand hand, BlockHitResult hit) {
-        // 手持方块物品点顶面时不打开界面：那一下是留给「往上叠一层」的
-        if (hit.getDirection() == Direction.UP && player.getItemInHand(hand).getItem() instanceof BlockItem) {
-            return InteractionResult.PASS;
-        }
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity instanceof TileEntitySnackCabinet cabinet) {
             player.openMenu(cabinet);
+            // 一行锚点日志：界面到底开没开，看服务端日志就能判断，不用靠猜。
+            TouhouLittleMaid.LOGGER.info("[Futo] snack cabinet opened by {} at {}",
+                    player.getGameProfile().getName(), pos);
+        } else {
+            TouhouLittleMaid.LOGGER.warn("[Futo] snack cabinet at {} has no block entity ({})",
+                    pos, blockEntity);
         }
         return InteractionResult.CONSUME;
     }

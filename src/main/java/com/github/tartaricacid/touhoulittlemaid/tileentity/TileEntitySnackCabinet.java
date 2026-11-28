@@ -24,9 +24,10 @@ import net.minecraft.world.level.block.state.BlockState;
  * 零食柜的方块实体，移植自上游 1.20.1 的 {@code tileentity/TileEntitySnackCabinet}。
  *
  * <p>27 格（与单个原版箱子同容量），所以界面直接复用原版
- * {@link ChestMenu#sixRows} + {@link net.minecraft.client.gui.screens.inventory.ChestScreen} ——
+ * {@link ChestMenu#threeRows} + {@link net.minecraft.client.gui.screens.inventory.ChestScreen} ——
  * 上游也是这么做的（反编译可见 {@code createMenu} 返回
- * {@code ChestMenu.method_19245(id, inventory, this)}，即 {@code sixRows}）。</p>
+ * {@code ChestMenu.method_19245(id, inventory, this)}，而 {@code method_19245} 就是
+ * {@code threeRows}（它给 {@code ChestMenu} 构造器传的行数是 3，菜单类型 {@code GENERIC_9x3}）。</p>
  *
  * <p>继承 {@link RandomizableContainerBlockEntity} 而不是 {@code BaseContainerBlockEntity}：
  * 前者自带 {@code LootTable} 支持，柜子因此可以被战利品表填充（上游同样）。</p>
@@ -110,8 +111,17 @@ public class TileEntitySnackCabinet extends RandomizableContainerBlockEntity {
 
     @Override
     protected AbstractContainerMenu createMenu(int id, Inventory playerInventory) {
-        // 27 格 = 原版「六行」箱子界面（3 行柜子 + 3 行玩家背包）
-        return ChestMenu.sixRows(id, playerInventory, this);
+        // 27 格 = 原版「三行」箱子（3 行柜子 + 3 行玩家背包，共 6 行）。
+        //
+        // 【这里必须是 threeRows，不能是 sixRows】—— 上一版写成了 sixRows，
+        // 于是每次右键都抛
+        //     IllegalArgumentException: Container size 27 is smaller than expected 54
+        // 因为 ChestMenu 的构造器里有 checkContainerSize(container, rows * 9)：
+        // sixRows 要 6*9 = 54 格（双箱），threeRows 才是 27 格（单箱）。
+        // 异常抛在 ServerPlayer#openMenu 里，客户端什么都收不到 —— 表现就是「点不开」。
+        // 上游同样是 27 格 + 三行（反编译：getContainerSize 返回 bipush 27，
+        // createMenu 调 ChestMenu.method_19245，而 method_19245 传的行数是 iconst_3）。
+        return ChestMenu.threeRows(id, playerInventory, this);
     }
 
     @Override
