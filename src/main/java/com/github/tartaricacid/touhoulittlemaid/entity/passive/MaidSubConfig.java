@@ -40,10 +40,13 @@ public final class MaidSubConfig {
      * 女仆语音频率，0.0 ~ 1.0（上游 {@code SoundFreq}）。
      *
      * <p>上游在客户端用 {@code PlaySoundEvent} 拦截语音，再按
-     * 「本值 × 全局频率」的概率丢弃。Fabric 1.18.2 没有等价事件，
-     * 所以本移植版把概率判定放在服务端的 {@code EntityMaid#playAmbientSound()} 里：
-     * 女仆的环境音本来就是服务端下发 {@code ClientboundSoundPacket} 播放的，
-     * 在服务端拦掉，客户端连包都收不到，效果等价而且更省带宽。</p>
+     * 「本值 × 全局频率」的概率丢弃。Fabric 1.18.2 没有等价事件，所以本移植版把同一个
+     * 判定提到服务端发声处（{@code EntityMaid#shouldPlayVoice()}）：女仆语音本来就是服务端
+     * 下发 {@code ClientboundSoundPacket} 播放的，在服务端拦掉，客户端连包都收不到，
+     * 效果等价而且更省带宽。</p>
+     *
+     * <p>它管的是<b>所有</b>女仆语音（环境音、攻击音、受伤、死亡、拾取、驯服），
+     * 不只是待机碎碎念 —— 与上游 {@code MaidSoundInstance} 的覆盖面一致。</p>
      */
     private static final EntityDataAccessor<Float> SOUND_FREQ =
             SynchedEntityData.defineId(EntityMaid.class, EntityDataSerializers.FLOAT);

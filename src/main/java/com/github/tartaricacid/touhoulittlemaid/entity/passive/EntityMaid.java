@@ -1950,74 +1950,25 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     // ---------------------------------------------------------------- 声音
 
     /**
-     * 两次「女仆语音」之间的全局最小间隔（tick）。
+     * 女仆语音是否要真正播出来（上游 {@code client/event/MaidSoundFreqEvent} 的等价实现）。
      *
-     * <p>原版 {@code Mob#baseTick} 的触发条件是
-     * {@code random.nextInt(1000) < ambientSoundTime++}，而
-     * {@code resetAmbientSoundTime()} 会把计数重置为 {@code -getAmbientSoundInterval()}.
-     * 于是默认 {@code interval = 80} 时的平均间隔只有约 125 tick（≈6 秒）——
-     * 单只女仆就已经偏密，场上三五只时必然叠在一起，听起来像「一直在说话」。</p>
-     *
-     * <p>上游靠客户端 {@code MaidSoundFreqEvent} 按「每只女仆的声音频率 × 全局频率」概率丢弃
-     * 一部分语音，默认全局 100% 时不过滤；它真正压住密度的是 {@code MaidSoundInstance}
-     * 那套自定义 SoundEngine 通道，本移植版没有。这里用一个等价且更直接的手段：
-     * <b>全局节流</b> —— 任意两只女仆的语音之间至少间隔这么久，
-     * 这无论同屏多少只女仆，同一时刻只有一个在说话。</p>
-     */
-    private static final int MAID_VOICE_MIN_GAP = 60;
-    /**
-     * 单只女仆两次环境音之间的基准间隔（tick）。
-     *
-     * <p>配合原版的「计数回爬 + 概率增长」机制，实际平均间隔约为
-     * {@code 本值 + 45} tick，即 {@code 240 → 约 14 秒}。取 240 是个折中：
-     * 既不会让玩家觉得女仆是哑巴，也不会 6 秒就冒一句话。</p>
-     */
-    private static final int MAID_AMBIENT_INTERVAL = 240;
-    /**
-     * 上一次任一女仆播放语音的全局时刻，用于 {@link #MAID_VOICE_MIN_GAP} 节流。
-     *
-     * <p>桌面端只有一个客户端 / 一个逻辑服务端，静态字段足够；
-     * 用 {@code level.getGameTime()} 做时间轴，跨维度时差值可能为负，
-     * 此时判定为「不是同一时间轴」直接放行，不会永久卡住。</p>
-     */
-    private static long lastMaidVoiceTick = Long.MIN_VALUE / 2;
-
-    /**
-     * 单只女仆的环境音间隔（原版默认 80，平均约 6 秒一次，太密）。
-     */
-    @Override
-    public int getAmbientSoundInterval() {
-        return MAID_AMBIENT_INTERVAL;
-    }
-
-    /**
-     * 女仆语音是否要真正播出来（上游 {@code MaidSoundFreqEvent} 的等价实现）。
-     *
-     * <p><b>这是「声音频率调了没反应」的根因所在。</b>上游的过滤是<b>按声音实例</b>做的：</p>
+     * <p>上游在客户端 {@code PlaySoundEvent} 里只拦 {@code MaidSoundInstance}，判据是</p>
      *
      * <pre>
-     * if (event.getSound() instanceof MaidSoundInstance maidSound) {
-     *     double f = maid.getConfigManager().getSoundFreq()
-     *              * MaidConfig.GLOBAL_MAID_SOUND_FREQUENCY.get() / 100;
-     *     if (f &lt; 1 &amp;&amp; Math.random() &gt; f) event.setSound(null);
-     * }
+     * double f = maid.getConfigManager().getSoundFreq()
+     *          * MaidConfig.GLOBAL_MAID_SOUND_FREQUENCY.get() / 100.0;
+     * if (f &lt; 1 &amp;&amp; Math.random() &gt; f) event.setSound(null);
      * </pre>
      *
-     * <p>也就是说被拦的不只是「自言自语」，而是<b>所有</b>女仆语音 ——
-     * 捡到东西的「哎嘿」、被驯服的欢呼、受伤的叫声，全都在内。</p>
-     *
-     * <p>本移植版最早只在 {@link #playAmbientSound()} 里拦了一道，其余语音照播，
-     * 所以把频率拖到 0% 之后仍然听得见「捡到东西」「受伤」的原声，
-     * 主观上就是「这个开关没用」。现在把判定收进这一个方法，所有语音都经过它。</p>
-     *
-     * <p>概率比较用 {@code <}：频率为 0 时 {@code nextDouble()} 必然不满足，
-     * 恒定静音；为 1 时直接短路放行，恒定可闻。</p>
+     * <p>本移植版没有自定义 SoundInstance，所以把同一个判定提到服务端发声处 ——
+     * 被拦掉时客户端连包都收不到，等价且更省带宽。比较方向与上游逐字对应
+     * （{@code f < 1 && random > f} 才丢弃），默认 100% 时短路放行。</p>
      */
     private boolean shouldPlayVoice() {
         double freq = MaidSubConfig.getSoundFreq(this)
                 * com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig
                 .globalMaidSoundFrequency() / 100.0D;
-        return freq >= 1.0D || this.getRandom().nextDouble() < freq;
+        return freq >= 1.0D || this.getRandom().nextDouble() <= freq;
     }
 
     /**
@@ -2036,29 +1987,23 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     /**
      * 环境音。
      *
-     * <p>前面的全局节流（{@link #MAID_VOICE_MIN_GAP}）管「多久能说一次」，
-     * 频率判定管「这次要不要说」，两者是正交的两件事：</p>
-     * <ul>
-     *     <li>节流是为了同屏多只女仆时不会叠在一起说话；</li>
-     *     <li>频率是玩家在配置界面里按只调整的音量意图。</li>
-     * </ul>
+     * <p><b>与上游一致：不覆写 {@code getAmbientSoundInterval()}，也不做任何节流。</b>
+     * 节奏完全交给原版 {@code Mob#baseTick}（{@code random.nextInt(1000) < ambientSoundTime++}，
+     * 间隔取 {@code getAmbientSoundInterval()} 的默认值 80，平均约 6 秒一次），
+     * 这里只多一道玩家配置的频率判定。</p>
+     *
+     * <p>此前本移植版把间隔改成 240、并额外加了「任意两只女仆的语音之间至少 60 tick」——
+     * 这两条都是上游没有的发明：单只就从约 6 秒拉长到约 14 秒，多只还会互相压制，
+     * 听感上就是「女仆太安静」。</p>
      */
     @Override
     public void playAmbientSound() {
-        long now = this.level.getGameTime();
-        long delta = now - lastMaidVoiceTick;
-        // delta < 0 说明换了维度（时间轴不同），不要卡住
-        if (delta >= 0 && delta < MAID_VOICE_MIN_GAP) {
-            return;
-        }
         SoundEvent sound = this.getAmbientSound();
         if (sound == null || !this.shouldPlayVoice()) {
             return;
         }
-        lastMaidVoiceTick = now;
         this.playSound(sound, this.getSoundVolume(), this.getVoicePitch());
     }
-
 
     @Nullable
     @Override
@@ -2106,9 +2051,17 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     }
 
 
+    /**
+     * 语音音调。上游 {@code EntityMaid#getVoicePitch} 就是 {@code 1.0F + rand * 0.1F}（javap 确认）。
+     *
+     * <p>上游真正发声走的是 {@code MaidSoundInstance}，而
+     * {@code AbstractTickableSoundInstance} 的 pitch 恒为 1.0 —— 所以听感基准是 1.0。
+     * 本移植版走原版发声路径，沿用上游这个方法体即可落在同一个基准上；
+     * 此前写成常数 {@code 1.3F} 会让语音明显偏高，与上游差出小半个八度。</p>
+     */
     @Override
     public float getVoicePitch() {
-        return 1.3F;
+        return 1.0F + this.getRandom().nextFloat() * 0.1F;
     }
 
     // ---------------------------------------------------------------- NBT

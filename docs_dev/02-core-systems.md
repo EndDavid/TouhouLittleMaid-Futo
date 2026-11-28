@@ -329,42 +329,53 @@ lvl=50  gohei=[enders_ender=1]                            sword=[]
 `brewing` / `danmaku_attack` / `game_win` / `game_lost` / `ai_chat`）在 peco 包里**没有音频**，
 保持静音 —— 不是遗漏。
 
-### 密度与并发
+### 密度与并发：与上游完全一致（不做节流）
 
 原版 `Mob#baseTick` 的触发是 `random.nextInt(1000) < ambientSoundTime++`，
 `resetAmbientSoundTime()` 把计数重置为 `-getAmbientSoundInterval()`。
-默认 `interval = 80` 时平均间隔只有约 125 tick（≈6 秒），而且 `playAmbientSound()`
-**完全没有并发控制** —— 场上三五只时每 6 秒各冒一句，听起来像「一直在说话」。
+默认 `interval = 80` 时期望间隔约 125 tick（≈6 秒）。
 
-上游靠客户端概率过滤（`MaidSoundFreqEvent`：`soundFreq × 全局频率`），但默认值是
-`1.0 × 100%`、**不过滤**；真正压住密度的是它那套自定义 SoundEngine 通道。
+**上游没有改这个节奏，本移植版现在也没有。** 逐个核对过：
 
-本移植版改用两层控制（`EntityMaid`）：
+| | 上游 1.18.2 | 上游 1.20.1 | 本移植版（现在） |
+|---|---|---|---|
+| 覆写 `getAmbientSoundInterval()`（SRG `m_8100_`） | 否 | 否 | **否** |
+| 覆写 `playAmbientSound()` 做节流 | 否 | 否 | 否（只加频率判定） |
+| 覆写 `getVoicePitch()`（SRG `m_6100_`） | 是：`1.0F + rand*0.1F` | 同 | 同 |
 
-| 机制 | 实现 | 效果 |
-|---|---|---|
-| 单只间隔 | `getAmbientSoundInterval()` → 240 | 期望 `240+45 ≈ 285 tick ≈ 14 秒` |
-| 全局节流 | 重写 `playAmbientSound()`，两次语音至少隔 60 tick | **同屏多少只，同一时刻只有一个在说话** |
+> 曾经的错误做法（已删除）：把 `getAmbientSoundInterval()` 改成 240、再加一条
+> 「任意两只女仆的语音之间至少隔 60 tick」的全局节流。两条都是上游没有的发明，
+> 单只就从约 6 秒拉长到约 14 秒、多只还会互相压制，现象就是「女仆太安静、
+> 和上游不一样」。判断「上游到底怎么写的」只能靠 javap：
+> `javap -p EntityMaid | grep m_8100_` 在两个上游 jar 里都是**空**。
 
-全局节流用 `level.getGameTime()` 做时间轴；跨维度时差值为负 → 判为「不同时间轴」直接放行。
+### 频率配置接到播放路径上
 
-### 频率配置必须接到播放路径上
+上游的频率过滤是**按声音实例**做的（客户端 `PlaySoundEvent` 只拦 `MaidSoundInstance`），
+拦的是**所有**女仆语音，不只是待机碎碎念。1.18.2 的字节码：
 
-上游的频率过滤是**按声音实例**做的，拦的是**所有**女仆语音，不只是待机碎碎念 ——
-因为在上游这些声音全走同一个自定义 SoundEngine 通道。本移植版收成一个入口：
+```
+double f = maid.getConfigManager().getSoundFreq()
+         * MaidConfig.GLOBAL_MAID_SOUND_FREQUENCY.get() / 100.0;
+if (f < 1 && !maidSound.isTestSound() && Math.random() > f) event.setSound(null);
+```
+
+本移植版没有自定义 `SoundInstance`，把同一个判定提到**服务端发声处** ——
+被拦掉时客户端连包都收不到，等价且更省带宽。判据与上游逐字对应：
 
 ```java
 private boolean shouldPlayVoice() {
     double freq = MaidSubConfig.getSoundFreq(this)                 // 单只 0~1
                 * MaidConfig.globalMaidSoundFrequency() / 100.0D;  // 全局 0~100
-    return freq >= 1.0D || this.getRandom().nextDouble() < freq;
+    return freq >= 1.0D || this.getRandom().nextDouble() <= freq;   // 上游：random > f 才丢
 }
 ```
 
 | 语音 | 接入方式 |
 |---|---|
 | 待机 / 工作模式环境音 | `playAmbientSound()` 里显式判 `shouldPlayVoice()` |
-| 捡到东西 `maid.ai.item_get` | 改成 `playMaidVoice(...)` |
+| 攻击模式 `maid.ai.find_target` 等 | 同上（都经 `IMaidTask#getAmbientSound` → `playAmbientSound`） |
+| 捡到东西 `maid.ai.item_get` | `playMaidVoice(...)` |
 | 被驯服 `maid.ai.tamed` | 同上 |
 | 受伤 / 着火受伤 | `getHurtSound()` 在频率不通过时返回 `null` |
 | 死亡 | `getDeathSound()` 同上 |
@@ -373,11 +384,18 @@ private boolean shouldPlayVoice() {
 > `Mob#playHurtSound` 里先调了 private 的 `resetAmbientSoundTime()`，重写会把它一起丢掉，
 > 女仆挨打后会立刻开始碎碎念。而 `LivingEntity#playHurtSound` 取到 `null` 本来就直接跳过。
 
-**不走**这个判定的：方块放置声、挤奶声、弩的射击声、落座音效 —— 那些是环境 / 交互动静。
+**不走**这个判定的：方块放置声、挤奶声、弩的射击声、落座音效（环境 / 交互动静），
+以及 `maid.ai.ai_chat`（上游的 `MaidAISoundInstance` 继承的是
+`AbstractTickableSoundInstance`，不是 `MaidSoundInstance`，上游同样不过滤）。
 
 坐下 / 起立音效照抄上游 `SwitchSittingEvent`：
 `playSound(SoundEvents.ITEM_PICKUP, 0.2F, ((rand-rand)*0.7+1)*2)` ——
 是原版拾取音效（不是 `maid.ai.item_get`），音调升一个八度。
+
+配置值的写入链路（逐段核对过，报文顺序与服务端读取一致
+`action, entityId, payload`）：`MaidConfigScreen` 左右箭头各 ±10% →
+`MaidClientPacketSender#sendSoundFreq` → `MaidConfigPacket.SOUND_FREQ` →
+`handleSoundFreq` → `MaidSubConfig#setSoundFreq`（夹到 0~1）→ 同步数据 → `shouldPlayVoice()`。
 
 ## 配置：Forge Config API Port 到底给了什么，我们用了多少
 
