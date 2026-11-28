@@ -24,44 +24,16 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 /**
  * 「生成？？？」占位物品的图标渲染器，对应上游
- * {@code TileEntityEntityPlaceholderRenderer} 里 {@code renderByItem} 那一半。
+ * {@code TileEntityEntityPlaceholderRenderer#renderByItem}。
  *
- * <p>画什么取决于物品 NBT 里的 {@code RecipeId}：</p>
- * <ol>
- *     <li>优先用 {@code textures/item/<配方文件名>.png}
- *         （比如 {@code altar/spawn_box} → {@code textures/item/spawn_box.png}）；</li>
- *     <li>那张贴图不存在时退回 {@code textures/item/entity_placeholder.png}。</li>
- * </ol>
- * <p>这样新增一条非物品类祭坛配方时，只要放一张同名贴图进来，进度图标就自动对了 ——
- * 与上游的约定一致。</p>
+ * <p>贴图取 {@code textures/item/<配方文件名>.png}，不存在则退回
+ * {@code textures/item/entity_placeholder.png}。</p>
  *
- * <h2>为什么是手写的一块 quad</h2>
+ * <p>这里手写一块朝向 +Z 的单位 quad（上游的「单南面」）。用 {@code addBox} 造零厚度板
+ * 会同时踩「背面 UV 跑出贴图」与「四个退化侧面共面」，表现是图标变成条纹。</p>
  *
- * <p>早先的版本用 {@code LayerDefinition} + {@code addBox(..., 16, 16, 0)} 造了一块「零厚度板」，
- * 那会同时踩两个坑：</p>
- * <ul>
- *     <li>原版拆 UV 是按盒子六个面平铺的，厚度为 0 时<b>背面</b>的 u 从 {@code u + 2d + w} 起算，
- *         也就是 16 → 32，直接跑出这张 16 宽的贴图；</li>
- *     <li>四块侧面面积退化为 0，却与正反面共面 —— 同一个 z 上堆了五六层 quad。</li>
- * </ul>
- * <p>两者叠加的表现就是<b>图标变成条纹</b>。上游用的是「单南面」({@code singleSouthFace()}），
- * 本来就只画一块面。这里照做：一块朝向 +Z 的单位 quad。</p>
- *
- * <h2>为什么自己算帧，而不是取图集 sprite</h2>
- *
- * <p>{@code reborn_maid.png} 是 16×240、{@code spawn_box.png} 是 16×656 ——
- * 两者都是「若干帧竖着叠起来」的动态贴图（{@code .png.mcmeta} 里只写了 {@code frametime: 2}，
- * 没写 {@code frames} 数组，所以帧数 = 高 / 宽）。</p>
- *
- * <p>走方块图集（{@code TextureAtlasSprite}）本来是最省事的做法，但<b>这两张图进不了图集</b>：
- * 图集只会收「被某个模型引用」的贴图，而 {@code models/item/reborn_maid.json} /
- * {@code spawn_box.json} 对应的<b>不是物品</b>（{@code reborn_maid} 是祭坛配方的产物、
- * {@code spawn_box} 也一样），{@code ModelBakery} 只按物品注册名去加载 {@code models/item/*}，
- * 于是这两张 sprite 根本不会被 stitch —— 查出来永远是 {@code missingno}。</p>
- *
- * <p>所以这里自己读 PNG 尺寸与 {@code mcmeta} 的 {@code frametime}，直接绑原贴图，
- * 每帧只把 UV 的 v 区间挪到当前那一帧。代价是它与原版动画的相位不保证完全同步
- * （原版用 {@code frametime} tick 计数），但观感一致。</p>
+ * <p>帧数自己读 PNG 尺寸与 {@code mcmeta} 得出：这两张贴图没有物品模型引用，
+ * 进不了方块图集，查出来永远是 {@code missingno}。</p>
  */
 public final class EntityPlaceholderItemRenderer implements BuiltinItemRendererRegistry.DynamicItemRenderer {
     private static final ResourceLocation FALLBACK =

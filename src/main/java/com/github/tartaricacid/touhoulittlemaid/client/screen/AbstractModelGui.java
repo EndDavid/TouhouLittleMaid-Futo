@@ -33,33 +33,6 @@ import java.util.List;
 /**
  * 换肤（模型选择）界面基类，逐行移植自上游
  * {@code client/gui/entity/model/AbstractModelGui}。
- *
- * <p>布局数值与上游完全一致，全部集中在这里：</p>
- * <table border="1">
- *     <caption>与上游逐项对应</caption>
- *     <tr><th>项</th><th>上游写法</th></tr>
- *     <tr><td>参考原点</td><td>{@code startX = width/2 + 50}、{@code startY = height/2 + 5}</td></tr>
- *     <tr><td>主底图</td><td>{@code BG} 的 (0,0)，256x180，左上角 {@code (midX-128, midY-80)}</td></tr>
- *     <tr><td>右侧竖条</td><td>{@code SIDE} 的 (0,0)，24x180，{@code (midX+122, midY-80)}</td></tr>
- *     <tr><td>滚动条滑块</td><td>{@code (midX+126, midY-61 + 127*scroll)}，12x15，UV (24,0) / (36,0)</td></tr>
- *     <tr><td>包页签</td><td>底图 {@code (startX-98+28*i, startY-108)} 28x31 UV(116,224)；
- *         图标按钮 {@code (startX-98+28*i, startY-105)} 28x25 UV(116,194)；
- *         图标 16x16 画在 {@code (midX-92+28*i, midY-98)}</td></tr>
- *     <tr><td>翻页按钮</td><td>{@code (startX-119 / startX+99, startY-101)} 20x20，文字 &lt; &gt;</td></tr>
- *     <tr><td>关闭按钮</td><td>{@code (startX+122, startY-97)} 21x17 UV(58,201) 下移 18</td></tr>
- *     <tr><td>模型格</td><td>起点 {@code (-100,-35)}（按钮写成 {@code -108,-61} 因为按钮自带 8/26 内缩），
- *         行距 20x30，一行 11 个</td></tr>
- *     <tr><td>页数文字</td><td>{@code (midX, midY-120)}</td></tr>
- * </table>
- *
- * <p><b>与上游的差异只有一处：</b>上游用 {@code MiscConfig.MODEL_ICON_CACHE} 决定
- * 「画缓存图标还是实时画实体」，本移植版没有图标缓存，所以
- * {@link #drawRightEntity} 永远走实时绘制分支。左上角那个复选框因此也省略。</p>
- *
- * <p><b>两个类型参数：</b>{@code T} 是被换肤的实体，{@code E} 是该实体的模型定义类型
- * （女仆 {@code MaidModelInfo}、坐垫 {@code ChairModelInfo}）。上游同样是这样泛型化的，
- * 本移植版最初把它写死成 {@code MaidModelInfo}，导致坐垫换肤界面无法复用 ——
- * 两边除了「一个格子画的是什么」以外完全一致，没有必要写两遍。</p>
  */
 public abstract class AbstractModelGui<T extends LivingEntity, E extends IModelInfo> extends Screen {
     /** 占位点击回调（上游给纯装饰按钮用它）。 */

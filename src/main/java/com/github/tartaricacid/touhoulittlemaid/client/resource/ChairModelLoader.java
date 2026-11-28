@@ -49,7 +49,7 @@ public final class ChairModelLoader {
         // 页签顺序「内置在最前」，重名时内置赢。
         loaded += CustomPackLoader.loadExternalChairPacks();
         long millis = (System.nanoTime() - startNanos) / 1_000_000L;
-        TouhouLittleMaid.LOGGER.info("[Futo] Chair model loading time: {} ms ({} chair models)", millis, loaded);
+        TouhouLittleMaid.LOGGER.debug("[Futo] Chair model loading time: {} ms ({} chair models)", millis, loaded);
     }
 
     private static int loadChairPack(String namespace) {

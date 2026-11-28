@@ -362,3 +362,22 @@ Caused by: java.util.zip.ZipException: ZipFile invalid LOC header (bad signature
 
 配套习惯：改完 jar 先关游戏，再部署，再启动。这条和 `port/kill-dev-run.ps1`（只杀
 `loom-cache/launch.cfg` 匹配到的进程）一起用，不要手动 `taskkill /IM java.exe`。
+
+## 日志分级：诊断走 debug，一次性的走 info
+
+移植过程中为了验证埋了大量 `[Futo] ...` 一次性日志（bbox、开箱、进度可见集、兼容模组是否在场…），
+它们都已经被对应轮次验证过了，留在 `info` 只会淹没真正有用的行。现在的约定：
+| 级别 | 放什么 |
+|---|---|
+| `error` / `warn` | 失败与异常：读不到文件、jar 损坏、TEX 解析失败、缺方块实体… |
+| `info` | 每次启动各一条的横幅（`Touhou Little Maid initialized`）、清单下载条数、模型骨骼缺失告警 |
+| `debug` | 所有 `[Futo]` 诊断锚点：渲染器 bbox、动画状态切换、棋类 layout、兼容模组是否在场、进度可见集、资源重载计时… |
+默认日志级别是 `info`，所以 `debug` 那批**默认不输出**。排查问题时把对应 logger 调到
+`debug`（例如启动参数 `-Dfabric.log.level=debug`）就能全拿回来，不需要改代码。
+例外：以下诊断只在显式开关下运行，日志保持 `info`：
+- `debug/SnackCabinetSelfTest`（`-PsnackSelftest`）、
+- `compat/cloth/ClothConfigSelfTest`（`-PclothSelftest`）、
+- `client/TouhouLittleMaidFutoClient` 里的 `download selftest`（`-PdownloadSelftest`），
+- `client/animation/gecko/AnimationManager#DEBUG_ANIM_STATE`（常量，改成 `true` 才输出）。
+`MaidFishingDiagnostics` 额外在 `report()` 入口加了 `isDebugEnabled()` 短路：关闭时连
+「按女仆去重」的那张表都不维护，整条诊断链路零开销。

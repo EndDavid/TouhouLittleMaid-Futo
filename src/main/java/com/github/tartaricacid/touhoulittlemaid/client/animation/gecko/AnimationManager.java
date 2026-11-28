@@ -238,7 +238,7 @@ public final class AnimationManager {
             return;
         }
         Mob mob = maid.asEntity();
-        TouhouLittleMaid.LOGGER.info("[Futo] anim {} -> {} (sitting={}, moving={}, y={})",
+        TouhouLittleMaid.LOGGER.debug("[Futo] anim {} -> {} (sitting={}, moving={}, y={})",
                 last, animationName, maid.isMaidInSittingPose(),
                 mob.getDeltaMovement().horizontalDistanceSqr() > 1.0E-4,
                 String.format(java.util.Locale.ROOT, "%.3f", mob.getY()));

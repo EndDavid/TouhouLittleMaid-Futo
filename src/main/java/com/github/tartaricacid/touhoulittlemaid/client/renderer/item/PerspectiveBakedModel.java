@@ -14,33 +14,6 @@ import java.util.Random;
 
 /**
  * 「按视角切换模型」的烘焙模型 —— 上游 {@code client/renderer/item/PerspectiveBakedModel} 的移植。
- *
- * <h2>它解决什么问题</h2>
- *
- * <p>御币在<b>背包 / 物品栏</b>里应该是一张 16×16 的平面图标（{@code item/generated} 生成的一层贴片），
- * 而在<b>手上</b>应该是 Blockbench 做的 3D 模型（{@code hakurei_gohei_in_hand}）。
- * 同一个物品 id 只能对应一个 {@code BakedModel}，所以必须有一个包装器在渲染时按视角二选一。</p>
- *
- * <h2>为什么 1.18.2 不能照抄上游的写法</h2>
- *
- * <p>上游覆写的是 {@code BakedModel#handlePerspective(TransformType, PoseStack)} ——
- * <b>那是 Forge 给 {@code BakedModel} 打的扩展方法</b>，原版接口里没有。
- * 原版的视角变换走 {@code getTransforms()} 返回的 {@code ItemTransforms}，</p>
- *
- * <pre>
- * // net.minecraft.client.renderer.entity.ItemRenderer#render(...)
- * ItemTransforms transforms = model.getTransforms();
- * transforms.getTransform(type).apply(leftHand, poseStack);
- * ... renderModelLists(model, ...)     // ← 这里画的是同一个 model 的 quads
- * </pre>
- *
- * <p>也就是说「变换」和「几何」都取自<b>同一个</b> model，包装器无法在
- * {@code getTransforms()} 里知道当前是哪个 type（{@code getTransform(type)} 才知道，
- * 但那时已经晚了，{@code getQuads} 不带 type）。所以没法像上游那样只靠 BakedModel 完成切换。</p>
- *
- * <p>本移植版的做法：这个类只负责<b>携带</b>两套模型并提供 {@link #pickFor(TransformType)}，
- * 真正的选择发生在 {@code mixin/client/ItemRendererMixin} 里 ——
- * 那里同时拿得到 {@code ItemStack} 和 {@code TransformType}，是唯一确定的位置。</p>
  */
 public class PerspectiveBakedModel implements BakedModel {
     /**

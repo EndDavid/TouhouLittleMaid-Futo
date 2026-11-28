@@ -19,41 +19,6 @@ import java.util.regex.Pattern;
 
 /**
  * 「外部语言表」缓存，移植自上游 {@code client/resource/LanguageLoader}。
- *
- * <h2>它解决的是什么问题</h2>
- * <p>模型包的名字/简介<b>不是写死的文案</b>，而是一个键：包里的 {@code maid_model.json}
- * 写 {@code "name": "model.<domain>.<名字>.name"}，在线清单 {@code info.json} 也写
- * {@code "name": "tlm.xxx_pack.name"}，真正的译文放在</p>
- * <ul>
- *     <li>包内 {@code assets/<domain>/lang/<语言代码>.lang}（下载来的模型包）；</li>
- *     <li>{@code info.json} 每条记录的 {@code language} 字段里（在线清单，界面列表用）。</li>
- * </ul>
- * <p>这两处原版都不会读：{@code ResourceManager} 只认资源包里的 {@code .json}
- * 语言文件，而 {@code tlm_custom_pack/} 里的 zip 连资源包都不是。不补这一层，
- * 界面上就全是 {@code tlm.yingbai_arknights_pack.name} 这种原始键。</p>
- *
- * <h2>译文怎么生效</h2>
- * <p>由 {@code mixin/client/LanguageMixin} 在 {@code ClientLanguage#getOrDefault}
- * 的 HEAD 处查这张表。能这么做的前提是 {@code LanguageManager} 会把
- * {@code ClientLanguage} 注入 {@code Language.getInstance()} —— 于是
- * {@code Component.translatable(...)} 的解析全部经过它。</p>
- *
- * <h2>线程</h2>
- * <p>写入方有三个：资源重载线程（{@link com.github.tartaricacid.touhoulittlemaid.client.resource.ModelReloader}）、
- * {@code HttpUtil} 的 IO 线程（{@link InfoGetManager#loadInfoJson} 里清单下载完就登记译文）、
- * 以及渲染线程（下载完成后的重载）。读取方是渲染线程与文字排版，频率极高。
- * 所以缓存必须是 {@link ConcurrentHashMap}，且<b>不许</b>在遍历时清空 ——
- * {@link #clear()} 只在重载入口调用一次。</p>
- *
- * <h2>与上游的差异</h2>
- * <ul>
- *     <li>上游读 {@code .lang} 用 {@code commons-io} 的 {@code IOUtils.readLines}，
- *         Fabric 侧不保证有那个库，这里用 {@link BufferedReader}。</li>
- *     <li>上游的 {@code LANG_CACHE} 是普通 {@code HashMap}，写读跨线程；这里换成并发容器。</li>
- *     <li>上游 {@code getLanguageMap} 只接受 {@code HashMap<String, HashMap<String, String>>}，
- *         这里放宽成 {@code Map<String, ? extends Map<String, String>>}，
- *         清单解析、包内 {@code .lang}、内置表三条路共用一个入口。</li>
- * </ul>
  */
 public final class LanguageLoader {
     private static final String COMMENT_SYMBOL = "#";

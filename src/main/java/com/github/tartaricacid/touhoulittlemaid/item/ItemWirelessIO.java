@@ -36,33 +36,6 @@ import java.util.Objects;
 
 /**
  * 隙间（无线 I/O 饰品），移植自上游 {@code item/ItemWirelessIO}。
- *
- * <p>这件物品同时是<b>可配置的饰品</b>和<b>手持工具</b>：</p>
- * <ul>
- *     <li>Shift 右击箱子 → 把坐标写进 NBT（{@code BindingPos}）；</li>
- *     <li>右击空气 → 打开配置界面（I/O 方向、黑白名单、9 格过滤清单）；</li>
- *     <li>放进女仆饰品栏后，女仆每 100 tick 与那个箱子之间搬一次物品
- *         （逻辑在 {@code WirelessIOBauble}）。</li>
- * </ul>
- *
- * <h2>数据布局（与上游逐字一致，存档可互换）</h2>
- * <ul>
- *     <li>{@code ItemIOMode}（boolean）—— {@code true} = 女仆 → 箱子；缺省 {@code false} = 箱子 → 女仆；</li>
- *     <li>{@code ItemFilterMode}（boolean）—— {@code true} = 黑名单；缺省 {@code false} = 白名单；</li>
- *     <li>{@code ItemFilterList}（CompoundTag）—— 9 格过滤清单，{@code ItemStackHandler} 的序列化形式；</li>
- *     <li>{@code BindingPos}（CompoundTag）—— 绑定的箱子坐标；</li>
- *     <li>{@code SlotConfigData}（byte[]）—— 38 个槽位的「冻结」标记，见 {@code WirelessIOBauble}。</li>
- * </ul>
- *
- * <h2>1.18.2 适配</h2>
- * <ul>
- *     <li>{@code MenuProvider} + {@code NetworkHooks.openScreen}（Forge）→ Fabric 的
- *         {@link ExtendedScreenHandlerFactory} + {@code ServerPlayer#openMenu}。
- *         界面除了菜单 id 之外还要带「手上这件物品」，扩展类型正好用来塞这段数据。</li>
- *     <li>{@code I18n.get}（客户端类）→ {@link TranslatableComponent}。
- *         上游把这个调用放在公共类里是安全的（服务端不会走到 {@code appendHoverText}），
- *         但本移植版一直避免在公共类里静态引用客户端类型，改成组件后两边都干净。</li>
- * </ul>
  */
 public class ItemWirelessIO extends Item implements ExtendedScreenHandlerFactory {
     /**

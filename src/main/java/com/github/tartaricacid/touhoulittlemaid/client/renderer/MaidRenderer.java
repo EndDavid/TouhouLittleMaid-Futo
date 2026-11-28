@@ -23,42 +23,6 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * 女仆渲染器：用模组自带的基岩版（GeckoLib3）模型绘制女仆。
- *
- * <p>模型来源是内置模型包（{@code assets/geckolib}、{@code assets/touhou_little_maid} 等），
- * 由 {@link com.github.tartaricacid.touhoulittlemaid.client.resource.GeckoModelLoader}
- * 在资源重载时解析；实体上的 {@code ModelId} 决定用哪一套。</p>
- *
- * <h2>人脸贴片（表情层）为什么要在这里处理</h2>
- *
- * <p>TLM 的模型把「表情」做成独立的 <b>0 厚度贴片骨骼</b>，叠在头部方块正面上：</p>
- * <table border="1">
- *     <caption>旧版模型（1.10 / 1.12）里的表情骨骼</caption>
- *     <tr><th>骨骼</th><th>含义</th><th>上游由谁驱动</th></tr>
- *     <tr><td>{@code blink}</td><td>闭眼</td><td>{@code animation/maid/default/head/blink.js}</td></tr>
- *     <tr><td>{@code hurtBlink}</td><td>受伤表情（XX 眼 + 青筋）</td><td>{@code head/hurt.js}</td></tr>
- * </table>
- *
- * <p><b>关键事实：些些 {@code .js} 文件在两个上游 jar 里都不存在。</b>
- * 1.18.2 与 1.20.1 的发布 jar 里 {@code .js} 数量分别是 0和 2（且都是
- * {@code authors_and_credits} 的展示动画）。上游其实是用
- * {@code MaidBaseAnimation} / {@code MaidExtraAnimation} 里的 Java 匿名类
- * <b>硬编码</b>了同名动画 —— 用 {@code javap} 反编译核对过：</p>
- *
- * <pre>
- * MaidExtraAnimation$4（对应 head/hurt.js）：
- *     hurtBlink.setHidden(!maid.onHurt());
- *
- * MaidBaseAnimation$2（对应 head/blink.js）：
- *     remainder = (ageInTicks + |uuid.leastBits| % 10) % 60;
- *     blink.setHidden(!(55 &lt; remainder &amp;&amp; remainder &lt; 60));
- * </pre>
- *
- * <p>本移植版还没有搬那套硬编码动画，于是这些贴片就保持「模型默认可见」。
- * 现象就是：<b>琪露诺这类带受伤表情的模型，一生成就顶着受伤脸</b>
- * （用户报告的那个问题），而且所有模型都会「一直闭眼」。</p>
- *
- * <p>这里按上游的判定把状态补回来。放在 {@code renderEarly} 是因为它是
- * <b>动画 tick 之后、骨骼真正绘制之前</b>唯一的钩子，写进去的值本帧一定生效。</p>
  */
 public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMaidEntity<EntityMaid>>
         implements IGeoEntityRenderer<EntityMaid> {
@@ -101,34 +65,6 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
 
     /**
      * 表情贴片沿模型前方向外推的距离（单位：模型单位，1 单位 = 1/16 方块）。
-     *
-     * <p><b>为什么需要这个偏移：</b>表情贴片与头部正面几乎是同一张平面。
-     * 以灵梦（{@code hakurei_reimu}）为例：</p>
-     * <pre>
-     * head  : origin [-4, 18, -4]     size [8, 8, 8]  → 正面 z = -4    / 16 = -0.2500000
-     * blink : origin [-4, 18, -4.001] size [8, 8, 0]  → 平面 z = -4.001/ 16 = -0.2500625
-     *                                                    间距   = 6.25e-5 方块
-     * </pre>
-     *
-     * <p>而 1.18.2 的深度缓冲是 24 位、近平面 0.05，精度随距离平方增长：</p>
-     * <pre>
-     * Δd ≈ d² · (1 / near) / 2²⁴ = d² · 1.19e-6
-     * d = 5 格 → 3.0e-5   (小于 6.25e-5，贴片稳定胜出)
-     * d = 7 格 → 5.8e-5   (临界)
-     * d = 8 格 → 7.6e-5   (大于 6.25e-5 —— 两个面开始互相穿插)
-     * </pre>
-     *
-     * <p>也就是说站在 7 格开外时，脸和表情贴片会逐像素「抢深度」，画面表现正是
-     * 「眨眼时脸部明暗/明暗纹理忽变」—— 不是光照算错，而是同一位置有两个面在打架。
-     * 之前把贴片背面的重复面删掉只解决了一半（贴片自身不再自相残杀），
-     * 贴片与头部正面之间仍然共面。</p>
-     *
-     * <p>这里把贴片整体沿 -Z（模型正面方向）外推 {@code 0.02} 模型单位
-     * = {@code 1.25e-3} 方块，是原间距的 20 倍，也远高于常规视距下的深度精度，
-     * 因此在任何距离都不会再穿插；而 0.00125 方块在视觉上完全不可见。</p>
-     *
-     * <p>模型空间里只有 X 被镜像（见 {@code GeoCube}：{@code origin.x = -(x + size.x)/16}），
-     * Y / Z 不镜像，所以「向外」恒为 -Z。</p>
      */
 
     public MaidRenderer(EntityRendererProvider.Context context) {
@@ -312,67 +248,6 @@ public class MaidRenderer extends GeoReplacedEntityRenderer<EntityMaid, GeckoMai
 
     /**
      * 被抱着（鞍）时的模型姿态 —— <b>横抱在玩家两手之间</b>。
-     *
-     * <h2>上游原文（1.18.2 与 1.20.1 逐字一致）</h2>
-     *
-     * <p>{@code EntityMaidRenderer#setupRotations}：</p>
-     *
-     * <pre>
-     * if (mob.getVehicle() instanceof Player &amp;&amp; !mainInfo.isGeckoModel()) {
-     *     poseStack.translate(-0.375, 0.8325, 0.375);
-     *     poseStack.mulPose(Axis.ZN.rotationDegrees(65));
-     *     poseStack.mulPose(Axis.YN.rotationDegrees(-80));
-     * }
-     * </pre>
-     *
-     * <p>本移植版把 legacy 与 gecko 两种模型并到了同一条 gecko 管线，那个
-     * {@code !isGeckoModel()} 分支永远不会命中，所以必须在这里补一次。</p>
-     *
-     * <h2>为什么这三个数字可以逐字照搬</h2>
-     *
-     * <p>关键在「{@code setupRotations} 里到底是哪个坐标系」。反编译 1.18.2 的
-     * {@code LivingEntityRenderer#render}，那几行的调用顺序是：</p>
-     *
-     * <pre>
-     * this.setupRotations(entity, poseStack, ...);   // ← 我们在这里画的东西
-     * poseStack.scale(-1.0F, -1.0F, 1.0F);           // ← 翻转在这之后
-     * poseStack.translate(0.0D, -1.501D, 0.0D);
-     * </pre>
-     *
-     * <p>矩阵是右乘的，所以最终是
-     * {@code M = T · Rz · Ry · S(-1,-1,1) · T(0,-1.501,0)}：顶点<b>先</b>被
-     * {@code T(0,-1.501,0)} 和 {@code S(-1,-1,1)} 处理，<b>之后</b>才轮到
-     * {@code setupRotations} 里写的那三个变换。也就是说那三个变换真正作用在一个：</p>
-     *
-     * <ul>
-     *     <li>{@code +Y} 朝上、</li>
-     *     <li>脚底在 {@code y = 0}（{@code T(0,-1.501,0)} 把模型对齐到原点）、</li>
-     *     <li>{@code +X} 是角色右侧、{@code -Z} 是面朝方向（{@code S(-1,-1,1)} 只翻转 X / Y）</li>
-     * </ul>
-     *
-     * <p>的<b>普通实体本地坐标系</b>上。再看 {@code GeoCube}：构建几何时做的正是同一套
-     * 镜像（{@code origin.x = -(origin.x + size.x) / 16}，X 取负、Y / Z 不动），
-     * gecko 管线拿到的同样是「+Y 朝上、脚底在 y=0、+X 是角色右侧、-Z 是面朝方向」。
-     * <b>两个坐标系完全一致，旋转中心也都在脚底</b>，所以照搬即可。</p>
-     *
-     * <h2>她最终落在哪（相对玩家脚底，身高按 1.5 算）</h2>
-     *
-     * <p>实体轴心由 {@code EntityMaid#updateCarriedPosition()} 放在「身前 0.75、抬高 0.15」；
-     * 局部 {@code +Z} 是<b>朝玩家</b>，所以 translate 里的 {@code +0.375} 是往回收。</p>
-     *
-     * <table border="1">
-     *     <caption>横抱姿态的关键点（Gecko 模型）</caption>
-     *     <tr><th>点</th><th>右</th><th>上</th><th>前</th></tr>
-     *     <tr><td>脚底（模型原点）</td><td>-0.375</td><td>0.98</td><td>0.375</td></tr>
-     *     <tr><td>身体中点</td><td>+0.31</td><td>1.30</td><td>0.375</td></tr>
-     *     <tr><td>头部</td><td>+1.17</td><td>1.70</td><td>0.375</td></tr>
-     * </table>
-     *
-     * <p><b>旧版（1.10 / 1.12）模型整体再低 0.3 格</b>（三行数值各减 0.3）：
-     * 上游 {@code MaidBaseAnimation#ridingPosture} 末尾还有一句
-     * {@code GlWrapper.translate(0, 0.3, 0)}，它作用在<b>模型空间</b>
-     * （被 {@code S(-1,-1,1)} 翻成 -0.3），等价于把这里的 Y 从 0.8325 减到 0.5325。
-     * 详见下面的实现说明。</p>
      */
     protected void setupRotations(EntityMaid maid, PoseStack poseStack, float ageInTicks,
                                   float rotationYaw, float partialTicks) {

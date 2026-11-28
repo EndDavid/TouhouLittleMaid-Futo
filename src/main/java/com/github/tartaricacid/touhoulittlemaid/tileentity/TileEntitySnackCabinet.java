@@ -25,24 +25,11 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * 零食柜的方块实体，移植自上游 1.20.1 的 {@code tileentity/TileEntitySnackCabinet}。
  *
- * <p>27 格（与单个原版箱子同容量），所以界面直接复用原版
- * {@link ChestMenu#threeRows} + {@link net.minecraft.client.gui.screens.inventory.ChestScreen} ——
- * 上游也是这么做的（反编译可见 {@code createMenu} 返回
- * {@code ChestMenu.method_19245(id, inventory, this)}，而 {@code method_19245} 就是
- * {@code threeRows}（它给 {@code ChestMenu} 构造器传的行数是 3，菜单类型 {@code GENERIC_9x3}）。</p>
+ * <p>27 格，界面复用原版单箱（{@code ChestMenu.threeRows} + {@code ChestScreen}）。
+ * 继承 {@link RandomizableContainerBlockEntity} 是为了支持战利品表。</p>
  *
- * <p>继承 {@link RandomizableContainerBlockEntity} 而不是 {@code BaseContainerBlockEntity}：
- * 前者自带 {@code LootTable} 支持，柜子因此可以被战利品表填充（上游同样）。</p>
- *
- * <p><b>开关盖的音效</b>：{@link ContainerOpenersCounter} 负责统计「现在有几个玩家开着它」，
- * 从 0 变 1 时播放开盖音、从 1 变 0 时播放关盖音。这套是原版箱子 / 木桶的做法，
- * 用它可以避免多个玩家同时开同一个柜子时音效乱掉。</p>
- *
- * <p>音效本身是<b>木桶</b>的（{@link SoundEvents#BARREL_OPEN} / {@link SoundEvents#BARREL_CLOSE}），
- * 不是箱子的。上游用的也正是这两个：反编译 1.20.1 的 {@code TileEntitySnackCabinet$1} 可见
- * {@code onOpen} 取 {@code SoundEvents.f_11725_}、{@code onClose} 取 {@code f_11724_}，
- * 而按 1.18.2 的 srg → mojmap 映射反查，{@code f_11725_} = {@code BARREL_OPEN}、
- * {@code f_11724_} = {@code BARREL_CLOSE}。箱子那对「吱呀」声配木质柜子确实不搭。</p>
+ * <p>开合音效是<b>木桶</b>那一对（{@link SoundEvents#BARREL_OPEN} / {@link SoundEvents#BARREL_CLOSE}），
+ * 由 {@link ContainerOpenersCounter} 在「有人开着」的计数从 0 变 1 / 1 变 0 时播放。</p>
  */
 public class TileEntitySnackCabinet extends RandomizableContainerBlockEntity {
     private static final int SLOT_COUNT = 27;

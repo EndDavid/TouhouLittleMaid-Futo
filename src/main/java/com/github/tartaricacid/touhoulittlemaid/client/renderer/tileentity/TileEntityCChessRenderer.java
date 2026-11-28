@@ -140,38 +140,6 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
      * 棋盘与棋子共用的姿态。上游
      * 1.18.2 与 1.20.1 两份渲染器在这一段上
      * 是逐字相同的：
-     *
-     * <pre>
-     * mulPose(ZN(180));
-     * mulPose(YN(facing.toYRot()));
-     * if (facing == NORTH || facing == SOUTH) mulPose(YN(180));
-     * </pre>
-     *
-     * <h2>为什么这里写的是 {@code YP}</h2>
-     * <p>那句 {@code ZN(180)} 是为了把原版
-     * {@code ModelPart} 的 <b>Y 向下</b> 翻成 Y 向上
-     * ，而它顺带着把 x 也取了负。
-     * 本移植版画的基岩几何（{@code GeoCube}）
-     * 本来就是 Y 向上，而且
-     * {@code GeoCube#createFromPojoCube}里<b>已经把 x 取过
-     * 一次负</b>。把 {@code M = Z·R(-θ)} 用
-     * {@code Z} 共轭到基岩空间就是
-     * {@code Z·R(-θ)·Z = R(θ)}，所以这里写
-     * {@code YP(θ)}。</p>
-     *
-     * <p>写成 {@code YN(θ)} 在 NORTH / SOUTH 下看不出
-     * 差别（±180° 互为逆），但在
-     * EAST / WEST 会差整整半圈：点击命中的
-     * 格子和看到的棋子就对不上。</p>
-     *
-     * <h2>为什么 NORTH / SOUTH 还要再 180°</h2>
-     * <p>上游就有这一句。贴图里格线在
-     * u 上的单边留白是 5 / 19 像素（不对称
-     * ），少了这半圈整块棋盘就会偏出
-     * <b>整整一格</b>，重开区也会跑到
-     * 另一侧——「右边一列棋子不在
-     * 格线上」与「字也是倒的」能同时
-     * 出现，就是这个原因。</p>
      */
     private static void applyFacing(PoseStack poseStack, Direction facing) {
         // 实现在 BoardRenderUtil —— 三块棋盘共用一份，避免某一处悄悄改错。
@@ -208,7 +176,7 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
             logged = true;
             float[] bb = BedrockBlockModels.bounds("cchess");
             AnimatedGeoModel board = BedrockBlockModels.get("cchess");
-            TouhouLittleMaid.LOGGER.info(
+            TouhouLittleMaid.LOGGER.debug(
                     "[Futo] chess layout: board bbox={} lift={} surface={} | piece bbox={} center=({}, {}) lift={}",
                     bb == null ? "null" : java.util.Arrays.toString(bb), boardLift(), surface,
                     java.util.Arrays.toString(pb), pieceCenterX, pieceCenterZ, pieceLift);
@@ -216,7 +184,7 @@ public class TileEntityCChessRenderer implements BlockEntityRenderer<TileEntityC
             // z 0.464..1.061 与 -1.061..-0.464（关于 z=0 对称）。这里打出来对照。
             for (String boneName : new String[]{"main", "bone", "bone2"}) {
                 float[] mb = GeoBlockRenderer.measureBone(board, boneName);
-                TouhouLittleMaid.LOGGER.info("[Futo] chess bone {} -> {}", boneName,
+                TouhouLittleMaid.LOGGER.debug("[Futo] chess bone {} -> {}", boneName,
                         mb == null ? "null" : java.util.Arrays.toString(mb));
             }
         }

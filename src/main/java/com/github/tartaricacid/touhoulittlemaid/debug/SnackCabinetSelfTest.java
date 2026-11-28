@@ -26,33 +26,6 @@ import java.util.UUID;
 /**
  * 零食柜「右键打开 27 格存储」的<b>服务端自检</b>，只在
  * {@code -Dfuto.snack.selftest=true} 时装配（见 {@code build.gradle} 的 {@code -PsnackSelftest}）。
- *
- * <h2>为什么需要它</h2>
- *
- * <p>「右键点不开」这类报告既没法靠看代码定论，也没法用 RCON 复现 ——
- * {@code item replace block ... container.N} 只能证明方块实体是可读写的容器，
- * 证明不了玩家那一下右键真的走到了 {@code openMenu}。而这里缺的正是「点」这一步：
- * 之前 {@code use} 里还留着上游那句「手持方块物品点顶面 → {@code PASS}」，
- * 于是只要手上拿着方块，顶面就永远开不了界面。</p>
- *
- * <p>这个自检真正调用一遍
- * {@code BlockState#use(Level, Player, InteractionHand, BlockHitResult)}
- * —— 就是服务端收到右键包之后走的那条路 —— 然后断言
- * {@code player.containerMenu} 是 27 格 / 三行的 {@link ChestMenu}。四种拿法 / 三个面各测一次。</p>
- *
- * <h2>为什么手搓 ServerPlayer 而不是 Fabric 的 FakePlayer</h2>
- *
- * <p>1.18.2 这条线的 fabric-api（0.77）里<b>没有</b>
- * {@code net.fabricmc.fabric.api.entity.FakePlayer} —— 那个类要到 1.19 的 0.6.x 模块才有
- * （已核对缓存里 0.4.19 / 0.4.20 两个 jar，都没有）。所以这里按 Fabric 内部
- * {@code FakePlayerNetworkHandler} 的做法自己来：一个 {@link ServerPlayer}，
- * 外加一个把 {@code send} 全部吞掉的 {@link ServerGamePacketListenerImpl}
- * （底层 {@link Connection} 是本地构造的，不会连任何地方）。
- * 这样 {@code openMenu → initMenu → slotChanged} 里那些发包调用就落在空实现上，
- * 不会因为 {@code connection == null} 抛 NPE。</p>
- *
- * <p>用法：{@code gradlew runServer -PsnackSelftest}。跑完会自己 {@code halt}，
- * 日志里出现 {@code [Futo] snack selftest: PASS} 即通过（每一小步也单独打一行）。</p>
  */
 public final class SnackCabinetSelfTest {
     /** 等世界完全就绪再动手：SERVER_STARTED 时出生点区块刚被加载。 */

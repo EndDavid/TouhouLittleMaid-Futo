@@ -110,7 +110,7 @@ public final class AvailableSites {
         RAW_SITES.clear();
         RAW_SITES.putAll(allSites);
         saveSites(allSites);
-        TouhouLittleMaid.LOGGER.info("[Futo] AI sites in use: {} chat / {} tts (enabled ones only)",
+        TouhouLittleMaid.LOGGER.debug("[Futo] AI sites in use: {} chat / {} tts (enabled ones only)",
                 CHAT_SITES.size(), TTS_SITES.size());
     }
     public static void saveSites(Map<String, LinkedHashMap<String, Object>> allSites) {

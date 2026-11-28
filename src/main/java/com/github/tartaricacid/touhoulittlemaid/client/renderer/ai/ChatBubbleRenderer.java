@@ -22,40 +22,6 @@ import java.util.List;
 /**
  * 头顶气泡渲染器，按 <b>TLMO Fabric 1.20.1</b> 的九宫格样式绘制，支持
  * <b>文本</b>与<b>表情图标</b>两类内容。
- *
- * <h2>内容类型</h2>
- * <ul>
- *     <li>文本：{@code chat_text} / 台本里的普通句子 / {@code {翻译键}}；</li>
- *     <li>图标：台本里写成 {@code %命名空间:贴图路径%} 的条目。贴图是
- *         <b>60×20 一帧、竖直堆叠</b>的多帧动画（{@code idle1.png} = 8 帧），
- *         每 2 tick 换一帧，与上游 {@code (tickCount / 2) % count} 一致。</li>
- * </ul>
- *
- * <h2>贴图</h2>
- * <p>底图由 {@link ChatBubbleScripts#getBackground(String)} 按模型 id 决定：
- * 台本里写的若是 1.18.2 那三张 60×40 旧网格图，就换成 1.20.1 的
- * {@code type2.png}（白底 + 淡蓝边，九宫格）；其它自定义贴图原样使用。
- * 九宫格边距按 1.20.1 的 {@code blitNineSliced}：四角原样、四边单向、中间双向。</p>
- *
- * <h2>布局（与 1.20.1 {@code ChatBubbleRenderer} 逐项对齐）</h2>
- * <ul>
- *     <li>气泡按「右、左、右、左……」交替排布；</li>
- *     <li>每列向下堆叠，间距 16 px；</li>
- *     <li>总数为奇数时最后一条居中，放在「左右两列里较长的那一列」的底部；</li>
- *     <li>尾巴：左列从右侧伸出、右列从左侧伸出、居中用中间那个。</li>
- * </ul>
- *
- * <h2>坐姿 / 睡姿</h2>
- * <p>坐下时基线下移 0.25 格（1.20.1 {@code EntityMaidRenderer} 里那一段）；
- * 睡着时下移 1.2 格（48 px × 0.025，与 1.18.2 上游一致）。</p>
- *
- * <h2>顶点格式：这里踩过坑，别改回去</h2>
- * <p>本移植版没有 AT，无法自建渲染类型，改用原版公开的 {@code RenderType.text}。
- * 它的顶点格式是 {@code POSITION_COLOR_TEX_LIGHTMAP}，四个元素缺一不可：
- * 只写 {@code vertex → color → uv} 会在 {@code BufferBuilder#endVertex} 抛
- * {@code Not filled all elements of the vertex}，表现就是「一冒气泡客户端立刻崩」。
- * 所以 {@link #vertex} 末尾必须补 {@code uv2}，固定给
- * {@link LightTexture#FULL_BRIGHT}：气泡不该随天黑变暗。</p>
  */
 public final class ChatBubbleRenderer {
     /** 现代九宫格底图（1.20.1 的 {@code IChatBubbleData#TYPE_2}）：白底 + 淡蓝边。 */

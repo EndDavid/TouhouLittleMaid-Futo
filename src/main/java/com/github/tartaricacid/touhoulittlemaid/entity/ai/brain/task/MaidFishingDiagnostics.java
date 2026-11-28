@@ -52,6 +52,10 @@ final class MaidFishingDiagnostics {
     }
 
     private static void report(EntityMaid maid, String channel, String detail) {
+        // 关闭时不记账（debug 级别默认关闭），整条诊断链路零开销
+        if (!TouhouLittleMaid.LOGGER.isDebugEnabled()) {
+            return;
+        }
         UUID uuid = maid.getUUID();
         Map<String, String> perMaid = LAST.get(uuid);
         if (perMaid == null) {
@@ -65,7 +69,7 @@ final class MaidFishingDiagnostics {
             return;
         }
         perMaid.put(channel, detail);
-        TouhouLittleMaid.LOGGER.info("[Futo] fishing {} maid={} at={} -> {}",
+        TouhouLittleMaid.LOGGER.debug("[Futo] fishing {} maid={} at={} -> {}",
                 channel, uuid, maid.blockPosition(), detail);
     }
 }

@@ -20,70 +20,13 @@ import java.util.List;
 /**
  * 女仆手持物品渲染层。
  *
- * <p>本类的变换全部来自上游源码，没有一处是估的。三条依据：</p>
+ * <p>数值全部来自上游：基岩模型是 {@code translate(0, -0.0625, -0.1) + rotX(-90)}，
+ * 旧版模型是 {@code rotX(-90) + rotY(180) + translate((左?-1:1)/16, 0.125, -0.525)}。
+ * 本移植版的 GeckoLib 空间与上游一致，所以<b>两个分支最后都落在 {@code rotX(-90)}</b>：
+ * 把符号改成 +90、或把 {@code translate.x} 取反，会让剑拿反 / 盾转向身体 / 弩朝下
+ * （那两步合起来等于给整件物品再加一个 180° 翻转）。</p>
  *
- * <ol>
- *     <li><b>基岩（Gecko）模型。</b>上游 1.18.2 {@code GeckoLayerMaidHeld#renderArmWithItem}
- *         （第 72~75 行）与 1.20.1 同名类（第 72~74 行）都是：
- *         <pre>translate(0, -0.0625, -0.1);  mulPose(rotX(-90))</pre></li>
- *     <li><b>旧版（1.10 / 1.12）模型。</b>上游 1.18.2 {@code LayerMaidHeldItem#renderArmWithItem}
- *         （第 56~58 行）与 1.20.1 同名类（第 59~61 行）都是：
- *         <pre>rotX(-90);  rotY(180);  translate((isLeft ? -1 : 1) / 16, 0.125, -0.525)</pre>
- *         这三行就是原版 {@code ItemInHandLayer#renderArmWithItem} 的数值 —— 1.18.2 的 jar 反编译
- *         核对过，原版是 {@code rotX(-90)} / {@code rotY(180)} /
- *         {@code translate((flag ? -1 : 1) / 16f, 0.125, -0.625)}，上游只把末项改成 -0.525。</li>
- *     <li><b>盾 / 弓 / 弩不需要任何特判。</b>它们最终都走
- *         {@code ItemInHandRenderer#renderItem(..., THIRD_PERSON_RIGHT/LEFT_HAND)}，和玩家手持
- *         完全是同一条原版路径；「弩斜着摆开」「弓居中且弦朝身体」「盾面向外」这些姿态由物品模型
- *         JSON 里的 {@code thirdperson_*} 显示变换提供（原版 {@code ItemInHandLayer} 也不认识
- *         盾 / 弓 / 弩）。所以只要手部基准位姿和玩家一致，这三类物品自然就和玩家一致 ——
- *         反过来，只要基准位姿错了，它们就会表现得比普通物品更显眼。</li>
- * </ol>
- *
- * <h2>基岩分支为什么不能做「X 镜像共轭」</h2>
- *
- * <p>本移植版的 {@code geckolib3} 是从上游原样搬过来的：{@code util/RenderUtils.java}、
- * {@code geo/render/GeoBuilder.java} 与上游 1.18.2 逐字节相同，{@code geo/render/built/GeoCube.java}
- * 只差一个空行。也就是说手部定位骨骼链 {@code Root → … → RightHandLocator} 的整套变换
- * （{@code GeoBuilder} 对 pivot.x 取反、对绕 X/Y 的旋转取反，{@code GeoCube} 对 cube 的 x 取反）
- * 在两边是<b>同一个空间</b>。上游在这个空间里直接写 {@code rotX(-90)}，这里就必须照抄，
- * 不需要也不允许再乘任何补偿矩阵。</p>
- *
- * <p>把 {@code rotX(-90)} 改成 {@code rotX(+90)}，等价于在物品自己的局部坐标系里再乘一个
- * {@code rotX(180)}，于是：剑变成「拿反」（刃朝身后）、盾的外侧面转向身体（里外面反）、
- * 弩被翻成朝下（看上去「张开的幅度不够」）。<b>这三个症状同源，不是三个独立的问题。</b></p>
- *
- * <h2>旧版分支为什么要多一层 {@code rotZ(180)}</h2>
- *
- * <p>上游旧版模型用的是 {@code simplebedrockmodel}，它的模型空间是「Java 版」的 Y 轴向下空间：
- * {@code AbstractBedrockModel#convertPivot} 用 {@code 24 - pivot.y}（子骨骼用
- * {@code parent.pivot.y - pivot.y}），{@code convertOrigin} 用
- * {@code pivot.y - origin.y - size.y}。上游随后由原版 {@code LivingEntityRenderer#render} 里的
- * {@code poseStack.scale(-1, -1, 1)}（1.18.2 jar 反编译确认，紧接着还有
- * {@code translate(0, -1.501, 0)}）把它转进世界空间，这个 {@code scale} 就是 {@code rotZ(180)}。</p>
- *
- * <p>本移植版把旧版模型也直接喂进了 GeckoLib 管线（Y 轴向上，且 {@code GeoBuilder} /
- * {@code GeoCube} 做了 X 镜像）。两条管线因此相差一个<b>坐标基底</b>变换（不是镜像，行列式为 +1）：</p>
- * <pre>
- * C = diag(-1, -1, 1) = rotZ(180)        端口空间 = C · 上游模型空间
- * </pre>
- *
- * <p>同一个骨骼在端口里的局部坐标系相对上游被旋转了 C，所以要把物品放到世界上同样的位置，
- * 物品变换必须写成 {@code C · T_up}（{@code C} 自逆）：</p>
- * <pre>
- * C · rotX(-90) · rotY(180) ≡ rotX(-90)      ← 可直接验算，rotY(180) 正好被 C 吸收
- * C · translate(v)          ≡ translate(v)
- * </pre>
- *
- * <p>下面代码保留「{@code C} + 上游三行原样」的写法，方便一行一行对照上游；它的化简结果就是
- * {@code rotX(-90) + translate}，所以两个分支最后都落在 {@code rotX(-90)} 上，只有平移量不同。
- * 这也解释了此前把 {@code rotX} 改成 {@code +90}、把 {@code translate.x} 取反为什么会同时
- * 打坏普通物品：那两步合起来是给整件物品又加了一个 180° 翻转。</p>
- *
- * <p>未移植的上游分支：{@code SlashBladeCompat}（拔刀剑）、{@code RenderFixer.isCarryOnRender}
- * （CarryOn）、{@code TacCompat.addItemTranslate}（TACZ）、{@code extraLeft/RightHandBones}
- * （同一物品在额外手部骨骼上重绘）、{@code armLeft/RightPositioningBone}（现有 189 个模型里
- * 没有一个用到这个字段）。</p>
+ * <p>盾 / 弓 / 弩不需要特判：它们走原版 {@code ItemInHandRenderer}，显示变换由 JSON 提供。</p>
  */
 
 

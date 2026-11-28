@@ -105,7 +105,7 @@ public final class ServerModelPool {
         if (out.isEmpty()) {
             Collections.addAll(out, FALLBACK);
         }
-        TouhouLittleMaid.LOGGER.info("[Futo] random model pool: {} models", out.size());
+        TouhouLittleMaid.LOGGER.debug("[Futo] random model pool: {} models", out.size());
         return out;
     }
     private static void readPack(List<String> out, Path domainDir) {

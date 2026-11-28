@@ -37,7 +37,7 @@ public final class MaidEdibleBlockManager {
         FarmersDelightCompat.addFarmersDelightEdible();
 
         for (IMaidEdibleBlock block : edibleBlocks) {
-            TouhouLittleMaid.LOGGER.info("[Futo] edible block registered: {}",
+            TouhouLittleMaid.LOGGER.debug("[Futo] edible block registered: {}",
                     block.getClass().getSimpleName());
         }
         edibleBlocks = ImmutableList.copyOf(edibleBlocks);

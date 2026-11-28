@@ -40,36 +40,6 @@ import java.util.zip.ZipFile;
 /**
  * 游戏目录下 {@code tlm_custom_pack/} 的模型包加载器，对应上游
  * {@code client/resource/CustomPackLoader} 的**外部包那一半**。
- *
- * <h2>为什么非要有它</h2>
- * <p>本移植版的内置模型包是「构建期展开成普通资源」的，所以一直走
- * {@code ResourceManager}（见 {@link GeckoModelLoader} 的类注释）。但
- * <b>玩家下载 / 手放的模型包是磁盘上的 zip</b>，{@code ResourceManager} 看不见它们 ——
- * 不做这一层的话，「在线下载模型包」这个功能下完等于没下：文件存在，
- * 模型列表里一个都不多。</p>
- *
- * <h2>接法：三个注入点，而不是重写整条加载链</h2>
- * <ol>
- *     <li>{@link GeckoModelLoader#reload()} 末尾调 {@link #loadExternalMaidPacks()}，
- *         {@code ChairModelLoader#reload()} 末尾调 {@link #loadExternalChairPacks()} ——
- *         外部包追加在内置包之后，顺序与上游「默认包排最前、其余按域名字典序」一致；</li>
- *     <li>{@link GeckoModelLoader} 的 {@code open(ResourceLocation)} 加一层兜底：
- *         {@code ResourceManager} 找不到时问 {@link #openExternal(ResourceLocation)}。
- *         几何、动画、图标全部走那一个方法，所以只改一处就让整条管线都能读 zip；</li>
- *     <li>贴图单独注册成动态纹理（{@link PackTexture}）—— 贴图不走
- *         {@code ResourceManager}，而是 {@code TextureManager}。</li>
- * </ol>
- *
- * <h2>优先级：内置资源 > 外部包</h2>
- * <p>{@code open()} 先问 {@code ResourceManager}，再问外部包。后果是「外部包用了与内置包
- * 相同的域名」时，它的 {@code maid_model.json} 会被内置那份盖住 —— 这正是上游
- * 「默认包强行覆盖」的等价行为，日志里会留一条 warn。</p>
- *
- * <h2>线程</h2>
- * <p>{@link #scan()} 与两个 {@code loadExternal*} 都跑在资源重载线程上；
- * {@link #openExternal(ResourceLocation)} 在渲染线程也会被读（惰性兜底构建模型），
- * 所以 {@code SOURCES} 用 {@code volatile} 存整份不可变列表，扫描时整体替换，
- * 读方不加锁也不会看到半个目录。</p>
  */
 public final class CustomPackLoader {
     /** 与上游一致：游戏目录下的模型包文件夹名。 */
@@ -180,7 +150,7 @@ public final class CustomPackLoader {
         }
         sources = List.copyOf(found);
         if (!found.isEmpty()) {
-            TouhouLittleMaid.LOGGER.info("[Futo] found {} custom model pack(s) in {}", found.size(), folder);
+            TouhouLittleMaid.LOGGER.debug("[Futo] found {} custom model pack(s) in {}", found.size(), folder);
         }
     }
 
@@ -311,7 +281,7 @@ public final class CustomPackLoader {
         }
         MaidModelRegistry.putPack(GeckoModelLoader.buildPack(domain, root, validModels));
         registerTexture(parseIcon(root));
-        TouhouLittleMaid.LOGGER.info("[Futo] loaded {} maid model(s) from custom pack {}", validModels.size(), source.name());
+        TouhouLittleMaid.LOGGER.debug("[Futo] loaded {} maid model(s) from custom pack {}", validModels.size(), source.name());
         return validModels.size();
     }
 
@@ -365,7 +335,7 @@ public final class CustomPackLoader {
         }
         ChairModelRegistry.putPack(ChairModelLoader.buildPack(domain, root, validModels));
         registerTexture(parseIcon(root));
-        TouhouLittleMaid.LOGGER.info("[Futo] loaded {} chair model(s) from custom pack {}", validModels.size(), source.name());
+        TouhouLittleMaid.LOGGER.debug("[Futo] loaded {} chair model(s) from custom pack {}", validModels.size(), source.name());
         return validModels.size();
     }
 

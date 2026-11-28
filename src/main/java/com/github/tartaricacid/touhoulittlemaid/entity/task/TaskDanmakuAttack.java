@@ -41,34 +41,6 @@ import java.util.function.Predicate;
 
 /**
  * 弹幕攻击模式，移植自上游 {@code entity/task/TaskDanmakuAttack}。
- *
- * <p>主手必须持有御币（{@link ItemHakureiGohei}），否则整个模式不生效。
- * 弹幕数量按<b>周围可攻击目标数</b>三档切换（上游设计，用来避免卡服）：</p>
- *
- * <table border="1">
- *     <caption>目标数与弹幕形态</caption>
- *     <tr><th>可攻击目标数</th><th>形态</th><th>伤害系数</th></tr>
- *     <tr><td>≤ 1</td><td>单发直射（有「多重射击」时改为 3 发 15° 扇）</td><td>{@code attack * (f + 1)}</td></tr>
- *     <tr><td>≤ 5</td><td>8 发 60° 扇</td><td>{@code attack * (f + 1.2)}</td></tr>
- *     <tr><td>&gt; 5</td><td>32 发 120° 扇</td><td>{@code attack * (f + 1.5)}</td></tr>
- * </table>
- *
- * <p><b>三个自定义附魔</b>（{@code InitEnchantments}）：</p>
- * <ul>
- *     <li>{@code impeding}（滞弹）→ 弹幕命中后按等级施加缓慢（时长
- *         {@code (20 + level * 10) * 20} tick，在 {@code EntityDanmaku} 里结算）；</li>
- *     <li>{@code speedy}（速弹）→ 初速乘 {@code level + 1}，即 I 级两倍、II 级三倍；</li>
- *     <li>{@code enders_ender}（末影之末）→ 弹幕能伤到末影人 / 末影龙。</li>
- * </ul>
- *
- * <p><b>与上游的差异：</b></p>
- * <ul>
- *     <li>{@code isWeapon(maid, stack)}（上游 1.20.1 用它做「主手是不是武器」的通用判定）
- *         本移植版的 {@code IAttackTask} 还没有这个方法，因此直接用 {@link #hasGohei}。</li>
- *     <li>上游在 {@code speed} 之上还叠了一段距离修正
- *         （{@code += clamp(distance / 40 - 0.4, 0, 2.4)}），不准确度也随距离从 1.0 收到 0.2。
- *         本移植版目前用固定值，属于既有实现，未在这次改动范围内。</li>
- * </ul>
  */
 public class TaskDanmakuAttack implements IRangedAttackTask {
     public static final ResourceLocation UID =

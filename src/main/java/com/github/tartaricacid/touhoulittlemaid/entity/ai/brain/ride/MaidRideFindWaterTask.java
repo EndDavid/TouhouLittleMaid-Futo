@@ -159,7 +159,7 @@ public class MaidRideFindWaterTask extends MaidCheckRateTask {
             return;
         }
         this.lastState = state;
-        TouhouLittleMaid.LOGGER.info("[Futo] fishing maid={} at={} -> {}",
+        TouhouLittleMaid.LOGGER.debug("[Futo] fishing maid={} at={} -> {}",
                 maid.getUUID(), maid.blockPosition(), detail);
     }
 }

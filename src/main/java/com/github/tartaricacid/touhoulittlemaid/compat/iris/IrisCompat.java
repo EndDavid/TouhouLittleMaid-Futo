@@ -50,7 +50,7 @@ public final class IrisCompat {
      * 客户端入口调用一次，只为了在日志里留一条可断言的锚点。
      */
     public static void init() {
-        TouhouLittleMaid.LOGGER.info("[Futo] Iris present: {}", isLoaded());
+        TouhouLittleMaid.LOGGER.debug("[Futo] Iris present: {}", isLoaded());
     }
 }
 

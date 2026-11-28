@@ -29,38 +29,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 /**
  * 「女仆历史 AI 聊天记录」界面，按 TLMO 1.20.1 的 {@code HistoryAIChatScreen} 重做。
- *
- * <h2>版式（与 1.20.1 逐项对齐）</h2>
- * <pre>
- *                     女仆历史 AI 聊天记录
- *   [头像] ┌--------------┐           ┌----------┐
- *          │ 女仆说的话   │           │ 压缩摘要  │
- *          └--------------┘           │          │
- *                        ┌----------┐ │ （正文）  │
- *                        │ 玩家的问 │ └----------┘
- *                        └----------┘ [清除历史聊天记录]
- *   [头像] ┌--------------┐           [   返回   ]
- *          │ 女仆说的话   │
- *          └--------------┘
- * </pre>
- * <p>气泡按时间从旧到新向下排，女仆侧在左（灰底 + 头像），玩家侧在右（蓝底 + 皮肤头），
- * 每条纹一条「x天前 / x小时前」。右侧是压缩摘要面板与两个按钮。</p>
- *
- * <h2>数据来源</h2>
- * <p>1.20.1 把整份聊天管理器同步到客户端，历史直接在本地读；本移植版只在打开界面时
- * 现要一份快照（{@code GetMaidAIHistoryPacket} → {@link SyncMaidAIHistoryPacket}），
- * 因此 {@code init} 里要先建 widget，收到快照后 {@link #refresh()} 重建。</p>
- *
- * <h2>与 1.20.1 的差异</h2>
- * <ul>
- *     <li><b>没有「压缩摘要」的内容</b>：上游的 {@code HistorySummaryManager} 会定期把
- *         长对话压成摘要（另一次 LLM 请求），本移植版还没做，所以这个面板永远显示
- *         「当前还没有压缩摘要」—— 与上游「还没触发压缩」时的长相一致。</li>
- *     <li>没有工具调用气泡（本移植版没有工具调用）。</li>
- *     <li>助手侧的消息要<b>先解 JSON 再显示</b>：历史里存的原始响应是
- *         {@code {"chat_text":"...","tts_text":"..."}}，直接画出来就是一串原始 JSON。
- *         上游 {@code transformMessage} 同样用 {@code new ResponseChat(text).getChatText()}。</li>
- * </ul>
  */
 public class AIHistoryScreen extends Screen {
     private static final MutableComponent HISTORY_TITLE =

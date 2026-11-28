@@ -19,37 +19,13 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * 零食柜的方块实体渲染器（上游 1.20.1 的 {@code TileEntitySnackCabinetRenderer}）。
  *
- * <p>几何直接读 {@code models/bedrock/block/snack_cabinet.json}、贴图是
- * {@code textures/bedrock/block/snack_cabinet.png}，走本移植版已有的
- * {@link BedrockBlockModels} 管线（与祭坛 / 神社 / 三张棋盘 / 野餐垫同一条路）。
- * 那条管线已经把 texel→格、X 轴翻转、负 inflate、零厚度面、骨骼层级都处理过了，
- * 所以这里既不需要再手抄几百行 {@code addBox}，也不需要 {@code ZN(180)} 之类的手工姿态修正。</p>
+ * <p>几何与贴图走 {@link BedrockBlockModels} 管线。姿态与神社 / 野餐垫同一套：
+ * 基岩几何 Y 向上、底面 y=0、水平居中，所以只要 {@code translate(0.5, floorOffset, 0.5)}
+ * 再按朝向导转 —— <b>不要再补 {@code ZN(180)}</b>，也不要写 {@code T(0.5) R T(-0.5)}
+ * （那是「绕点 (0.5,0,0.5) 旋转」，会让除朝南外的三个朝向整体偏半格）。</p>
  *
- * <h2>姿态：与神社 / 野餐垫同一套</h2>
- *
- * <p>基岩几何是 <b>Y 向上、底面在 y = 0、水平居中在原点</b>
- * （{@code root} 骨骼的 cube 是 {@code origin[-8,0,-8] size[16,16,16]}，正好 -0.5..0.5），
- * 所以只需要「挑到方块中心 + 按朝向转」，不需要上游那句
- * {@code translate(0.5, 1.5, 0.5)} 与 {@code ZN(180)} —— 那是旧的「原版 ModelPart」空间（Y 向下）的代偿，
- * 与野餐垫那里踩过的是同一个坑。</p>
- *
- * <p><b>一个必须记住的算式</b>：{@code T(0.5) R T(-0.5)} 等于「绕点 (0.5, 0, 0.5) 旋转」。
- * 而这个模型的自身已经居中在原点，所以再补一句 {@code T(-0.5)} 就不是「还回去」：
- * 转 0° 时它恰好抵消，转 180° 时得到 {@code (1 - x, y, 1 - z)}，模型整体偏移半格。
- * 本渲染器初版就是这么写的，于是只有朝南（角度 0）时看起来对，其余三个朝向全部偏出去半格。</p>
- *
- * <h2>为什么要按 TYPE 隐藏骨骼</h2>
- *
- * <p>模型里有三个骨骼：{@code root}（柜体本身，恰好 1 格高）、
- * {@code full}（高玻璃罩，顶到 2.11 格）与 {@code half}（矮玻璃罩，顶到 1.94 格）。
- * 它们是<b>互斥</b>的三个外观，取决于柜顶上摆了什么（见
- * {@code BlockSnackCabinet#TYPE}）。
- * 上游在 {@code render} 里直接改 {@code BedrockPart.visible}：
- * {@code TYPE == 1} 只显示 {@code full}、{@code TYPE == 2} 只显示 {@code half}、
- * 其余两个都不显示（反编译 1.20.1 的字节码可见）。</p>
- *
- * <p>本移植版最初少了这一步，于是三个骨骼全画了 —— 表现就是
- * 「空柜子也竖着两格高的玻璃罩」。</p>
+ * <p>{@code root} / {@code full} / {@code half} 三个骨骼互斥，每帧按
+ * {@code BlockSnackCabinet#TYPE} 设置 {@code hidden}。</p>
  */
 public class TileEntitySnackCabinetRenderer implements BlockEntityRenderer<TileEntitySnackCabinet> {
     private static final ResourceLocation TEXTURE =

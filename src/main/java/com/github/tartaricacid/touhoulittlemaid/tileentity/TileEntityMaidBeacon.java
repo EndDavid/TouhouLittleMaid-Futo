@@ -26,37 +26,6 @@ import java.util.List;
 
 /**
  * 神社庭灯的方块实体，移植自上游 {@code tileentity/TileEntityMaidBeacon}。
- *
- * <p>职责有三块：</p>
- * <ol>
- *     <li><b>吸取 P 点</b>：每 80 tick（4 秒）扫一次 {@code ShrineLampMaxRange} 范围内的
- *         {@link EntityPowerPoint}，把它们的 P 值折算成灵力存进自己（1.00 灵力 = 100 P）；</li>
- *     <li><b>施加效果</b>：选中的效果每隔 80 tick 消耗一次灵力，给 8 格内所有女仆挂 100 tick 的
- *         对应 buff（等级 II）；</li>
- *     <li><b>持久化</b>：效果序号 / 存储量 / 「溢出是否删除」三项要进存档，也要能跟着物品走。</li>
- * </ol>
- *
- * <h2>与上游的差异</h2>
- *
- * <p><b>1. NBT 存放位置。</b>上游 1.18.2 写的是 {@code getTileData()}，1.20.1 写的是
- * {@code getPersistentData()} —— 两者都是 Forge 给 {@code BlockEntity} 打的补丁
- * （最终落到 {@code ForgeData} 子标签里）。原版 1.18.2 没有这两样，所以：</p>
- * <ul>
- *     <li>存档走标准的 {@link #saveAdditional} / {@link #load}，直接写进传入的 compound；</li>
- *     <li>物品形态见 {@link #saveToItemTag()}：为了和上游的
- *         {@code StorageData.ForgeData.StoragePower} 结构兼容（老存档里的庭灯物品仍可读），
- *         这里手工构造同样的层级，{@code ItemMaidBeacon} 再做一层 {@code StorageData} 包装。</li>
- * </ul>
- *
- * <p><b>2. 没有 {@code TYPE} 静态字段。</b>方块实体类型放在 {@link InitBlocks#MAID_BEACON_TE}，
- * 避免「注册表 → 方块实体类 → 注册表」的静态初始化环。</p>
- *
- * <p><b>3. 吸取粒子。</b>上游 {@code EntityPowerPoint#spawnExplosionParticle()} 在服务端会向
- * 追踪者发 {@code BeaconAbsorbMessage}；本移植版让那个方法在服务端改用
- * {@code ServerLevel#sendParticles}，所以这里的调用点与上游完全相同。</p>
- *
- * <p><b>4. 配置读取走 {@code MiscConfig} 的空安全取值器</b>（{@code shrineLampMaxRange()} 等）。
- * 这个 tick 每 4 秒跑一次，配置未加载时直接 {@code .get()} 会把异常抛出服务端 tick 循环。</p>
  */
 public class TileEntityMaidBeacon extends BlockEntity {
     public static final String POTION_INDEX_TAG = "PotionIndex";

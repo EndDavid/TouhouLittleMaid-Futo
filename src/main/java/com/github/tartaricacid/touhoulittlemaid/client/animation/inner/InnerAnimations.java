@@ -16,58 +16,6 @@ import java.util.Map;
 
 /**
  * 内建动画注册表，对应上游 {@code client/animation/inner/InnerAnimation}。
- *
- * <h2>这是什么东西</h2>
- *
- * <p>TLM 的旧版（1.10 / 1.12）模型不在 JSON 里写关键帧动画，而是在
- * {@code maid_model.json} 的 {@code animation} 字段里列一串<b>伪路径</b>，例如：</p>
- *
- * <pre>
- * "animation": [
- *     "touhou_little_maid:animation/maid/default/head/default.js",
- *     "touhou_little_maid:animation/maid/default/head/blink.js",
- *     "touhou_little_maid:animation/maid/default/leg/default.js",
- *     "touhou_little_maid:animation/maid/default/arm/default.js"
- * ]
- * </pre>
- *
- * <p>这些 {@code .js} 文件<b>在任何一个发布 jar 里都不存在</b>。上游把它们注册进
- * {@code InnerAnimation.INNER_ANIMATION} 这张表，用<b>同名 Java 匿名类顶替脚本</b>
- * （{@code CustomJsAnimationManger} 只处理玩家自定义包里的真 JS）。所以正确处理方式
- * 不是「当成资源去读」，而是「按路径查 Java 实现」。</p>
- *
- * <h2>本类与上游的对应关系</h2>
- *
- * <table border="1">
- *     <caption>已移植的内建动画</caption>
- *     <tr><th>上游来源</th><th>路径</th></tr>
- *     <tr><td>{@code MaidBaseAnimation}</td><td>head/default, head/blink, head/beg,
- *         head/music_shake, head/ear_shake, leg/default, arm/default, arm/swing,
- *         sit/default, sit/skirt_hidden, sit/skirt_rotation, sit/skirt_rotation_swing,
- *         sleep/default, tail/default, wing/default</td></tr>
- *     <tr><td>{@code MaidExtraAnimation}</td><td>head/hurt, health/less_show</td></tr>
- *     <tr><td>{@code MaidTaskAnimation}</td><td>task/attack, task/danmaku_attack,
- *         task/farm, task/extinguishing, task/ranged_attack</td></tr>
- *     <tr><td>{@code EntityBaseAnimation}</td><td>base/float/default,
- *         base/rotation/reciprocate</td></tr>
- *     <tr><td>{@code SpecialAnimation}</td><td>special/hecatia_dimension,
- *         special/wakasagihime_sit</td></tr>
- *     <tr><td>{@code MaidArmorAnimation}</td><td>armor/default（由
- *         {@code MaidRenderer#updateArmorBones} 承担，见那里的说明）</td></tr>
- * </table>
- *
- * <h2>两个 PoseStack 级别的位移没有移植</h2>
- *
- * <p>上游 {@code ridingPosture} 与 farm 分支还会调 {@code GlWrapper.translate} /
- * {@code GlWrapper.rotate}，那是<b>改 PoseStack</b>、不是改骨骼，而本移植版的动画求值
- * （{@code GeckoMaidEntity#setCustomAnimations}）拿不到 PoseStack。其中：</p>
- * <ul>
- *     <li>{@code ridingPosture} 的 {@code translate(0, 0.3, 0)} 已经在
- *         {@code MaidRenderer#setupRotations} 里按上游矩阵链实现（含符号推导）；</li>
- *     <li>farm 分支的 {@code translate(0, 0.0713625, -0.35876875)} +
- *         {@code rotate(22.5, 1, 0, 0)} 暂缺 —— 影响的是「种田任务时整体前倾下蹲」，
- *         腿部角度与其余动作仍然生效。</li>
- * </ul>
  */
 public final class InnerAnimations {
     /** 路径 → 实现。键是全路径（含 {@code .js}）。 */

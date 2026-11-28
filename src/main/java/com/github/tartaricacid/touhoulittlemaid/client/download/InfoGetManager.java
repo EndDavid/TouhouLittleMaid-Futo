@@ -41,34 +41,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * 在线资源包清单的拉取 + 下载安装，移植自上游
  * {@code client/download/InfoGetManager}（Forge 1.18.2 版）。
- *
- * <h2>协议：一份静态 {@code info.json}，不是 REST</h2>
- * <p>整条链路只有两个 GET 请求：</p>
- * <ol>
- *     <li>{@code <root>/info.json} —— 一个 JSON <b>数组</b>，每项是一条资源包记录
- *         （字段见 {@link DownloadInfo}），客户端自己分页 / 分类 / 搜索；</li>
- *     <li>{@code <root>/<url>} —— 包体本身（普通 zip）{@code url} 是相对路径。</li>
- * </ol>
- * <p>两条线路：主站 CDN 与原始源。主站失败自动降级到备用源，并<b>记住这次降级</b>
- * （{@link #USE_BACKUP_URL}），后续包体下载都走同一个源 —— 否则会一半成功一半失败。</p>
- *
- * <h2>本地状态不靠「记住」，靠 CRC32</h2>
- * <p>{@code info.json} 里的 {@code checksum} 是包体 zip 的 CRC32。
- * 界面每次打开都扫一遍 {@code tlm_custom_pack/*.zip} 的实际 CRC32 去比对，
- * 于是「手删文件」「手动放入旧版本」都能被正确识别成未下载 / 需更新。
- * 这个比对在 {@code ModelDownloadGui#checkDownloadInfo} 里做。</p>
- *
- * <h2>与上游的差异</h2>
- * <ul>
- *     <li><b>MD5 用 {@link MessageDigest}、CRC32 用 {@code java.util.zip}。</b>
- *         上游用了 {@code commons-codec} / {@code commons-io}（Forge 自带），
- *         而 Fabric 侧没有保证这两个库一定在，自己算十行代码就够了。</li>
- *     <li><b>版本头换成 {@code X-Fabric-Version}。</b>上游 {@code X-Forge-Version}
- *         取的是 Forge 版本；本移植版取 Fabric Loader 版本，语义一致。</li>
- *     <li><b>不打包内置兜底清单。</b>与上游一致：网络不通且本地没有
- *         {@code config/touhou_little_maid/info.json} 时，界面只显示
- *         「网络好像出了问题」。</li>
- * </ul>
  */
 public final class InfoGetManager {
     /**

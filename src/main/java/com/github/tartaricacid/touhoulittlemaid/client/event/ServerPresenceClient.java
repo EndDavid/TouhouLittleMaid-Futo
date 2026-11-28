@@ -64,7 +64,7 @@ public final class ServerPresenceClient {
         }
         if (ClientPlayNetworking.canSend(ServerPresence.CHANNEL)) {
             ticksLeft = -1;
-            TouhouLittleMaid.LOGGER.info(
+            TouhouLittleMaid.LOGGER.debug(
                     "[Futo] remote server runs Touhou Little Maid, creative tabs kept");
             return;
         }
@@ -73,7 +73,7 @@ public final class ServerPresenceClient {
         }
         ticksLeft = -1;
         ServerPresence.setAbsent(true);
-        TouhouLittleMaid.LOGGER.warn(
+        TouhouLittleMaid.LOGGER.debug(
                 "[Futo] remote server does not run Touhou Little Maid (no {} channel): "
                         + "hiding its creative tabs, otherwise the items would be unusable",
                 ServerPresence.CHANNEL);
@@ -91,6 +91,6 @@ public final class ServerPresenceClient {
     private static void logTabSize(String name, CreativeModeTab tab) {
         NonNullList<ItemStack> items = NonNullList.create();
         tab.fillItemList(items);
-        TouhouLittleMaid.LOGGER.warn("[Futo] creative tab '{}' now exposes {} item(s)", name, items.size());
+        TouhouLittleMaid.LOGGER.debug("[Futo] creative tab '{}' now exposes {} item(s)", name, items.size());
     }
 }

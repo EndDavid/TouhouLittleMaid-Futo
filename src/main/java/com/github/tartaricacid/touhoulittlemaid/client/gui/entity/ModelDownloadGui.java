@@ -46,43 +46,6 @@ import java.util.Set;
 /**
  * 在线模型包下载界面，移植自上游 {@code client/gui/entity/ModelDownloadGui}
  * （Forge 1.18.2 版）。
- *
- * <h2>版式（与上游逐像素一致）</h2>
- * <pre>
- * 整体         420x240，居中
- * 顶部页签     52x20，间距 2，y+3       全部 / 女仆 / 坐垫 / 声音 / 更新
- * 关闭按钮     20x20 @ (x+400, y+2)
- * 列表        每页 4 行，268x46，首行 y+26，行距 48
- * 右侧上框    (x+270..x+420, y+26..y+72)   选中的包名
- * 右侧下框    (x+270..x+420, y+74..y+216)  搜索框 + 热门搜索
- * 翻页        &lt; @ (x, y+218) 40x20 ；&gt; @ (x+228, y+218) 40x20
- * 页码        居中于 x+134, y+227
- * 打开文件夹  (x+270, y+218) 150x20
- * </pre>
- *
- * <h2>三个「看起来像状态、其实是重算」的地方</h2>
- * <ol>
- *     <li><b>已下载 / 需更新</b>：不是记住的，是把 {@code tlm_custom_pack} 下每个 zip 的
- *         CRC32 算出来和清单里的 {@code checksum} 比对（{@link #checkDownloadInfo()}）。
- *         所以手删文件、手放旧版本都能立刻反映出来。</li>
- *     <li><b>搜索 / 页签 / 翻页</b>：全部是「重建控件」—— {@link #init()} 里
- *         {@code clearWidgets()} 之后按当前条件重新加一遍。上游同款做法，
- *         比维护一堆可见性开关更不容易漏。</li>
- *     <li><b>下载进度</b>：{@link DownloadInfo} 自己就是 {@code ProgressListener}，
- *         下载线程往它里面写百分比，{@link PackInfoButton} 每帧读它画进度条 ——
- *         界面这一侧没有任何轮询。</li>
- * </ol>
- *
- * <h2>与上游的差异</h2>
- * <ul>
- *     <li><b>关闭按钮回到女仆界面</b>（1.20.1 的行为）：点右上角关闭时发一个
- *         {@code MaidClientPacketSender.sendTab(MAIN, entityId)}，由服务端关掉当前菜单
- *         并按主界面页签重开 —— 与上游 1.20.1 的 {@code OpenMaidGuiMessage} 等价。
- *         1.18.2 原本是「直接回到世界」，从容器界面点进来的玩家会觉得像被踢出去。
- *         <b>ESC 仍是「回到世界」</b>，与上游两个版本都一致。</li>
- *     <li><b>页签的工具提示自己画。</b>1.18.2 的原版 {@code Button} 没有 tooltip 构造参数
- *         （那是 Forge 的补丁），所以与 {@code FlatColorButton} 一样在 {@code render} 末尾统一处理。</li>
- * </ul>
  */
 public class ModelDownloadGui extends Screen {
     private static final ResourceLocation BG =

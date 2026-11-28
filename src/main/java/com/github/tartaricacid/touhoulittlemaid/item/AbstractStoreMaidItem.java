@@ -11,33 +11,6 @@ import java.util.Optional;
 
 /**
  * 「内部存着一只女仆」的物品基类（上游 {@code item/AbstractStoreMaidItem} 的移植）。
- *
- * <p>照片（{@link ItemPhoto}）与胶片（上游 {@code ItemFilm}）都继承它，
- * 共同点是：NBT 里的 {@code MaidInfo} 子标签保存一份 {@code EntityMaid#saveWithoutId} 的结果。</p>
- *
- * <h2>与上游的差异</h2>
- *
- * <ol>
- *     <li><b>{@code onEntityItemUpdate} 没有对应钩子。</b>
- *         上游用这个 Forge 方法让掉落在地上的照片「发光 + 无敌 + 不掉进虚空」：
- *         <pre>
- *         entity.setGlowingTag(true);
- *         entity.setInvulnerable(true);
- *         if (y &lt; getMinBuildHeight()) { 拉住不往下掉 }
- *         </pre>
- *         其中「不被火烧 / 岩浆烧」这一点用 {@code Item.Properties#fireResistant()} 等价实现
- *         （见两个子类的构造函数）—— 这也正是语言文件里承诺的行为。
- *         剩下「发光」与「虚空保护」在 Fabric 侧需要每 tick 扫实体，代价与收益不成比例，
- *         暂不实现。</li>
- *     <li><b>三维预览要自己接一层。</b>
- *         上游靠 Forge 的 {@code registerTooltipComponentFactory} 把
- *         {@code ItemMaidTooltip} 对应到 {@code ClientMaidTooltip}。
- *         原版 1.18.2 没有那张注册表（{@code ClientTooltipComponent#create} 只是一个
- *         硬编码 {@code if}），Fabric 也没提供等价 API —— 但方法本身是静态可注入的，
- *         所以本移植版用 {@code mixin/client/ClientTooltipComponentMixin} 在 HEAD 处接上去，
- *         效果与上游的注册表一致（见 {@link #getTooltipImage} 与 {@code ClientMaidTooltip}）。</li>
- *     <li><b>YSM 兼容略过。</b>{@code YsmMaidInfo} 属于 YSM 联动，本移植版没有。</li>
- * </ol>
  */
 public abstract class AbstractStoreMaidItem extends Item {
     /**

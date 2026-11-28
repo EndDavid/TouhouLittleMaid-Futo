@@ -50,7 +50,7 @@ public final class IpnCompat {
      * 客户端入口调用一次，只为了在日志里留一条可断言的锚点。
      */
     public static void init() {
-        TouhouLittleMaid.LOGGER.info("[Futo] Inventory Profiles Next present: {}", isLoaded());
+        TouhouLittleMaid.LOGGER.debug("[Futo] Inventory Profiles Next present: {}", isLoaded());
     }
 }
 

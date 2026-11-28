@@ -152,7 +152,7 @@ public class MaidUpdateActivityFromSchedule extends Behavior<EntityMaid> {
             LAST_RIDE_STATE.clear();
         }
         LAST_RIDE_STATE.put(uuid, state);
-        com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.info(
+        com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.debug(
                 "[Futo] ride maid={} schedule={} rider={} isWork={} task={} mainHand={}",
                 uuid, activity.getName(), riderActivity.getName(),
                 InitEntities.RIDE_WORK.getName().equals(riderActivity.getName()),

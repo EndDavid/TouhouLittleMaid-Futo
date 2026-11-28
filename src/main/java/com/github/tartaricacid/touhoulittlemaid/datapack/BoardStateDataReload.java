@@ -86,7 +86,7 @@ public final class BoardStateDataReload implements SimpleSynchronousResourceRelo
             readData(pack, XIANGQI_PATH, BoardStateData::addXiangqiRecords);
             readData(pack, GOMOKU_PATH, BoardStateData::addGomokuRecords);
         });
-        TouhouLittleMaid.LOGGER.info("[Futo] board states loaded: gomoku={} xiangqi={} chess={}",
+        TouhouLittleMaid.LOGGER.debug("[Futo] board states loaded: gomoku={} xiangqi={} chess={}",
                 BoardStateData.getGomokuRecords().size(),
                 BoardStateData.getXiangqiRecords().size(),
                 BoardStateData.getChessRecords().size());

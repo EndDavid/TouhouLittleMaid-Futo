@@ -25,35 +25,6 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * 五子棋棋盘的渲染器，对应上游 1.20.1 的 {@code TileEntityGomokuRenderer}。
- *
- * <p>棋盘是 {@code gomoku.json}（一张 2×2 格的木桌 + 一层格线），棋子是
- * {@code gomoku_piece.json}（一颗 2×1×2 的圆饼）。画法与另外两张棋盘一致，
- * 三条经验照搬：不要 {@code ZN(180)}、摆放靠 {@code measureBone} 量、
- * 棋子本地坐标在点击坐标系上取负。</p>
- *
- * <h2>格线是怎么定下来的</h2>
- * <p>这张桌子没有格线贴图可以直接数（格线是单独一层 cube，贴图里是一张
- * 151×151 的透明底图）。用 {@code port/board_grid_probe.py} 解码后发现：
- * 竖线和横线都落在 rect 内第 5、15、25 … 145 个 texel 上 —— 正好 15 条、间距 10 texel、
- * 两端各留 5 texel、关于中心完全对称。151 texel 对应 2 格，于是</p>
- * <pre>
- *     间距   = 10 / 151 * 2 = 0.132450 格
- *     第 0 条 = -1 + 5.5 / 151 * 2 = -0.927152 格
- * </pre>
- * <p>这与 {@link GomokuUtil} 里的两个常数是同一组数字 —— 点击判定和渲染共用它们。</p>
- *
- * <h2>为什么棋子不跟着棋盘转</h2>
- * <p>{@code BlockGomoku#use} 拿到的是<b>原始方块内坐标</b>，没有按朝向旋转过；
- * 而棋盘本身还要转给玩家看。两边要对上，只需一个事实：
- * applyFacing 转的是 0/90/180/270 度，而这张 15×15 的格线是
- * <b>以方块中心为中心的正方形</b>，任何 90 度整数倍旋转都把它映回自己。
- * 所以棋子在<b>不旋转</b>的坐标系里摆到 {@code lineAt(k)} 上，
- * 就一定落在画出来的格线上，且就是点击返回的那个 k。</p>
- *
- * <p>这与中国象棋那边恰好相反：象棋的点击向量先按朝向转过
- * （{@code .yRot(facing.toYRot() * DEG)}），姿态相对点击坐标系才是半圈，
- * 所以它必须取负。两块棋盘度量方式一样、结论相反，
- * 差别只在「点击有没有先转」这一步。</p>
  */
 public class TileEntityGomokuRenderer implements BlockEntityRenderer<TileEntityGomoku> {
     private static final ResourceLocation BOARD_TEXTURE =
@@ -138,7 +109,7 @@ public class TileEntityGomokuRenderer implements BlockEntityRenderer<TileEntityG
         if (!logged) {
             logged = true;
             float[] bb = BedrockBlockModels.bounds("gomoku");
-            TouhouLittleMaid.LOGGER.info(
+            TouhouLittleMaid.LOGGER.debug(
                     "[Futo] gomoku layout: board bbox={} surface={} | piece bbox={} center=({}, {}) lift={} "
                             + "stoneBottom={} (should equal surface) | lattice origin={} step={}",
                     bb == null ? "null" : java.util.Arrays.toString(bb), surface,

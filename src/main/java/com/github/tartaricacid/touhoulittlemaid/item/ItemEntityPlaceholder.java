@@ -29,34 +29,6 @@ import java.util.Locale;
 
 /**
  * 「生成？？？」占位物品，移植自上游 {@code item/ItemEntityPlaceholder}。
- *
- * <p>三件进度（{@code base/spawn_maid}、{@code maid_base/reborn_maid}、
- * {@code challenge/spawn_lightning_bolt}）的图标要画的是「祭坛这条配方做出来的东西」，
- * 而它可能根本不是一个物品（女仆、闪电……）。上游的解法是注册这么一件空壳物品，
- * 把配方 id 记在 {@code RecipeId} 上，由客户端渲染器按配方名去换贴图：
- * {@code textures/item/<配方文件名>.png}。</p>
- *
- * <h2>它同时也是能用的物品</h2>
- * <p>对着<b>方块顶面</b>右键，会按 {@code RecipeId} 找到那条祭坛配方并直接生成产物
- * （{@code AltarRecipe#spawnOutputEntity}），然后消耗掉自己。上游就是这么写的，
- * 主要用途是给整合包作者 / 调试用。</p>
- *
- * <h2>与上游的差异</h2>
- * <table border="1">
- *     <tr><th>上游</th><th>本移植版</th><th>原因</th></tr>
- *     <tr>
- *         <td>{@code initializeClient} + {@code IItemRenderProperties}</td>
- *         <td>不写；渲染器在 {@code TouhouLittleMaidFutoClient} 里用
- *             {@code BuiltinItemRendererRegistry} 注册</td>
- *         <td>Fabric 没有 Forge 那套物品渲染属性（坐垫 / 手办 / 野餐篮同一套做法）</td>
- *     </tr>
- *     <tr>
- *         <td>{@code getRecipeManager().byType(...).get(id)}</td>
- *         <td>遍历 {@code getAllRecipesFor(...)} 比对 id</td>
- *         <td>1.18.2 没有 {@code byType} 的按 id 取值形式；本仓库读全量配方的写法见
- *             {@code compat/patchouli/AltarRecipeComponent}</td>
- *     </tr>
- * </table>
  */
 public class ItemEntityPlaceholder extends Item {
     private static final String RECIPE_ID_TAG = "RecipeId";

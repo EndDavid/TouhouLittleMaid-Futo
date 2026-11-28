@@ -43,41 +43,13 @@ import javax.annotation.Nullable;
 import java.util.List;
 
 /**
- * 零食柜，移植自上游 1.20.1 的 {@code block/BlockSnackCabinet}。
+ * 零食柜，移植自上游 1.20.1 的 {@code block/BlockSnackCabinet}（1.18.2 没有这个方块）。
  *
- * <p><b>这是 1.20.1 新增的内容</b>：1.18.2 的 jar 里既没有这个方块，也没有
- * {@code recipes/altar/snack_cabinet.json}。本仓库 baseline 早就拷了它的模型与贴图
- * （{@code models/bedrock/block/snack_cabinet.json}、{@code textures/bedrock/block/snack_cabinet.png}、
- * 物品模型），但方块与配方一直没接上 —— 于是那条祭坛配方也就无从谈起。</p>
+ * <p>{@link #TYPE} 表示<b>柜顶摆了什么</b>，只影响外观分层：{@code 0} 空、
+ * {@code 1} 满（高玻璃罩 {@code full}）、{@code 2} 半（矮玻璃罩 {@code half}），
+ * 判定依据是上方方块的标签 {@link #SNACK_CABINET_FULL} / {@link #SNACK_CABINET_HALF}。</p>
  *
- * <h2>方块本体是「不可见」的</h2>
- * <p>{@code models/block/snack_cabinet.json} 里<b>只有 particle 贴图、没有 elements</b>，
- * 所以世界里的柜子完全由方块实体渲染器用基岩模型画（与祭坛 / 神社 / 三张棋盘同一条管线）。
- * 这也解释了为什么 {@code blockstates} 里只有一个空 variants —— 它不按 state 换模型。</p>
- *
- * <h2>TYPE 属性做什么</h2>
- * <p>它表示<b>柜子顶上摆了什么</b>，只影响外观分层（反编译上游 1.20.1 的
- * {@code TileEntitySnackCabinetRenderer} 可见）：</p>
- * <ul>
- *     <li>{@code 0} —— 顶上是空的：只画柜体本身（1×1 的木柜）；</li>
- *     <li>{@code 1} —— 顶上是一个「满」的食物（蛋糕 / 烤鸡），画高玻璃罩 {@code full} 骨骼；</li>
- *     <li>{@code 2} —— 顶上是一个「半」的食物（派 / 芝士蛋糕），画矮玻璃罩 {@code half} 骨骼。</li>
- * </ul>
- * <p>判定依据是<b>上方方块的方块标签</b>：{@link #SNACK_CABINET_FULL} 与
- * {@link #SNACK_CABINET_HALF}。这两个标签上游由 datagen 生成，本移植版直接随包给 JSON
- * （{@code data/touhou_little_maid/tags/blocks/snack_cabinet_{full,half}.json}，内容照抄上游）。</p>
- *
- * <p><b>与上游的一处差异：</b>上游只在 {@code updateShape} 里「命中标签才改 TYPE」，
- * 邻居变成空气时直接走 {@code super}，于是<b>把食物拿走后玻璃罩不会消失</b>（要等下一次
- * 方块更新才可能被改掉）。这里改成三分支都赋值：上方既不在 full 也不在 half 标签里 → {@code 0}。
- * 这样「拿走食物 → 罩子消失」是即时且确定的。</p>
- *
- * <h2>与上游的其他差异</h2>
- * <p>上游 extends {@code BaseEntityBlock} 并自己实现 {@code use} → {@code openMenu}，这里同样。</p>
- *
- * <p>上游还有一段「蹲下 + 方块物品点顶面 = 往上叠一层」，本移植版没做：
- * 它依赖上游 {@code MaidConfig} 里的开关与其他方块的摸索行为，
- * 而「能装 27 格、能被女仆取用、顶上的食物有玻璃罩」这三件已经完整。</p>
+ * <p>方块本身不画（{@code ENTITYBLOCK_ANIMATED}），几何全在方块实体渲染器里。</p>
  */
 public class BlockSnackCabinet extends BaseEntityBlock {
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
@@ -185,26 +157,10 @@ public class BlockSnackCabinet extends BaseEntityBlock {
     }
 
     /**
-     * 右键打开 27 格存储（与上游逐字对应）。
+     * 右键打开 27 格存储。界面就是原版单箱（{@code ChestMenu.threeRows} + {@code ChestScreen}）。
      *
-     * <p>界面就是原版单箱（27 格、三行）：方块实体是
-     * {@link net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity}，
-     * {@code createMenu} 返回 {@link net.minecraft.world.inventory.ChestMenu#threeRows}，
-     * 客户端因此直接用 {@code ChestScreen} —— 与木桶 / 箱子同一套。</p>
-     *
-     * <h2>为什么这里<b>不再</b>有「手持方块点顶面 → PASS」那一条</h2>
-     *
-     * <p>上游 1.20.1 的 {@code BlockSnackCabinet#use} 开头确实有这一段（反编译字节码逐字确认），
-     * 它服务于上游那个「蹲下 + 方块物品点顶面 = 往柜顶叠一层食物」的动作。
-     * 本移植版没有做那个动作，于是这一段只剩下副作用：
-     * <b>手里随便拿着一个方块（木板、玻璃、甚至蛋糕）去点柜子顶面，界面不会开</b>，
-     * 玩家看到的就是「点不开」。</p>
-     *
-     * <p>而「想往柜顶放方块」并不需要这个特判：原版客户端在<b>蹲下 + 手上有物品</b>时
-     * 根本不会调用方块的 {@code use}（{@code MultiPlayerGameMode#useItemOn} 里的
-     * {@code isSecondaryUseActive() && !flag} 分支），这一条对箱子 / 木桶同样适用。
-     * 所以删掉之后，「站着右键 = 开界面」「蹲着右键 = 往柜顶放方块」两种操作都成立，
-     * 与木桶完全一致。</p>
+     * <p>不处理「手持方块点顶面」：那个分支只服务于上游「蹲下往柜顶叠一层」的动作，
+     * 而原版客户端在蹲下且手上有物品时根本不会调用方块的 {@code use}。</p>
      */
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
@@ -215,9 +171,6 @@ public class BlockSnackCabinet extends BaseEntityBlock {
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity instanceof TileEntitySnackCabinet cabinet) {
             player.openMenu(cabinet);
-            // 一行锚点日志：界面到底开没开，看服务端日志就能判断，不用靠猜。
-            TouhouLittleMaid.LOGGER.info("[Futo] snack cabinet opened by {} at {}",
-                    player.getGameProfile().getName(), pos);
         } else {
             TouhouLittleMaid.LOGGER.warn("[Futo] snack cabinet at {} has no block entity ({})",
                     pos, blockEntity);

@@ -27,45 +27,6 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 /**
  * 聊天气泡的服务端管理器，移植自 1.18.2 上游 {@code entity/chatbubble/ChatBubbleManger}。
- *
- * <h2>它负责什么</h2>
- * <ul>
- *     <li><b>三槽位写入</b>：{@link #addChatBubble}（最早到期的槽位被覆盖）；</li>
- *     <li><b>到期清理</b>：{@link #tick}；</li>
- *     <li><b>随机台词</b>：每 60 秒（按 UUID 打散，避免同一刻所有女仆一起说话）
- *         从模型台本里挑一条，分三类：
- *         <ol>
- *             <li>main —— 按作息 {@code idle} / {@code sleep} / {@code work}，
- *                 工作时还会再按任务 id 挑一次；</li>
- *             <li>special —— 早上 / 晚上 / 雨 / 雪 / 冷 / 热 / 受伤 / 讨食；</li>
- *             <li>other —— 饰品自定义（静音饰品给 {@code mute}）。</li>
- *         </ol>
- *     </li>
- *     <li><b>内部提示</b>：{@link #addInnerChatText}（25 秒内同一只女仆只弹一次）；</li>
- *     <li><b>AI 回复</b>：{@link #addAiChatText}（气泡 + 给主人发聊天栏消息）。</li>
- * </ul>
- *
- * <h2>台本从哪来</h2>
- * <p>{@link ChatBubbleScripts}：模组 jar 里的 {@code default_chat_bubble.json}
- * 与模型包自己的 {@code chat_bubble}，再叠上玩家用书与笔写进女仆身上的
- * {@link MaidScriptBookManager} 台本（上游同样是把三者拼起来）。</p>
- *
- * <h2>与 1.18.2 上游的差异</h2>
- * <ul>
- *     <li>上游用 Forge 的 {@code @EventBusSubscriber} 自动注册受伤监听；Fabric 没有事件总线，
- *         改成 {@link #init()} 里手工 {@code MinecraftForge.EVENT_BUS.register(this)}
- *         （本仓库的兼容层，见各保护类饰品）。</li>
- *     <li>上游的 {@code ServerCustomPackLoader.SERVER_MAID_MODELS} 换成了
- *         {@link ChatBubbleScripts}（直接读 jar，理由见那个类）。</li>
- *     <li>台本的读取失败只记一条 warn，不抛 —— 台本坏了不该让女仆不再说话。</li>
- * </ul>
- *
- * <h2>与 1.20.1 的差异</h2>
- * <p>1.20.1 把「随机台词」拆成了 KaomojiData（数据包里的颜文字表）+ EmojiChatBubbleData
- * （{@code textures/chat_bubble/maid_emoji/*.png} 的图片气泡），并加了权重配置。
- * 本移植版沿用 1.18.2 的一套（台本里直接写 {@code %贴图%} 或文本），等价于
- * 「颜文字 + 表情图」两种能力都有，只是数据来源不同。1.20.1 的那批
- * {@code maid_emoji/*.png} 与 {@code kaomoji.json} 没有随本仓库一起带过来。</p>
  */
 public final class ChatBubbleManger {
     private static final Cache<Integer, ChatText> INNER_CHAT_TEXT_CACHE =

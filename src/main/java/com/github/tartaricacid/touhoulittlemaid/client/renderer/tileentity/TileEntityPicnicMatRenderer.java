@@ -20,37 +20,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 /**
  * 野餐垫的渲染器，对应上游 1.20.1 的 {@code PicnicMatRender}。
- *
- * <p>模型直接读 1.20.1 的 {@code models/bedrock/block/picnic_mat.json}（与本模组 jar 里
- * 那一份<b>逐字节相同</b>），贴图是 {@code textures/bedrock/block/picnic_mat.png}，
- * 走本移植版已有的 {@link BedrockBlockModels} 管线 —— 与祭坛 / 神社 / 三张棋盘同一条路。
- * 那条管线把基岩几何的细节（按面 UV、负 inflate、零厚度面、骨骼层级与缩放）都处理过了，
- * 所以这里不再有手抄几百行 {@code addBox} 的可能。</p>
- *
- * <h2>为什么不照抄上游那两句 {@code translate(0.5,1.5,0.5)} + {@code ZN(180)}</h2>
- * <p>上游是拿「原版 {@code ModelPart} 空间」的旧模型画的：那个空间 Y 向下、y=24 是地面，
- * 所以要抬 1.5 格再翻过来。而这套 json 进的是本移植版的基岩管线，
- * {@code GeoCube#createFromPojoCube} 在换算时已经处理过方向，
- * 量出来的包围盒就是 <b>Y 向上、底面在 0、水平居中</b>：</p>
- * <pre>
- * Block model picnic_mat loaded: 49 bones, bbox x[-2.231..2.313] y[-0.013..0.625] z[-2.251..2.251]
- * </pre>
- * <p>照抄那两句的话，模型会被翻个底朝天再抬到 0.875~1.5 格高 —— 也就是「悬空倒扣」。
- * 这与上一轮祭坛 / 神社换基岩模型时踩过的坑是同一个，所以这里按实测包围盒来摆。</p>
- *
- * <h2>食物坐标为什么是 {@code 1.5 - z}</h2>
- * <p>上游那 6 组坐标是在「抬 1.5 格 + 翻转」之后的空间里给的，其中竖直分量正好被那个 1.5
- * 反了过来（{@code 1.4125 → 0.0875} 就是「贴着垫面」）。本移植版没有那两句，
- * 于是把 z 换成 {@code 1.5 - z} 就落回同一个世界位置；x / y 不变。</p>
- *
- * <h2>三层内容</h2>
- * <ol>
- *     <li><b>装饰件</b>：{@code basketHide / breadHide / cakeHide} 是模型自带的
- *         「看起来有东西」的贴片，对应格子里真放了东西时隐藏；开关是
- *         {@link AnimatedGeoBone#setHidden}（基岩模型没有 {@code visible} 字段）；</li>
- *     <li><b>物品</b>：{@code 3..8} 六格按固定坐标摆盘，数量 ≥ 10 时叠一摞；</li>
- *     <li><b>垫子本身</b>：最后画。</li>
- * </ol>
  */
 public class TileEntityPicnicMatRenderer implements BlockEntityRenderer<TileEntityPicnicMat> {
     private static final ResourceLocation TEXTURE =

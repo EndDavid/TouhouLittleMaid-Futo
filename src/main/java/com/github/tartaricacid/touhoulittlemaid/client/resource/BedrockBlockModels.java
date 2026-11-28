@@ -20,36 +20,6 @@ import java.util.Map;
 
 /**
  * 静态（无动画）基岩方块模型的加载、缓存与包围盒。
- *
- * <p>上游 1.20.1 把这批方块从「原版 JSON 模型」换成了「GeckoLib 基岩模型」，
- * 只有这样才能做出那种高精度外形：{@code models/bedrock/block/*.json} 里是
- * {@code minecraft:geometry}，纹理动辄 512×512，一个祭坛就有上千个 cube。</p>
- *
- * <h2>为什么可以复用实体那条管线</h2>
- * 本移植的 {@code geckolib3} 是完整的一套，几何解析（{@code Converter} →
- * {@code RawGeometryTree#parseHierarchy} → {@code GeoBuilder}）与渲染
- * （{@code IGeoRenderer}）都不依赖动画；{@link AnimatedGeoModel} 也只是给
- * {@code GeoModel} 包了一层可变骨骼，静止时旋转/位移全为 0，画出来就是静态模型。
- *
- * <h2>与实体模型的区别</h2>
- * <b>不做骨骼改名、也不补 {@code Root}。</b>{@link GeckoModelLoader} 那两步是为了让
- * 旧版女仆模型能复用 {@code maid.animation.json}；方块模型没有动画，而且它们的骨骼名
- * 是 {@code new} / {@code A} / {@code B} 这种，改名表根本不会命中。
- *
- * <h2>{@link #floorOffset} 与「上下颠倒 + 沉进地里」</h2>
- *
- * <p>换用基岩模型之前，这两个渲染器画的是原版 {@code EntityModel}，其顶点空间是
- * <b>Y 向下</b>的，所以代码里有一句 {@code ZN(180)} 把它翻上来，另外还有手调的
- * {@code +1.5} / {@code -1.5} 竖直偏移去凑各自模型的坐标原点。</p>
- *
- * <p>基岩几何（见 {@code GeoCube}）本来就是 <b>Y 向上</b>的 —— 女仆就是这么画的 ——
- * 于是那句 {@code ZN(180)} 反而把方块模型翻了个底朝天，手调偏移也不再对应新的原点
- * （祭坛的几何有相当一部分压在原点下方，神社的原点却正好在底面）。
- * 硬编码任何数字都注定只对一个模型正确。</p>
- *
- * <p>所以改成按模型自身量出来的包围盒计算：{@link #floorOffset} 返回
- * {@code -max(0, minY)}（只压不抬，因为 y = 0 本身就是方块底面），
- * 绝不硬编码任何数字。神社量出来的 minY 正好 0，祭坛是 −0.125（装饰件故意埋进地面），两者都不会被抬高。</p>
  */
 public final class BedrockBlockModels {
     /** 名称 → 模型；值可能是 {@code null}（文件缺失 / 解析失败）。 */
@@ -134,7 +104,7 @@ public final class BedrockBlockModels {
             // 注意占位符数量必须和参数个数严格一致：SLF4J 不会因为参数不足报错，
             // 而是把多余的 "{}" 原样打进日志（上一版就漏了一个参数，日志里出现 "model minY={}"）。
             // 这里的 offset 与 floorOffset 用的是同一条规则（只压不抬）。
-            TouhouLittleMaid.LOGGER.info(
+            TouhouLittleMaid.LOGGER.debug(
                     "[Futo] Block model {} loaded: {} bones, bbox x[{}..{}] y[{}..{}] z[{}..{}] floorOffset={} (model minY={})",
                     name, model.bones().size(),
                     fmt(b[0]), fmt(b[3]), fmt(b[1]), fmt(b[4]), fmt(b[2]), fmt(b[5]),

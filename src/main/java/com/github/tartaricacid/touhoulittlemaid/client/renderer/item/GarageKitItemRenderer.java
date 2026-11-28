@@ -63,11 +63,6 @@ public class GarageKitItemRenderer implements BuiltinItemRendererRegistry.Dynami
     @Nullable
     private StatueBaseModel baseModel;
 
-    /**
-     * 只打一次诊断日志，避免刷屏。留着它是因为这个图标排查过两轮，
-     * 下次再出问题可以直接从日志确认渲染器到底有没有被调用。
-     */
-    private boolean loggedFirstRender = false;
 
     @Override
     public void render(ItemStack stack, ItemTransforms.TransformType mode, PoseStack poseStack,
@@ -76,11 +71,6 @@ public class GarageKitItemRenderer implements BuiltinItemRendererRegistry.Dynami
         Level level = minecraft.level;
         if (level == null) {
             return;
-        }
-        if (!this.loggedFirstRender) {
-            this.loggedFirstRender = true;
-            TouhouLittleMaid.LOGGER.info(
-                    "[Futo] Garage kit item renderer active (mode={}, hasTag={})", mode, stack.hasTag());
         }
 
         EntityCacheUtil.onClientLevelChange(level);

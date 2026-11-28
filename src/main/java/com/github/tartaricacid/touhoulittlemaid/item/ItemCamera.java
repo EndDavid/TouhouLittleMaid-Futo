@@ -28,34 +28,6 @@ import java.util.Optional;
 
 /**
  * 文文的相机（上游 {@code item/ItemCamera} 的移植）。
- *
- * <h2>功能</h2>
- *
- * <p>对本模组的女仆「拍一张照」：把她从世界上收走，并在原地掉落一张
- * {@link ItemPhoto}，照片里存着她完整的存档数据。之后拿照片右击方块即可放出来 ——
- * 这是跨维度 / 远距离搬运女仆的手段（也正是 mcmod 上写的效果）。</p>
- *
- * <h2>三条判定</h2>
- *
- * <ul>
- *     <li>只认<b>自己的</b>女仆（{@code isOwnedByPlayer}）；</li>
- *     <li>必须<b>活着且不在睡觉</b> —— 睡着的女仆不响应交互，强行收走会留下一个
- *         已经绑定床位的空壳；</li>
- *     <li>用 {@link MaidRayTraceHelper} 判断「视线是否真的对准她」，因为
- *         {@code Minecraft#hitResult} 是客户端独有的，而收人要跑在服务端。</li>
- * </ul>
- *
- * <h2>与上游的差异</h2>
- *
- * <ul>
- *     <li><b>没有成就触发器。</b>上游最后会
- *         {@code InitTrigger.MAID_EVENT.trigger(serverPlayer, TriggerType.PHOTO_MAID)}，
- *         那套 Forge 触发器体系（{@code InitTrigger} / {@code TriggerType} /
- *          advancement JSON）尚未移植。</li>
- *     <li><b>去掉了拍照时关闭居家模式以外的副作用。</b>上游这里还会清作息点
- *         （{@code SchedulePos#clear}），但那会把她用罗盘辛苦摆好的三个点一起抹掉 ——
- *         而玩家拍照只是想把女仆收进相片，没打算重设作息。本移植版只关掉居家开关。</li>
- * </ul>
  */
 public class ItemCamera extends Item {
     private static final String MAID_INFO = AbstractStoreMaidItem.MAID_INFO;

@@ -2587,32 +2587,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
     /**
      * 被主人抱着（鞍）时，每 tick 把位置贴到「玩家身前 0.75 格、抬高 0.15 格」，
      * 朝向对齐玩家<b>上半身骨骼</b>的偏航角（{@code yBodyRot}）。
-     *
-     * <h2>为什么需要</h2>
-     *
-     * <p>乘客的坐标<b>不由服务端同步</b>：服务端只发「谁骑谁」
-     * （{@code ClientboundSetPassengersPacket}），具体坐标由客户端自己算。
-     * 原版算它的地方是 {@code Entity#rideTick()} 最后那一句
-     * {@code getVehicle().positionRider(this)}，而 {@code rideTick()} 只会在
-     * {@code Level#tickPassenger} 里被调到。</p>
-     *
-     * <p>反编译 {@code ClientLevel} 确认这条路径<b>会</b>执行（字节码顺序是
-     * {@code setOldPosAndRot → tickCount++ → rideTick}，且只对
-     * {@code tickingEntities} 里的实体执行 —— 女仆在表里）。
-     * 但它依赖「客户端确实复现了乘客关系」，一旦哪个环节没对上，画面就会永远停在
-     * 抱起那一刻。所以在 {@link #tick()} 里再算一遍作为兜底：两端结果完全一致，
-     * 不需要任何额外网络包。</p>
-     *
-     * <h2>为什么绝不能在这里调 setOldPosAndRot()</h2>
-     *
-     * <p>理由就是上一段：{@code tickPassenger} 已经替我们调过了。渲染器画的是
-     * {@code lerp(partialTick, xo, getX())}，而 {@code xo} 的语义是「上一 tick 的位置」。
-     * 反编译 ClientLevel 确认：乘客每次 tick 之前，tickPassenger() 已经替她调过一次
-     * setOldPosAndRot()（字节码顺序：setOldPosAndRot → tickCount++ → rideTick）。
-     * 所以「旧位置 → 新位置」之间本来就有插值。
-     * 这里再调一次会把 xo 覆盖成新位置，插值区间长度变成 0 ——
-     * 表现正是「每 tick 瞬移到玩家身前一次」，看起来只有 20 帧。
-     * 这是之前「女仆跟随不平滑」的根因。</p>
      */
 
 
@@ -2728,39 +2702,6 @@ public class EntityMaid extends TamableAnimal implements IMaid,
 
     /**
      * 被抱着时<b>不可被准星选中</b>。
-     *
-     * <h2>为什么需要</h2>
-     *
-     * <p>被鞍抱起后她正好悬在玩家身前 0.75 格，而准星射线（{@code GameRenderer#pick}）
-     * 只取「最近的那个」，所以她必然挡在中间。此时右键任何东西都会变成
-     * {@code mobInteract}，一路走到 {@code openMaidGui} —— 表现就是
-     * 「抱着女仆想开箱子，结果打开了女仆界面」。</p>
-     *
-     * <p>反编译确认这条链：{@code GameRenderer} 里实体射线的过滤器就是
-     * <pre>
-     * private static boolean method_18144(Entity e) {
-     *     return !e.isSpectator() &amp;&amp; e.isPickable();
-     * }
-     * </pre>
-     * 而 {@code Minecraft#startUseItem} 的实体分支一旦命中，就
-     * <b>不会再回头去试方块</b>（{@code case ENTITY → interactAt → interact → return}），
-     * 所以只在 {@code mobInteract} 里拒绝是没用的，必须让她从射线里消失。</p>
-     *
-     * <h2>与上游一致的做法</h2>
-     *
-     * <p>上游 1.20.1 的 {@code EntityBroom} 对同一个问题就是同一套解法：
-     * <pre>
-     * public boolean isPickable() {
-     *     boolean hasPlayer = ...;   // 有玩家骑着
-     *     return hasPlayer ? false : super.isPickable();
-     * }
-     * </pre>
-     * 上游 {@code EntityMaid} 本身没有这个重写，但它的抱持位置同樣是身前 0.75 格，
-     * 遇到的是同一个坑。</p>
-     *
-     * <p>放下她仍然有路可走，且都不经过实体射线：拿鞍右键空气 / 方块
-     * （{@code MaidSaddleEvents} 挂在 {@code UseItemCallback} 上）。
-     * 射线穿透她之后，被挡在后面的箱子、门、拉杆都有正常响应。</p>
      */
     @Override
     public boolean isPickable() {

@@ -15,36 +15,6 @@ import net.minecraft.world.entity.LivingEntity;
 
 /**
  * 在 GUI 里画一个会自转的实体（上游 {@code util/RenderHelper#renderEntityInInventory} 的移植）。
- *
- * <h2>为什么不能直接用 {@code InventoryScreen#renderEntityInInventory}</h2>
- *
- * <p>那个方法也能在 GUI 里画实体，但它的朝向被写死成从鼠标坐标反推：</p>
- *
- * <pre>
- * float angleX = (float) Math.atan(mouseX / 40.0F);
- * entity.setYRot(180.0F + angleX * 40.0F);
- * </pre>
- *
- * <p>{@code atan} 的值域是 {@code (-π/2, π/2)}，乘 40 之后女仆只能在
- * {@code 180° ± 62.8°} 这个约 125° 的扇区里摆动 —— <b>无法整圈自转</b>。
- * 物品提示框里的预览需要匀速转一圈（否则看不清背面和侧面），所以这里照抄上游的写法：
- * 自己往 modelview 里塞变换，再直接调 {@link EntityRenderDispatcher#render}，
- * 实体朝向固定 {@code 180°}，绕 Y 轴的旋转由外部传入的 {@link Quaternion} 决定。</p>
- *
- * <h2>modelview 的两次「分层」为什么必要</h2>
- *
- * <p>这段是从原版 {@code renderEntityInInventoryRaw} 学来的结构，两步都在
- * {@code RenderSystem.getModelViewStack()} 上做：</p>
- *
- * <ol>
- *     <li>先把 GUI 坐标系搬到 {@code (x, y, blitOffset + 1050)}、并把 Z 轴翻过来
- *         （{@code scale(1, 1, -1)}）—— 这是把「GUI 的 XY 平面」变成「世界的 XY 平面 + 朝向相机」；</li>
- *     <li>再 {@code applyModelViewMatrix()} 落地，之后<b>新建一个干净的 PoseStack</b>
- *         用来画实体本身（{@code translate(0, 0, 1000)} 拉开深度、{@code scale} 缩放实体）。</li>
- * </ol>
- *
- * <p>分两步的好处是实体自己的变换不会污染 GUI 后续的绘制 ——
- * 方法返回前会把 modelview 栈 pop 回去，并 {@code applyModelViewMatrix()} 刷新一次。</p>
  */
 @Environment(EnvType.CLIENT)
 public final class InventoryEntityRenderer {

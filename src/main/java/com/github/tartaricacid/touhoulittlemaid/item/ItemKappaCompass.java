@@ -30,33 +30,6 @@ import java.util.List;
 
 /**
  * 河童的罗盘，逐行移植自上游 {@code item/ItemKappaCompass}。
- *
- * <h2>用法（四个动作，按顺序设定）</h2>
- * <ol>
- *     <li><b>右击方块</b>：依次记下工作点 → 娱乐点 → 睡觉点。第二、三个点距前一个
- *         超过 64 格就拒绝（否则三个圈会散落在完全不同的地方，玩家根本看不出关系）；</li>
- *     <li><b>潜行右击方块</b>：清空罗盘里记的坐标；</li>
- *     <li><b>右击女仆</b>：把三个点写进她的 {@code SchedulePos}，之后她开着 Home
- *         就会按日程在三个圈之间活动；</li>
- *     <li><b>潜行右击女仆</b>：清空她的作息坐标（<b>注意它同时会把 Home 关掉</b> ——
- *         上游的 {@code SchedulePos#clear} 会把三个点并回工作点并置
- *         {@code configured = false}，于是下次开 Home 会以她当时的站位重新锚定）。</li>
- * </ol>
- *
- * <h2>数据放在物品 NBT 里</h2>
- * <p>{@code KappaCompassData} 子标签下用 {@link Activity#getName()} 作键
- * （{@code minecraft:work} / {@code minecraft:idle} / {@code minecraft:rest}），
- * 加一个 {@code Dimension}。与上游键名完全一致，所以罗盘可以在两个模组之间被识别。</p>
- *
- * <h2>与上游的差异</h2>
- * <ul>
- *     <li>上游用 {@code player.isDiscrete()}（Forge 给 {@code Player} 加的方法，
- *         语义是「潜行且没骑在载具上」）。vanilla 1.18.2 没有它，这里用
- *         {@link Player#isShiftKeyDown()}。差别只在「骑在船上潜行右键女仆」这一种情况，
- *         而骑乘状态下本来就打不到女仆。</li>
- *     <li>上游 {@code sendMessage(Component, UUID)} 是 Forge 的重载；这里换成
- *         {@code displayClientMessage(Component, false)}（不刷动作栏）。</li>
- * </ul>
  */
 public class ItemKappaCompass extends Item {
     private static final String KAPPA_COMPASS_DATA = "KappaCompassData";

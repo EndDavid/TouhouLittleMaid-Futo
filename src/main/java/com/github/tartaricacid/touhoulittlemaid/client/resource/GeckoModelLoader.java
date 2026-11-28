@@ -140,7 +140,7 @@ public final class GeckoModelLoader {
         CustomPackLoader.loadExternalMaidPacks();
         long millis = (System.nanoTime() - startNanos) / 1_000_000L;
 
-        TouhouLittleMaid.LOGGER.info("[Futo] Model loading time: {} ms ({} maid models, {} geometries, {} animation files)",
+        TouhouLittleMaid.LOGGER.debug("[Futo] Model loading time: {} ms ({} maid models, {} geometries, {} animation files)",
                 millis,
                 MaidModelRegistry.all().size(),
                 GeckoLibCache.getInstance().getGeoModels().size(),

@@ -23,49 +23,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * 把「Touhou Little Maid: Main」创造模式页签的图标换成布都的 pack 立绘。
- *
- * <h2>为什么只能走 mixin</h2>
- *
- * <p>1.18.2 里页签图标只有一个来源：{@code CreativeModeTab#getIconItem()} 返回的
- * {@code ItemStack}，再交给 {@code ItemRenderer#renderAndDecorateItem} 画成 16×16 的物品图标。
- * Fabric 的 {@code FabricItemGroupBuilder.icon(Supplier&lt;ItemStack&gt;)} 也只收物品栈，
- * 没有任何「直接给一张贴图」的口子。要既不改注册表（上游没有这种物品，
- * 凭空多注册一件会被 {@code /give}、REI 之类看到），又让它显示成画而不是物品，
- * 就只能在画的那一步把 {@code ItemStack} 换成贴图。</p>
- *
- * <h2>注入点</h2>
- *
- * <p>{@code CreativeModeInventoryScreen#renderTabButton(PoseStack, CreativeModeTab)} 里
- * 画完页签底图之后会调用一次
- * {@code itemRenderer.renderAndDecorateItem(tab.getIconItem(), x, y)}。这里把这一次调用
- * 重定向掉：是本模组的主页签就改画 {@code textures/gui/tab_icon.png}，否则原样转交给
- * 原方法（其它页签的行为一点不变）。</p>
- *
- * <p>{@code PoseStack} 与 {@code CreativeModeTab} 都是 {@code renderTabButton} 的参数，
- * 重定向处理器的入参里拿不到，所以在 HEAD 处先存进两个 {@code @Unique} 字段。
- * 单线程（渲染线程）逐帧调用，不存在并发问题。</p>
- *
- * <h2>坐标与深度</h2>
- *
- * <p>重定向拿到的是原版算好的 {@code x, y}，也就是那个 16×16 物品图标槽位的左上角。
- * 这里以它为基准保持中心不变、边长取 {@link #futo$tabIconSize}（默认 16，即原版尺寸），
- * 所以左上角要往回挪 {@code (size - 16) / 2}；默认值下偏移为 0，位置与原版完全一致。</p>
- *
- * <p>贴图保持 32×32 不缩放，靠 {@code blit} 把整张 UV 压进 16×16 的目标矩形，
- * 由 GPU 点采样一次完成。这样才能「32×32 的材质按 16×16 显示」——
- * 注意不能用 9 参的 {@code blit}：那个重载的 UV 跨度就是目标宽高，写 16 会变成裁掉原图四分之三。</p>
- *
- * <p>深度用 100：原版在画图标之前把 {@code itemRenderer.blitOffset} 设成 100
- * 让物品盖在页签底图上，我们顶替的正是那一层，所以取同一个值，
- * 既盖住底图也不会突出到别的东西前面。</p>
- *
- * <h2>另一半职责：服务端没装本模组时把页签藏起来</h2>
- *
- * <p>Fabric 两端各自加载模组，服务端没装本模组时客户端照样注册了三个页签，
- * 于是玩家能把物品拖出来 —— 但那些物品在服务端注册表里不存在，拿到手就等于空气。
- * 判定见 {@code network/ServerPresence}（走 Fabric 的 channel 通告），
- * 这里负责界面侧的三件事：<b>不画按钮</b>、<b>点不到</b>、<b>悬停不出提示</b>。
- * 页签内容本身的清空在 {@code init/InitItems} 的三个 {@code appendItems} 里。</p>
  */
 @Mixin(CreativeModeInventoryScreen.class)
 public class CreativeModeInventoryScreenMixin {

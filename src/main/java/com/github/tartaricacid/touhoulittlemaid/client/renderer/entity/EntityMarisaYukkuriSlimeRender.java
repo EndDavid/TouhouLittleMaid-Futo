@@ -21,34 +21,6 @@ import net.minecraft.world.entity.monster.MagmaCube;
 
 /**
  * 把原版岩浆怪渲染成「魔理沙油库里」。
- *
- * <p>与史莱姆那一半（{@link EntityYukkuriSlimeRender}）不同，这一版<b>直接用上游 1.20.1 的
- * 基岩模型与贴图</b>，而不是手写网格：</p>
- *
- * <table border="1">
- *     <caption>两版的差异</caption>
- *     <tr><th></th><th>1.18.2</th><th>1.20.1（本实现）</th></tr>
- *     <tr><td>贴图</td><td>64×64</td><td><b>128×128</b></td></tr>
- *     <tr><td>几何</td><td>手写 {@code LayerDefinition}，9 根骨骼</td><td>{@code marisa_yukkuri.json}，14 根骨骼</td></tr>
- *     <tr><td>UV</td><td>(0,18) / (46,14) / (0,49) …</td><td>(45,16) / (45,33) / (0,0) … <b>全换</b></td></tr>
- * </table>
- *
- * <p>也就是说这不是「换一张图」而是「换整套外观」，手写网格等于把 JSON 手工重排一遍，
- * 抄错一个 uv 就是贴图错位且极难发现。所以这里走 {@link BedrockEntityModels} +
- * {@link GeoBlockRenderer}（内部就是 GeckoLib 的 {@code renderRecursively}），
- * 几何与贴图都保持上游原样。</p>
- *
- * <h2>为什么继承 {@link EntityRenderer} 而不是 {@code MobRenderer}</h2>
- * <p>{@code LivingEntityRenderer#render} 会给 {@code PoseStack} 套上
- * {@code scale(-1, -1, 1)} 和 {@code translate(0, -1.501, 0)}，那是给「y 向下」的原版
- * {@code EntityModel} 准备的；基岩几何是 <b>y 向上、原点在脚底</b>，直接画会上下颠倒。
- * 想用 {@code MobRenderer} 就得在 {@code renderToBuffer} 里做逆变换，而那个逆变换依赖
- * {@code scale()} 算出来的压缩比例（每个 tick 都不同），无法静态抵消。</p>
- *
- * <p>{@code EntityRenderer#render} 拿到的矩阵栈则<b>只有</b>「平移到实体脚下」，
- * 正是基岩几何要的坐标系 —— 女仆渲染器（{@code GeoReplacedEntityRenderer}）也是这么绕开
- * {@code LivingEntityRenderer} 的。阴影不受影响：它由 {@code EntityRenderDispatcher}
- * 按 {@code shadowRadius} / {@code shadowStrength} 画，与是否继承 {@code MobRenderer} 无关。</p>
  */
 public class EntityMarisaYukkuriSlimeRender extends EntityRenderer<MagmaCube> {
     /** 上游 1.20.1 的贴图（128×128）。旧版 {@code textures/entity/marisa_yukkuri.png} 是 64×64，不能混用。 */

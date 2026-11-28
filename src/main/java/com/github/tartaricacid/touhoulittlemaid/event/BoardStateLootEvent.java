@@ -81,7 +81,7 @@ public final class BoardStateLootEvent {
             // 不补这一下，池子会因为数据表为空而根本不存在（「掉不出残局道具」）。
             if (BoardStateData.isEmpty()) {
                 BoardStateDataReload.load(resourceManager);
-                com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.info(
+                com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.LOGGER.debug(
                         "[Futo] board states loaded on demand for {}: gomoku={} xiangqi={} chess={}",
                         id,
                         BoardStateData.getGomokuRecords().size(),

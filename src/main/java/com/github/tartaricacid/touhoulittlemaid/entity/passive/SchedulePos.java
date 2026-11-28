@@ -16,34 +16,6 @@ import javax.annotation.Nullable;
 /**
  * 女仆的三段作息坐标：工作点 / 娱乐点 / 睡觉点，外加它们所属的维度。逐行移植自上游
  * {@code entity/passive/SchedulePos}。
- *
- * <h2>它为什么不能只是一个「家」坐标</h2>
- * <p>女仆的日程表会在 {@code WORK} / {@code IDLE} / {@code REST} 三种活动之间切换，
- * 每种活动有自己的活动半径（{@code MaidWorkRange} / {@code MaidIdleRange} /
- * {@code MaidSleepRange}）。所以「居家模式」不是一个点，而是<b>三个点</b>：
- * 早上她围着工作点转、傍晚围着娱乐点转、夜里回睡觉点。上游用一个
- * {@link Activity#getName()} 作键的 {@code KappaCompassMapping} 把三者写进同一份数据。</p>
- *
- * <h2>{@link #configured} 的语义</h2>
- * <p>只有河童的罗盘真正写入过坐标，{@code configured} 才为 {@code true}。
- * 玩家在女仆界面上第一次打开 Home 开关时，走的是
- * {@link #setHomeModeEnable(EntityMaid, BlockPos)}：<b>未配置</b>就把三个点全部设成
- * 她当时站的那一格，<b>已配置</b>就原样沿用罗盘写下的坐标。这就是「先摆好三个点，
- * 再开 Home」能生效、而「先开 Home 再摆点」不会把点冲掉的原因。</p>
- *
- * <h2>{@link #tick} 与 {@link #restrictTo}</h2>
- * <p>{@code restrictTo} 只负责按当前活动把 vanilla 的活动范围（{@code restrictCenter} +
- * {@code restrictRadius}）挪到对应的点上；{@link #tick} 每 40 tick 检查一次，
- * 女仆跑出范围就把寻路目标指回去，跑得太远（超出半径 4 格以上）就直接传送。</p>
- *
- * <h2>与上游的差异</h2>
- * <ul>
- *     <li>上游用 {@code MaidConfig.MAID_WORK_RANGE.get()}；Forge Config API Port 的
- *         {@code ConfigValue#get()} 在配置未加载时返回默认值，本移植版统一走
- *         {@link MaidConfig#workRange()} 这类带默认值的包装方法。</li>
- *     <li>上游 1.18.2 的 {@code EntityMaid} 还有 {@code getSchedulePos()} 之外的
- *         「旧存档 RESTRICT_CENTER 迁移」，本移植版从来没有写过那个键，不需要迁移。</li>
- * </ul>
  */
 public final class SchedulePos {
     /**

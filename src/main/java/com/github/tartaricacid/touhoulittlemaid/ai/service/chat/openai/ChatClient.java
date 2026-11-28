@@ -73,7 +73,7 @@ public final class ChatClient {
         String url = resolveUrl();
         // 每次请求都留一行：曾经有过「明明填了 key，请求却在打 127.0.0.1」的困惑，
         // 而当时只有失败才打日志，看不出到底选了哪个站点。
-        TouhouLittleMaid.LOGGER.info("[Futo] AI chat POST {}", url);
+        TouhouLittleMaid.LOGGER.debug("[Futo] AI chat POST {}", url);
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.JSON_UTF_8.toString())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + this.apiKey)

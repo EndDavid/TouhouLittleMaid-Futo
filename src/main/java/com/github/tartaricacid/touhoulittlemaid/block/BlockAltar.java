@@ -42,33 +42,6 @@ import java.util.Optional;
 
 /**
  * 祭坛方块，移植自上游 {@code block/BlockAltar}。
- *
- * <p>祭坛本身<b>没有形状也没有贴图</b>：{@link #getRenderShape} 返回
- * {@code ENTITYBLOCK_ANIMATED}，真正画出来的是
- * {@code client/renderer/tileentity/TileEntityAltarRenderer} 里那台约 8×5×8 的大模型。
- * 玩家看到的「祭坛 × 8 个方块」其实是一整套 {@link TileEntityAltar}，
- * 只有其中一个负责渲染（见 {@code TileEntityAltar#isRender}）。</p>
- *
- * <h2>交互（与上游一致）</h2>
- * <ul>
- *     <li>潜行，或主手为空 → 把顶部贡品取回来；</li>
- *     <li>否则 → 把主手物品放上去（一次一件）。</li>
- * </ul>
- * 每次放 / 取之后都会立刻重算一次配方：够料就产出、扣灵力、清空贡品。
- *
- * <h2>与上游的差异（都是 Forge 独占 API，没有等价物）</h2>
- * <ol>
- *     <li>{@code onBlockExploded} → 改用原版的 {@code wasExploded}。
- *         语义相同（爆炸时把其余祭坛格还原成建坛前的方块），但原版这个方法在
- *         方块被置为空气<b>之前</b>调用，所以被还原出来的方块可能扛过这次爆炸 ——
- *         这点比上游「更结实」，不会留下悬空的祭坛格。</li>
- *     <li>{@code initializeClient} / {@code IBlockRenderProperties} 没有对应物：
- *         上游靠它让「挖掘粒子用原本方块的贴图」。Fabric 侧没有这个钩子，
- *         所以破坏祭坛时粒子是默认的石头粒子。只影响观感。</li>
- *     <li>{@code getSoundType(BlockState, LevelReader, BlockPos, Entity)} 是 Forge 重载，
- *         原版只有无参的 {@code getSoundType(BlockState)}，拿不到坐标也就无法回落到
- *         原本方块的音效，因此祭坛统一使用石头音效。</li>
- * </ol>
  */
 public class BlockAltar extends Block implements EntityBlock {
     public BlockAltar() {

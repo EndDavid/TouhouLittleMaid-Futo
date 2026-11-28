@@ -69,7 +69,7 @@ public final class SettingReader {
         }
         readBuiltinSettings();
         readCustomPacks();
-        TouhouLittleMaid.LOGGER.info("[Futo] loaded {} character settings for AI chat", SETTINGS.size());
+        TouhouLittleMaid.LOGGER.debug("[Futo] loaded {} character settings for AI chat", SETTINGS.size());
     }
     /**
      * 读模组 jar（开发环境是 build 输出目录）里 {@code assets/<domain>/settings/*.yml}。
@@ -199,7 +199,7 @@ public final class SettingReader {
         String fileName = modelId.replace(':', '_').replace('/', '_') + YAML_SUFFIX;
         Path target = SETTINGS_FOLDER.resolve(fileName);
         if (Files.exists(target)) {
-            TouhouLittleMaid.LOGGER.info("[Futo] AI setting for {} already exists, not overwriting", modelId);
+            TouhouLittleMaid.LOGGER.debug("[Futo] AI setting for {} already exists, not overwriting", modelId);
             return false;
         }
         try {
@@ -214,7 +214,7 @@ public final class SettingReader {
             }
             Files.write(target, builder.toString().getBytes(StandardCharsets.UTF_8));
             reloadSettings();
-            TouhouLittleMaid.LOGGER.info("[Futo] auto generated AI setting saved to {}", target);
+            TouhouLittleMaid.LOGGER.debug("[Futo] auto generated AI setting saved to {}", target);
             return true;
         } catch (IOException e) {
             TouhouLittleMaid.LOGGER.error("[Futo] failed to save auto generated AI setting", e);

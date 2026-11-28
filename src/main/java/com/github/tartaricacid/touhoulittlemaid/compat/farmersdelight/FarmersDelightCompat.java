@@ -37,7 +37,7 @@ public final class FarmersDelightCompat {
      */
     public static void addFarmersDelightEdible() {
         boolean loaded = isLoaded();
-        TouhouLittleMaid.LOGGER.info("[Futo] Farmer's Delight present: {}", loaded);
+        TouhouLittleMaid.LOGGER.debug("[Futo] Farmer's Delight present: {}", loaded);
         if (!loaded) {
             return;
         }

@@ -38,44 +38,6 @@ import java.util.UUID;
 
 /**
  * 魔理沙的扫帚，移植自上游 1.20.1 的 {@code entity/item/EntityBroom}。
- *
- * <h2>它为什么要两个人才能飞</h2>
- * <p>扫帚本身没有任何动力：{@link #travel(Vec3)} 只有一句话有意义 ——
- * 「驾驶位是玩家、且背上<b>还坐着一只女仆</b>」时，把 WASD 与俯仰角翻译成速度。
- * 少了女仆就直接掉下去。这条判定就是「女仆是灵力的来源」这个设定在代码里的样子，
- * 也是 {@code BroomTipsOverlay} 那句提示存在的原因。</p>
- *
- * <h2>为什么控制逻辑写在 {@code travel} 里、而不是读键盘状态</h2>
- * <p>早期 1.18.2 上游的做法是在 {@code travel} 里直接读
- * {@code Minecraft.getInstance().options.keyUp.isDown()}（还留了一句「不要问我为什么客户端数据能跑到服务端」）。
- * 那样服务端永远读不到按键，只能靠客户端自己飞、服务端被动跟着报上来的坐骑物坐标走。</p>
- *
- * <p>1.20.1 改成了「读 {@code player.zza} / {@code player.xxa} / 跳跃键」，<b>这套在 1.18.2 也成立</b>，
- * 而且完全不需要客户端类：</p>
- * <ul>
- *     <li>客户端每 tick 发 {@code ServerboundPlayerInputPacket}，它带着 {@code xxa} / {@code zza} / {@code isJumping} / {@code isShiftKeyDown}；</li>
- *     <li>服务端 {@code ServerGamePacketListenerImpl#handlePlayerInput} 把它交给
- *         {@code ServerPlayer#setPlayerInput(xxa, zza, jumping, shift)}；</li>
- *     <li>而 {@code setPlayerInput} 的函数体是 <b>{@code if (isPassenger())}</b> 才写入这四个值 ——
- *         骑扫帚恰好就是 {@code isPassenger()}。</li>
- * </ul>
- * <p>也就是说「骑着的时候，双端都能读到真实按键」，于是控制可以放在服务端算，
- * 不再依赖「客户端自己飞」。本移植版直接采用这个方案。</p>
- *
- * <h2>与上游 1.20.1 的三处差异</h2>
- * <ol>
- *     <li><b>没有 {@code IBroomControl} 接口层。</b>它在上游存在的意义是让附属模组插入自己的飞行方式
- *         （{@code ILittleMaid.registerBroomControl}）。本移植版还没有 {@code ILittleMaid} 扩展注册表，
- *         写一个只有内置实现、永远只有一个元素的「扩展点」只会是假的。
- *         行为本身与 1.20.1 的 {@code PlayerBroomControl} 一致。</li>
- *     <li><b>没有 {@code HasCustomInventoryScreen} / {@code getRiddenSpeed} / {@code onGround()} 重写。</b>
- *         这三个 API 在 1.18.2 都不存在（前一个是 1.19.4+ 的接口，后两个分别是 1.19 与 1.20 才有）。
- *         速度乘子直接在 {@code travel} 里算，效果一致。</li>
- *     <li><b>1.18.2 没有 {@code LivingEntity#travelRidden} / {@code tickRidden}。</b>
- *         上游那套「骑行输入 → {@code tickRidden} → 只让本地操纵的一侧 {@code travel}」
- *         在这里压缩成了 {@link #travel(Vec3)} 里的几行，顺序与语义逐条对齐，
- *         连同「非本地操纵的一侧不模拟位置」这条也一并搬了过来 —— 理由见那个方法的注释。</li>
- * </ol>
  */
 public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity {
     private static final EntityDataAccessor<Optional<UUID>> OWNER_ID =
@@ -154,38 +116,6 @@ public class EntityBroom extends AbstractEntityFromItem implements OwnableEntity
     /**
      * 骑行状态下的每 tick 移动，结构对齐上游 1.20.1 的
      * {@code LivingEntity#travelRidden(Player, Vec3)}。
-     *
-     * <p>1.18.2 的 {@code LivingEntity} 既没有 {@code travelRidden} 也没有 {@code tickRidden}，
-     * 它的 {@code aiStep} 里是<b>无条件</b>调用 {@code this.travel(new Vec3(xxa, yya, zza))}
-     * （字节码偏移 721）。所以这里把上游那三层
-     * 「{@code travelRidden} → {@code tickRidden} → {@code travel}」压进 {@code travel} 一个方法里，
-     * 相对顺序保持一致。</p>
-     *
-     * <h2>为什么必须分成「本地操纵 / 非本地操纵」两半</h2>
-     * <p>上游 1.20.1 的 {@code travelRidden} 原文：</p>
-     * <pre>{@code
-     * private void travelRidden(Player player, Vec3 vec3) {
-     *     Vec3 input = this.getRiddenInput(player, vec3);
-     *     this.tickRidden(player, input);          // 浮动、朝向：两端都跑
-     *     if (this.isControlledByLocalInstance()) {
-     *         this.setSpeed(this.getRiddenSpeed(player));
-     *         this.travel(input);                  // 只有这一侧真的 move
-     *     } else {
-     *         this.calculateEntityAnimation(false);
-     *         this.setDeltaMovement(Vec3.ZERO);    // 另一侧：速度清零，不动
-     *         this.tryCheckInsideBlocks();
-     *     }
-     * }
-     * }</pre>
-     * <p>也就是：<b>被玩家操纵的坐骑只有一侧在算位置</b>，另一侧的位置完全来自客户端上行的
-     * {@code ServerboundMoveVehiclePacket}。</p>
-     *
-     * <p><b>本移植版最初漏掉了这个分支</b>，两端都在 {@code rideControl} + {@code move}。
-     * 于是服务端也按自己的 {@code tickCount} 相位算出一条浮动速度、也在挪扫帚；
-     * 而 1.18.2 的 {@code Entity#lerpTo(...)} 是<b>直接 {@code setPos}</code></b>
-     * （1.18.2 里它没有插值，字节码只有 {@code setPos} + {@code setRot} 两句），
-     * 客户端每收到一次位置包就被硬按到服务端那条<b>相位不同</b>的正弦上 ——
-     * 两条正弦互相拉扯，浮动看起来就是一顿一顿的「生硬」，而不是平滑的上下漂。</p>
      */
     @Override
     public void travel(Vec3 vec3) {

@@ -157,7 +157,7 @@ public class TileEntityWChessRenderer implements BlockEntityRenderer<TileEntityW
         if (!logged) {
             logged = true;
             float[] bb = BedrockBlockModels.bounds("wchess");
-            TouhouLittleMaid.LOGGER.info(
+            TouhouLittleMaid.LOGGER.debug(
                     "[Futo] wchess layout: board bbox={} surface={} | piece bbox={} center=({}, {}) lift={}",
                     bb == null ? "null" : java.util.Arrays.toString(bb), surface,
                     java.util.Arrays.toString(pb), pieceCenterX, pieceCenterZ, pieceLift);
