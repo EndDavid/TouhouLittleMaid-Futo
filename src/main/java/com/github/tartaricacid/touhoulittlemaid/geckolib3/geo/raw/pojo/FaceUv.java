@@ -12,6 +12,9 @@ public class FaceUv implements Serializable {
     private double[] uv;
     @SerializedName("uv_size")
     private double[] uvSize;
+    /** 贴图矩形的旋转角（0 / 90 / 180 / 270）。基岩格式里几乎只用 180。 */
+    @SerializedName("uv_rotation")
+    private Integer uvRotation;
 
     public String getMaterialInstance() {
         return materialInstance;
@@ -31,6 +34,14 @@ public class FaceUv implements Serializable {
 
     public double[] getUvSize() {
         return uvSize;
+    }
+
+    public Integer getUvRotation() {
+        return uvRotation;
+    }
+
+    public void setUvRotation(Integer value) {
+        this.uvRotation = value;
     }
 
     public void setUvSize(double[] value) {

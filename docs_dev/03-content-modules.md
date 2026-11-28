@@ -2938,3 +2938,50 @@ data get block 2 -55 0
 
 - **观感**：玻璃罩的高度、托板朝向、图标动画的节奏，仍然要真人看一眼。
   能自动断言的只有「包围盒正确」「状态机正确」「渲染时不抛异常」。
+
+### 玻璃罩为什么「多出一块」：基岩格式的逐面 `uv_rotation`
+
+模型文件本身没问题。连着两次对比过：`models/bedrock/block/snack_cabinet.json`
+与 Forge 1.20.1、Fabric 1.20.1 两个 jar 里的同名文件 **md5 完全一致**
+（`602aff12765e90c56fc6ad93c3954dba`），贴图也一致（`snack_cabinet.png`，128×128）。
+
+差的是**读取方**。基岩格式允许每个面自带 `"uv_rotation"`，上游 1.20.1 jar 里
+（`simplebedrockmodel`）是这么实现的：
+
+```
+FaceItem.uvRotation          @SerializedName("uv_rotation")  int
+FaceItem.getRotatedUVs(w,h)  返回 8 个数 u0,v0,u1,v1,u2,v2,u3,v3（按顶点顺序）
+BedrockCubePerFace.fillUV    调用 getRotatedUVs(w, h)          <-- 真的用了
+```
+
+四档旋转对应的顶点顺序（`u1,v1` 是矩形左上、`u2,v2` 是右下）：
+
+| `uv_rotation` | 顶点顺序 |
+|---|---|
+| 0（默认） | `u2,v1  u1,v1  u1,v2  u2,v2` |
+| 90 | `u1,v1  u1,v2  u2,v2  u2,v1` |
+| 180 | `u1,v2  u2,v2  u2,v1  u1,v1` |
+| 270 | `u2,v2  u2,v1  u1,v1  u1,v2` |
+
+本移植版的 `FaceUv` **没有这个字段**（`GeoCube` 的 per-face 分支直接把
+`getUv()` / `getUvSize()` 塞进 `GeoQuad`），于是所有声明了 `uv_rotation: 180`
+的面都被当成「没转」采样。零食柜的玻璃罩整层（外框 `full` 的 cube0/cube1/cube2、
+内框、两块 45° 斜板、玻璃片）**全部**带 `180` —— 框线与亮点的位置因此整体翻到了
+矩形的另一侧：看上去就是「玻璃显示不对」「斜角多出一块」。柜体 `root` 那一块
+正好六个面都不带 `uv_rotation`，所以柜身一直是正常的，问题只在罩子上。
+
+同一份数据里 `shrine.json` 也带 `uv_rotation`，所以神社那边顺带一起修正了。
+
+改动一共三处，尽量小：
+
+- `FaceUv`：加 `uv_rotation` 字段与 getter（可空，缺省 = 0）；
+- `GeoQuad`：加一个直接吃 8 个数（4 组 `u,v`）的构造器；
+- `GeoCube`：per-face 的 12 处构造统一走 `perFace(...)`，按上表选顶点顺序。
+  `mirror` 与 `uv_rotation` 同时出现时仍走旧路径（上游 per-face 分支本身也不处理 mirror）。
+
+box-UV 的模型（祭坛 / 棋盘 / 电脑 / 键盘 …）一个字节都没动：它们不进这条路。
+
+验证：`compileJava` 与 `build` 绿；四道守卫绿（`check-encoding` 1649 / 0 bad）；
+`runClient` 到 `Sound engine started`，11 个基岩方块模型的 bbox 日志全部照常打印，
+`crash-reports/` 为空。**观感仍需真人确认**：玻璃框线是否回到罩子边上、
+上一轮圈出来的那块斜板是否回到玻璃里。

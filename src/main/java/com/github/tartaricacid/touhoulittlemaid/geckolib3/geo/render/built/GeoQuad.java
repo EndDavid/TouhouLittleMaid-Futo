@@ -44,4 +44,20 @@ public class GeoQuad {
         this(verticesIn, (float) uvCoords[0], (float) uvCoords[1], (float) uvSize[0], (float) uvSize[1], texWidth,
                 texHeight, mirrorIn, directionIn);
     }
+
+    /**
+     * 直接给定 4 个顶点的 (u, v) —— 供基岩格式的 {@code uv_rotation} 使用。
+     *
+     * <p>{@code uvs} 是 8 个数 {@code u0,v0,u1,v1,u2,v2,u3,v3}，按顶点顺序对应。
+     * 上游 {@code FaceItem#getRotatedUVs(texW, texH)} 返回的就是这个形状，
+     * 这里只照单赋值，不做任何换算（换算在 {@code GeoCube} 里）。</p>
+     */
+    public GeoQuad(GeoVertex[] verticesIn, float[] uvs, Direction directionIn) {
+        this.direction = directionIn;
+        this.vertices = verticesIn;
+        for (int i = 0; i < 4; i++) {
+            this.vertices[i] = verticesIn[i].setTextureUV(uvs[i * 2], uvs[i * 2 + 1]);
+        }
+        this.normal = directionIn.step();
+    }
 }

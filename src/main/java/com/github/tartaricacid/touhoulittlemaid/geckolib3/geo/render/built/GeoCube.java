@@ -113,44 +113,32 @@ public class GeoCube {
             FaceUv up = faces.getUp();
             FaceUv down = faces.getDown();
 
-            quadWest = west == null ? null
-                    : new GeoQuad(new GeoVertex[]{P4, P3, P1, P2}, west.getUv(), west.getUvSize(), textureWidth,
-                    textureHeight, cubeIn.getMirror(), Direction.WEST);
-            quadEast = east == null ? null
-                    : new GeoQuad(new GeoVertex[]{P7, P8, P6, P5}, east.getUv(), east.getUvSize(), textureWidth,
-                    textureHeight, cubeIn.getMirror(), Direction.EAST);
-            quadNorth = north == null ? null
-                    : new GeoQuad(new GeoVertex[]{P3, P7, P5, P1}, north.getUv(), north.getUvSize(), textureWidth,
-                    textureHeight, cubeIn.getMirror(), Direction.NORTH);
-            quadSouth = south == null ? null
-                    : new GeoQuad(new GeoVertex[]{P8, P4, P2, P6}, south.getUv(), south.getUvSize(), textureWidth,
-                    textureHeight, cubeIn.getMirror(), Direction.SOUTH);
-            quadUp = up == null ? null
-                    : new GeoQuad(new GeoVertex[]{P4, P8, P7, P3}, up.getUv(), up.getUvSize(), textureWidth,
-                    textureHeight, cubeIn.getMirror(), Direction.UP);
-            quadDown = down == null ? null
-                    : new GeoQuad(new GeoVertex[]{P1, P5, P6, P2}, down.getUv(), down.getUvSize(), textureWidth,
-                    textureHeight, cubeIn.getMirror(), Direction.DOWN);
+            quadWest = perFace(new GeoVertex[]{P4, P3, P1, P2}, west, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.WEST);
+            quadEast = perFace(new GeoVertex[]{P7, P8, P6, P5}, east, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.EAST);
+            quadNorth = perFace(new GeoVertex[]{P3, P7, P5, P1}, north, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.NORTH);
+            quadSouth = perFace(new GeoVertex[]{P8, P4, P2, P6}, south, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.SOUTH);
+            quadUp = perFace(new GeoVertex[]{P4, P8, P7, P3}, up, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.UP);
+            quadDown = perFace(new GeoVertex[]{P1, P5, P6, P2}, down, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.DOWN);
 
             if (Boolean.TRUE.equals(cubeIn.getMirror()) || Boolean.TRUE.equals(mirror)) {
-                quadWest = west == null ? null
-                        : new GeoQuad(new GeoVertex[]{P7, P8, P6, P5}, west.getUv(), west.getUvSize(), textureWidth,
-                        textureHeight, cubeIn.getMirror(), Direction.WEST);
-                quadEast = east == null ? null
-                        : new GeoQuad(new GeoVertex[]{P4, P3, P1, P2}, east.getUv(), east.getUvSize(), textureWidth,
-                        textureHeight, cubeIn.getMirror(), Direction.EAST);
-                quadNorth = north == null ? null
-                        : new GeoQuad(new GeoVertex[]{P3, P7, P5, P1}, north.getUv(), north.getUvSize(), textureWidth,
-                        textureHeight, cubeIn.getMirror(), Direction.NORTH);
-                quadSouth = south == null ? null
-                        : new GeoQuad(new GeoVertex[]{P8, P4, P2, P6}, south.getUv(), south.getUvSize(), textureWidth,
-                        textureHeight, cubeIn.getMirror(), Direction.SOUTH);
-                quadUp = up == null ? null
-                        : new GeoQuad(new GeoVertex[]{P1, P5, P6, P2}, up.getUv(), up.getUvSize(), textureWidth,
-                        textureHeight, cubeIn.getMirror(), Direction.UP);
-                quadDown = down == null ? null
-                        : new GeoQuad(new GeoVertex[]{P4, P8, P7, P3}, down.getUv(), down.getUvSize(), textureWidth,
-                        textureHeight, cubeIn.getMirror(), Direction.DOWN);
+                quadWest = perFace(new GeoVertex[]{P7, P8, P6, P5}, west, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.WEST);
+                quadEast = perFace(new GeoVertex[]{P4, P3, P1, P2}, east, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.EAST);
+                quadNorth = perFace(new GeoVertex[]{P3, P7, P5, P1}, north, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.NORTH);
+                quadSouth = perFace(new GeoVertex[]{P8, P4, P2, P6}, south, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.SOUTH);
+                quadUp = perFace(new GeoVertex[]{P1, P5, P6, P2}, up, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.UP);
+                quadDown = perFace(new GeoVertex[]{P4, P8, P7, P3}, down, textureWidth, textureHeight,
+                    cubeIn.getMirror(), Direction.DOWN);
             }
         } else {
             double[] uv = cubeIn.getUv().boxUVCoords;
@@ -251,5 +239,70 @@ public class GeoCube {
         }
 
         return cube;
+    }
+
+    /**
+     * per-face UV 的四边形，并按 {@code uv_rotation} 旋转贴图矩形。
+     *
+     * <p>基岩格式允许每个面单独写 {@code "uv_rotation": 180}，意思和原版模型里
+     * 「把这张贴图转 180°」一样。上游（1.20.1 jar 里的 simplebedrockmodel）在
+     * {@code FaceItem#getRotatedUVs(texW, texH)} 里处理它，返回 8 个数
+     * {@code u0,v0,u1,v1,u2,v2,u3,v3} 直接按顶点顺序赋值；本移植版此前完全没有这个字段，
+     * 于是所有带 {@code uv_rotation} 的面都被当成「没转」采样。</p>
+     *
+     * <p>零食柜的玻璃罩正好全是 {@code 180}：外框、内框、两块斜板、玻璃片都带它。
+     * 忽略之后框线/亮点落到了矩形的另一侧，看上去就是「玻璃显示不对、斜角多出一块」。</p>
+     *
+     * <p>{@code mirror} 与 {@code uv_rotation} 同时出现时仍走旧路径：上游 per-face
+     * 分支本身也不处理 mirror，这里不替它做决定。</p>
+     */
+    private static GeoQuad perFace(GeoVertex[] vertices, FaceUv face, float texWidth, float texHeight,
+                                   Boolean cubeMirror, Direction direction) {
+        if (face == null) {
+            return null;
+        }
+        Integer rotation = face.getUvRotation();
+        if (rotation == null || rotation == 0 || Boolean.TRUE.equals(cubeMirror)) {
+            return new GeoQuad(vertices, face.getUv(), face.getUvSize(), texWidth, texHeight, cubeMirror, direction);
+        }
+        double[] uv = face.getUv();
+        double[] size = face.getUvSize();
+        float u1 = (float) (uv[0] / texWidth);
+        float v1 = (float) (uv[1] / texHeight);
+        float u2 = (float) ((uv[0] + size[0]) / texWidth);
+        float v2 = (float) ((uv[1] + size[1]) / texHeight);
+        float[] uvs = new float[8];
+        if (rotation == 90) {
+            uvs[0] = u1;
+            uvs[1] = v1;
+            uvs[2] = u1;
+            uvs[3] = v2;
+            uvs[4] = u2;
+            uvs[5] = v2;
+            uvs[6] = u2;
+            uvs[7] = v1;
+        } else if (rotation == 180) {
+            uvs[0] = u1;
+            uvs[1] = v2;
+            uvs[2] = u2;
+            uvs[3] = v2;
+            uvs[4] = u2;
+            uvs[5] = v1;
+            uvs[6] = u1;
+            uvs[7] = v1;
+        } else if (rotation == 270) {
+            uvs[0] = u2;
+            uvs[1] = v2;
+            uvs[2] = u2;
+            uvs[3] = v1;
+            uvs[4] = u1;
+            uvs[5] = v1;
+            uvs[6] = u1;
+            uvs[7] = v2;
+        } else {
+            // 非法角度：退回「不转」，与上游 default 分支一致
+            return new GeoQuad(vertices, face.getUv(), face.getUvSize(), texWidth, texHeight, cubeMirror, direction);
+        }
+        return new GeoQuad(vertices, uvs, direction);
     }
 }
