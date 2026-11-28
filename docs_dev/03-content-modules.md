@@ -3147,12 +3147,41 @@ javap -p -c -cp <jar> com.github.tartaricacid.touhoulittlemaid.init.InitCreative
 `assets/touhou_little_maid/blockstates/` 下：我们 **16** 个、1.18.2 上游 15 个、1.20.1 上游 16 个。
 唯一的差集就是 `snack_cabinet`（1.20.1 新方块，已移植），没有缺的。
 
-### 顺带发现：jar 里躺着一个 14 MB 的死包
+### 顺带发现：jar 里躺着一个 14 MB 的死包（已删除）
 
 `src/main/resources/assets/touhou_little_maid/tlm_custom_pack/touhou_little_maid-1.0.0.zip`
 （14 MB）是从上游资源树原样拷进来的，会整包进 jar。但本移植版的内置模型是**展开成普通资源**
 的，`CustomPackLoader#scan()` 只扫 `FabricLoader.getGameDir()/tlm_custom_pack/`，
-`GetJarResources` 也只被 `AvailableSites` 用来读那一份 yml —— **没有任何代码去读 jar 里这份 zip**。
-它里面的 `model_id` 与展开后的 `assets/<ns>/maid_model.json` 完全相同，将来若有人误加一条
-「读 jar 内包」的分支，会立刻变成重复注册。删掉它 jar 能少掉三分之一（39 MB → 约 25 MB）。
+`GetJarResources` 也只被 `AvailableSites` 用来读 `/assets/<modid>/config/*.yml` ——
+**没有任何代码去读 jar 里这份 zip**，而它的 `model_id` 与展开后的
+`assets/<ns>/maid_model.json` 完全相同，将来若有人误加一条「读 jar 内包」的分支，
+会立刻变成重复注册。
 
+**已删除**。同目录的 `default_chat_bubble.json` 必须留：`ChatBubbleScripts` 用的是硬编码路径
+`assets/touhou_little_maid/tlm_custom_pack/default_chat_bubble.json`。
+
+删除前后的实测：
+
+| | 删除前 | 删除后 |
+|---|---|---|
+| `build/libs/*.jar` | 39 MB | **26 MB** |
+| jar 内 `.zip` 条目 | 1 个（14 MB） | **0** |
+| `models/entity/*.json` | 179 | 179（不变） |
+| `maid_model.json` 条目 | 194 | 194（不变） |
+| `maid_chair.json` 条目 | 58 | 58（不变） |
+
+额外做的完整性核对（脚本遍历 `assets/<ns>/maid_model.json` 与 `maid_chair.json`）：
+
+```
+模型条目: 194   模型文件缺失/解析失败: 0   首张贴图缺失: 0
+缺失的 .json 动画: 0   缺失的 .js 动画: 324（旧 JS 引擎格式，本移植版本来就不加载）
+坐垫条目: 58    模型文件缺失: 0
+```
+
+`build` 绿、四道守卫绿；`runClient` 冒烟到 `Sound engine started`，
+`latest.log` 里 `missing model` / `missing texture` / `Unable to load model` 均为 0 条，
+`run/crash-reports/` 为空。
+
+> 校验脚本有个坑值得记：`model_list` 里少数条目（如 `hakurei_reimu_2`）的 `model` 字段
+> **自带 `.json` 后缀**，其余不带。拼接时若无条件补 `.json`，会得到 `xxx.json.json` 而误报
+> 「模型文件缺失」——第一次就是这么误判了两条。
