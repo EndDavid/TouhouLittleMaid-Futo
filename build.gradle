@@ -44,8 +44,7 @@ dependencies {
 	compileOnly "com.google.code.findbugs:jsr305:3.0.2"
 
 	// Forge Config API Port：上游 TLMO 1.20.1 也用它，因此这里直接复用它提供的
-	// net.minecraftforge.common.ForgeConfigSpec，配置代码可以按上游原样搬运，不必自造轮子。
-	//
+	// net.minecraftforge.common.ForgeConfigSpec
 	// 用 libs/ 下的本地 jar：离线构建可用，版本也钉死不会漂移。
 	// 注意：Loom 的 include（JiJ 打包）只接受模块坐标，不接受本地文件，
 	// 因此这两个库需要在运行时另外安装（与上游 TLMO 的做法一致，
@@ -57,17 +56,8 @@ dependencies {
 	modCompileOnly files("libs/Patchouli-1.18.2-71.1-FABRIC.jar")
 	modLocalRuntime files("libs/Patchouli-1.18.2-71.1-FABRIC.jar")
 	// night-config：ForgeConfigAPIPort 的配置读写依赖它。
-	//
-	// 原版 ForgeConfigAPIPort 是把这两个 jar 作为 JiJ（jar-in-jar）内嵌的，
-	// 但 Loom 只对「正规模块坐标依赖」展开嵌套 jar，对 files() 本地文件不展开 ——
-	// 于是开发环境启动时会报「requires any version of
-	// com_electronwill_night-config_core, which is missing」。
-	//
-	// 解决办法：把它们从 ForgeConfigAPIPort 的 META-INF/jars 里解出来，
-	// 单独作为模组依赖加入（这两个 jar 自带 fabric.mod.json，mod id 正是
-	// com_electronwill_night-config_core / _toml，因此加载器能直接认到）。
-	// 必须是 modImplementation（而非 compileOnly）：既要在编译期解析
-	// ModLoadingContext#registerConfig 的签名，也要在运行期出现在 classpath 上。
+
+	// 展开 FCAP 的 JiJ
 	modImplementation files("libs/core-3.6.5.jar")
 	modImplementation files("libs/toml-3.6.5.jar")
 
@@ -107,7 +97,6 @@ dependencies {
         // me.shedaniel.rei.api.client.plugins.REIClientPlugin 实现，并把它登记在
         // fabric.mod.json 的 rei_client 入口点里 —— REI 启动时才会去找这个入口点，
         // 没装 REI 时这段代码根本不会被加载，所以这里是可选依赖（compileOnly），
-        // 绝不写进 fabric.mod.json 的 depends。
         //
         // 注意 REI 8.4.778 的 jar 里没有声明对 architectury 的依赖（虽然它的核心类
         // 直接引用 dev.architectury.platform.*），所以编译期必须把 architectury 也放上
@@ -168,47 +157,22 @@ dependencies {
         // 因此本联动的验证只能到「注解进得了 class 文件 + 缺 IPN 时不报错」这一层。
         modCompileOnly files("libs/InventoryProfilesNext-fabric-1.18.2-1.10.20.jar")
 
-        // ------------------------------------------------------------------ 可选联动（农夫乐事）
+        // 农夫乐事
         //
         // 上游 compat/farmersdelight 只做一件事：让女仆能「偷吃」派（PieBlock）与盛宴（FeastBlock）。
-        // 它依赖的是 1.20.1 才引入的「方块类食物」体系（api/block/IMaidEdibleBlock 等），
-        // 上游 1.18.2 根本没有这套东西 —— 所以本轮先把那套基础设施一起移植过来了。
-        //
-        // 编译期需要农夫乐事的类（PieBlock / FeastBlock / getServingsProperty），
-        // 所以是 modCompileOnly；运行期由 FarmersDelightCompat 先 isModLoaded 再加载实现类，
-        // 没装时那段代码一行都不会被链接。
-        //
-        // 与 IPN 不同，它没有额外的硬前置，所以带进开发环境是安全的：
         // 想验「装了农夫乐事」那条分支时加 -PfarmersDelightRuntime。
         modCompileOnly files("libs/farmers-delight-fabric-1.18.2-1.2.5.hotfix.jar")
 
-        // 注：饰品（Curios）联动本轮未做 —— 上游 1.18.2 没有 compat/curios，
-        // 1.20.1 的 Fabric 版对接的是 Accessories，两者都不对接 Trinkets。详见 docs_dev/03。
         if (project.hasProperty('farmersDelightRuntime')) {
             modLocalRuntime files("libs/farmers-delight-fabric-1.18.2-1.2.5.hotfix.jar")
         }
 
-        // ------------------------------------------------------------------ 可选联动（Iris）
-        //
-        // Iris 是 Oculus 在 Fabric 侧的等价物（上游 TLMO 1.20.1 的注释就写着
-        // "Fabric: Oculus->Iris"）。我们的代码只用 FabricLoader#isModLoaded("iris")
-        // 做判断，<b>不引用 Iris 的任何类型</b>，所以这里没有编译期依赖。
-        //
-        // 想真的验证一次「装了 Iris 的那条分支」时加 -PirisRuntime：
-        // 它会顺手把 Iris 与它要求的 Sodium 一起放进开发环境。
-        // 默认不加载 —— 光影会改变所有渲染结果，日常验证不该带上它。
-        // 用法：gradlew runClient -PirisRuntime
+        // Iris
+        // gradlew runClient -PirisRuntime
         if (project.hasProperty('irisRuntime')) {
             modLocalRuntime files("libs/iris-mc1.18.2-1.6.5.jar")
             modLocalRuntime files("libs/sodium-fabric-mc1.18.2-0.4.1+build.15.jar")
-            // JOML：Sodium 1.18.2 把它作为 JiJ 内嵌在 META-INF/jars/joml-1.10.2.jar 里，
-            // 而 Loom **不展开 files() 本地依赖的嵌套 jar**（与 fiber / night-config 同一个坑）。
-            // 第一次试的时候就是这样炸的：
-            //   Mixin transformation of net.minecraft.client.renderer.culling.Frustum failed
-            //   Caused by: ClassNotFoundException: org.joml.Matrix4f
-            //            at sodium.mixins.json:core.MixinFrustum
-            // 所以从这里把 Sodium 自带的那份 JOML 解出来放进 libs/，按普通库载
-            // （它没有 fabric.mod.json，所以是 implementation 而不是 modLocalRuntime）。
+            // JOML：Sodium 1.18.2 把它作为 JiJ 内嵌在 META-INF/jars/joml-1.10.2.jar 里
             implementation files("libs/joml-1.10.2.jar")
         }
 
@@ -222,12 +186,7 @@ processResources {
 	}
 }
 
-// 固定开发客户端的玩家名。
-//
-// Loom 默认每次启动都会随机生成一个玩家名（日志里的 "Setting user: Player857"），
-// 而离线模式下的 UUID 是 MD5("OfflinePlayer:" + name) —— 名字一变 UUID 就变，
-// 于是「上一轮训好的女仆」在新的一轮里 owner 对不上，表现为【女仆完全无法交互】。
-// 固定名字后 UUID 稳定，跨次启动的存档数据才有意义。
+// 固定开发客户端的玩家名
 loom {
 	runs {
 		client {
@@ -242,29 +201,16 @@ loom {
 			//   gradlew runServer            （另开一个终端）
 			//   gradlew runClient -PjoinServer
 			// 然后用 RCON 在玩家脚边 /summon 目标实体。
-			// 不带这个属性时行为与以前完全一致。
 			if (project.hasProperty('joinServer')) {
 				programArgs "--server", "127.0.0.1", "--port", "25565"
 			}
-			// 配置界面自检。加 -PclothSelftest 启动时会给客户端 JVM 带上
-			// -Dfuto.cloth.selftest=true，于是 compat/cloth/ClothConfigSelfTest
-			// 会在标题画面出现后自动构建、打开并保存一次配置界面，把结果写进日志。
-			//
-			// 为什么用 Gradle 属性而不是直接 jvmArgs 常量：日常构建与 runClient
-			// 不该带上它 —— 自检会把界面顶到前台，还会改一次 toml（随即还原）。
-			// 用法：gradlew runClient -PclothSelftest
+			// 配置界面自检
+			// gradlew runClient -PclothSelftest
 			if (project.hasProperty('clothSelftest')) {
 				vmArgs "-Dfuto.cloth.selftest=true"
 			}
-			// 在线模型包下载界面的自检。加 -PdownloadSelftest 会带上
-			// -Dfuto.download.selftest=true，于是客户端在标题画面稳定后
-			// 自动 setScreen(new ModelDownloadGui())，让这个纯 Screen 的
-			// init / render 真正跑若干帧并把任何异常打进日志。
-			//
-			// 为什么需要它：这个界面不属于任何 MenuType，没有「进世界再点」
-			// 之外的入口；而它自己画的东西很多（九宫格气泡、进度条、EditBox、
-			// 类型图标），只靠 build 绿是验不到运行时异常的。
-			// 用法：gradlew runClient -PdownloadSelftest
+			// 在线模型包下载界面的自检
+			// gradlew runClient -PdownloadSelftest
 			if (project.hasProperty('downloadSelftest')) {
 				vmArgs "-Dfuto.download.selftest=true"
 			}
@@ -279,7 +225,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 java {
-	// 编译与运行游戏都用 JDK 17（Gradle 守护进程本身需要 21，由 JAVA_HOME 提供）。
+	// 编译与运行游戏都用 JDK 17（Gradle 守护进程本身需要 21，由 JAVA_HOME 提供）
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(17)
 	}
@@ -293,19 +239,6 @@ jar {
 
 	// ------------------------------------------------------------------
 	// 把三个「纯 Java、且不是 mod」的库合并进主 jar。
-	//
-	// 为什么必须这样：`implementation files(...)` 只把它们放到 Gradle 的
-	// runtimeClasspath 上 —— 也就是**只对 `gradlew runClient` 有效**。产出的 jar
-	// 里没有它们，玩家把 jar 丢进自己的 mods 目录后会在启动阶段炸：
-	//
-	//   java.lang.NoClassDefFoundError: org/yaml/snakeyaml/Yaml
-	//       at ...ai.manager.setting.AvailableSites.readSites
-	//       at ...config.subconfig.AIConfig.init
-	//
-	// 也不能改用 Loom 的 `include`：那会把 jar 塞进 META-INF/jars 交给 Fabric Loader
-	// 当作**独立 mod** 加载，而这三个 jar 里都没有 fabric.mod.json，加载器会拒绝。
-	// 所以直接把类合并进来。
-	//
 	// 排除项只留「合并后会坏掉」的那几类：
 	//   - MANIFEST / 签名：多个 MANIFEST 合并没有意义，签名与合并后的内容也不再匹配；
 	//   - module-info：snakeyaml 带 META-INF/versions/9/module-info.class（multi-release），
@@ -350,6 +283,7 @@ jar {
 // 都不受影响；被检查的 WirelessIOTransfer 用的是 main 的编译产物，也就是真正会打进
 // jar 的那一份。
 // ---------------------------------------------------------------------------
+/*
 sourceSets {
         verify {
                 java.srcDirs = ['port/verify-wireless-io']
@@ -366,8 +300,4 @@ tasks.register('verifyWirelessIo', JavaExec) {
         mainClass = 'com.github.tartaricacid.touhoulittlemaid.item.bauble.TransferCheck'
 }
 
-// 说明：这里故意不声明 loom.accessWidenerPath。
-// 上游用 Forge AT 打开了 SensorType/Activity/MemoryModuleType 的私有构造函数与
-// Brain#lastScheduleUpdate，本移植版改为「反射 + 行为自带时间戳」实现（见 MaidReflection），
-// 因为 Loom 1.15 要求 classTweaker 表头、而 Fabric Loader 0.14.25 只认 accessWidener 表头，
-// 同一份文件无法同时满足两者。
+ */
