@@ -1,7 +1,9 @@
 package com.github.tartaricacid.touhoulittlemaid.tileentity;
 
+import com.github.tartaricacid.touhoulittlemaid.block.BlockSnackCabinet;
 import com.github.tartaricacid.touhoulittlemaid.init.InitBlocks;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -33,8 +35,14 @@ import net.minecraft.world.level.block.state.BlockState;
  * 前者自带 {@code LootTable} 支持，柜子因此可以被战利品表填充（上游同样）。</p>
  *
  * <p><b>开关盖的音效</b>：{@link ContainerOpenersCounter} 负责统计「现在有几个玩家开着它」，
- * 从 0 变 1 时播放开盖音、从 1 变 0 时播放关盖音。这套是原版箱子的做法，
+ * 从 0 变 1 时播放开盖音、从 1 变 0 时播放关盖音。这套是原版箱子 / 木桶的做法，
  * 用它可以避免多个玩家同时开同一个柜子时音效乱掉。</p>
+ *
+ * <p>音效本身是<b>木桶</b>的（{@link SoundEvents#BARREL_OPEN} / {@link SoundEvents#BARREL_CLOSE}），
+ * 不是箱子的。上游用的也正是这两个：反编译 1.20.1 的 {@code TileEntitySnackCabinet$1} 可见
+ * {@code onOpen} 取 {@code SoundEvents.f_11725_}、{@code onClose} 取 {@code f_11724_}，
+ * 而按 1.18.2 的 srg → mojmap 映射反查，{@code f_11725_} = {@code BARREL_OPEN}、
+ * {@code f_11724_} = {@code BARREL_CLOSE}。箱子那对「吱呀」声配木质柜子确实不搭。</p>
  */
 public class TileEntitySnackCabinet extends RandomizableContainerBlockEntity {
     private static final int SLOT_COUNT = 27;
@@ -44,12 +52,12 @@ public class TileEntitySnackCabinet extends RandomizableContainerBlockEntity {
     private final ContainerOpenersCounter openersCounter = new ContainerOpenersCounter() {
         @Override
         protected void onOpen(net.minecraft.world.level.Level level, BlockPos pos, BlockState state) {
-            TileEntitySnackCabinet.playSound(level, pos, state, SoundEvents.CHEST_OPEN);
+            TileEntitySnackCabinet.playSound(level, pos, state, SoundEvents.BARREL_OPEN);
         }
 
         @Override
         protected void onClose(net.minecraft.world.level.Level level, BlockPos pos, BlockState state) {
-            TileEntitySnackCabinet.playSound(level, pos, state, SoundEvents.CHEST_CLOSE);
+            TileEntitySnackCabinet.playSound(level, pos, state, SoundEvents.BARREL_CLOSE);
         }
 
         @Override
@@ -148,10 +156,12 @@ public class TileEntitySnackCabinet extends RandomizableContainerBlockEntity {
 
     private static void playSound(net.minecraft.world.level.Level level, BlockPos pos, BlockState state,
                                   SoundEvent sound) {
-        // 与上游一致：音源点在方块中心，音量 0.5，音调随方块位置微扰（同一个柜子音调稳定）
-        double x = (double) pos.getX() + 0.5D;
-        double y = (double) pos.getY() + 0.5D;
-        double z = (double) pos.getZ() + 0.5D;
+        // 与上游逐字一致：音源点在「方块中心 + 朝向方向半格」，也就是贴着正面（抽屉面）；
+        // 音量 0.5，音调随位置微扰（同一个柜子音调稳定）。
+        Direction facing = state.getValue(BlockSnackCabinet.FACING);
+        double x = (double) pos.getX() + 0.5D + (double) facing.getStepX() * 0.5D;
+        double y = (double) pos.getY() + 0.5D + (double) facing.getStepY() * 0.5D;
+        double z = (double) pos.getZ() + 0.5D + (double) facing.getStepZ() * 0.5D;
         level.playSound(null, x, y, z, sound, SoundSource.BLOCKS, 0.5F,
                 level.random.nextFloat() * 0.1F + 0.8F);
     }

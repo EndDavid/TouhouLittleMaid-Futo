@@ -3049,3 +3049,24 @@ java.lang.IllegalArgumentException: Container size 27 is smaller than expected 5
 `[Futo] snack cabinet opened by <玩家> at <坐标>`，方块实体缺失时打 `warn`。
 以后再有「点不开」的报告，先看服务端日志有没有这一行，就能立刻分辨
 「没点到 / 没走到 openMenu」还是「打开了但客户端没画」。
+### 开关音效：木桶，不是箱子
+现象：柜子右键打开时是**箱子**的「吱呀」声，与木质柜子不搭。
+查下来是移植时抄错了常量 —— 上游用的正是木桶那一对：
+```
+javap -p -c  <1.20.1 jar>  'TileEntitySnackCabinet$1'
+  onOpen  → getstatic  SoundEvents.f_11725_
+  onClose → getstatic  SoundEvents.f_11724_
+```
+`f_xxxxx_` 是 Forge 编译产物里的 srg 名，反查要两步（两张表都在 loom 缓存里）：
+`srg/1.18.2/srg-mojmap-merged.tsrg` 把 obf 名映到 srg（`aM → f_11724_`、`aN → f_11725_`），
+`forge/mojmap.tsrg2` 把同一个 obf 名映到 Mojang 名（`aM → BARREL_CLOSE`、`aN → BARREL_OPEN`）。
+所以上游 = `BARREL_OPEN` / `BARREL_CLOSE`；本移植版原先写的 `CHEST_OPEN` / `CHEST_CLOSE` 是错的，
+现在改回木桶。
+顺带把音源点也对齐了上游：不是方块中心，而是「中心 + 朝向半格」
+（反编译 `playSound` 可见 `BlockSnackCabinet.FACING` → `Direction#step()` → 各轴 `+ step * 0.5`），
+也就是声音贴着正面（抽屉面）发出。音量 0.5、音调 `random * 0.1 + 0.8` 原本就与上游一致。
+验证：`build` 绿；四个自检脚本绿（`check-encoding` 1650 文件 / 0 坏、`check-jar`、
+`check-renderers` 11/11 + 14/12、`check-dangling`）；`runServer -PsnackSelftest` 仍然 PASS ——
+自检里那四次 `openMenu` 都会走 `startOpen → onOpen → playSound`，
+所以「换音效没把打开流程弄坏」是有证据的。
+**没验的**：听感。像不像木桶、0.5 音量在这种小方柜上合不合适，要真人上机听。
